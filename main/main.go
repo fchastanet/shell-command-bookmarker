@@ -162,6 +162,11 @@ func (m model) View() string {
 			border.BottomRight = "┤"
 		}
 		style = style.Border(border)
+		tabsCount := len(m.Tabs)
+		style = style.Width(
+			m.width/tabsCount -
+				(style.GetBorderLeftSize() + style.GetBorderRightSize() + m.width%2),
+		)
 		renderedTabs = append(renderedTabs, style.Render(t))
 	}
 
@@ -174,9 +179,7 @@ func (m model) View() string {
 	}
 
 	row := lipgloss.JoinHorizontal(lipgloss.Top, renderedTabs...)
-	//gap := activeTabStyle.Render(strings.Repeat(" ", max(0, m.width-lipgloss.Width(row)-2)))
 	doc.WriteString(row)
-	//doc.WriteString(lipgloss.JoinHorizontal(lipgloss.Bottom, row, gap))
 	doc.WriteString("\n")
 	doc.WriteString(windowStyle.Width((lipgloss.Width(row) - windowStyle.GetHorizontalFrameSize())).Render(m.TabContent[m.activeTab]))
 	doc.WriteString(strings.Repeat("\n", height) + helpView)
@@ -192,7 +195,7 @@ func main() {
 		Tabs:       tabs,
 		TabContent: tabContent,
 	}
-	if _, err := tea.NewProgram(m, tea.WithMouseAllMotion(), tea.WithAltScreen()).Run(); err != nil {
+	if _, err := tea.NewProgram(m, tea.WithMouseAllMotion()).Run(); err != nil {
 		fmt.Println("Error running program:", err)
 		os.Exit(1)
 	}
