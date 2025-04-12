@@ -9,13 +9,17 @@ import (
 	"github.com/charmbracelet/lipgloss"
 )
 
+type Tab struct {
+	Title string
+	Model tea.Model
+}
+
 type Tabs struct {
-	Tabs        []string
-	TabsContent []string
-	width       int
-	height      int
-	activeTab   int
-	Keys        keyMap
+	Tabs      []Tab
+	width     int
+	height    int
+	activeTab int
+	Keys      keyMap
 	// styles
 	windowStyle       lipgloss.Style
 	highlightColor    lipgloss.AdaptiveColor
@@ -27,8 +31,7 @@ type Tabs struct {
 }
 
 func NewTabs(
-	tabs []string,
-	tabsContent []string,
+	tabs []Tab,
 	windowStyle lipgloss.Style,
 	highlightColor lipgloss.AdaptiveColor,
 ) *Tabs {
@@ -37,7 +40,6 @@ func NewTabs(
 	inactiveTabStyle := lipgloss.NewStyle().Border(inactiveTabBorder, true).BorderForeground(highlightColor).Padding(0, 1)
 	return &Tabs{
 		Tabs:        tabs,
-		TabsContent: tabsContent,
 		windowStyle: windowStyle,
 		activeTab:   0,
 		Keys: keyMap{
@@ -81,7 +83,14 @@ func tabBorderWithBottom(left, middle, right string) lipgloss.Border {
 }
 
 func (m Tabs) Init() tea.Cmd {
-	return nil
+	var batches []tea.Cmd
+	for _, tab := range m.Tabs {
+		if tab.Model == nil {
+			continue
+		}
+		batches = append(batches, tab.Model.Init())
+	}
+	return tea.Batch(batches...)
 }
 
 func (m Tabs) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -114,7 +123,7 @@ func (m Tabs) View() string {
 
 	var renderedTabs []string
 
-	for i, t := range m.Tabs {
+	for i, tab := range m.Tabs {
 		var style lipgloss.Style
 		isFirst, isLast, isActive := i == 0, i == len(m.Tabs)-1, i == m.activeTab
 		if isActive {
@@ -138,14 +147,14 @@ func (m Tabs) View() string {
 			m.width/tabsCount -
 				(style.GetBorderLeftSize() + style.GetBorderRightSize() + m.width%2),
 		)
-		renderedTabs = append(renderedTabs, style.Render(t))
+		renderedTabs = append(renderedTabs, style.Render(tab.Title))
 	}
 
 	row := lipgloss.JoinHorizontal(lipgloss.Top, renderedTabs...)
 	doc.WriteString(row)
 	doc.WriteString("\n")
 	doc.WriteString(m.windowStyle.Width((lipgloss.Width(row) - m.windowStyle.GetHorizontalFrameSize())).
-		Render(m.TabsContent[m.activeTab]),
+		Render(m.Tabs[m.activeTab].Model.View()),
 	)
 	return doc.String()
 }

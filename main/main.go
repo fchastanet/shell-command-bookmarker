@@ -7,8 +7,10 @@ import (
 
 	"github.com/charmbracelet/bubbles/help"
 	"github.com/charmbracelet/bubbles/key"
+	"github.com/charmbracelet/bubbles/table"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/fchastanet/shell-command-bookmarker/components/customTable"
 	"github.com/fchastanet/shell-command-bookmarker/components/tabs"
 )
 
@@ -67,15 +69,18 @@ var keys = keyMap{
 }
 
 func (m model) Init() tea.Cmd {
-	return m.TabsComponent.Init()
+	// Initialize sub-models
+	return tea.Batch(
+		m.TabsComponent.Init(),
+	)
 }
 
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmds []tea.Cmd
-	tabsModel, tabsCmd := m.TabsComponent.Update(msg)
+	tabsModel, cmd := m.TabsComponent.Update(msg)
 	tabsModelConverted := tabsModel.(tabs.Tabs)
 	m.TabsComponent = &tabsModelConverted
-	cmds = append(cmds, tabsCmd)
+	cmds = append(cmds, cmd)
 
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
@@ -123,15 +128,63 @@ func (m model) View() string {
 	return docStyle.Render(doc.String())
 }
 
+func SearchTableModel() customTable.TableModel {
+	columns := []table.Column{
+		{Title: "Rank", Width: 4},
+		{Title: "City", Width: 10},
+		{Title: "Country", Width: 10},
+		{Title: "Population", Width: 10},
+	}
+	rows := []table.Row{}
+	t := table.New(
+		table.WithColumns(columns),
+		table.WithRows(rows),
+		table.WithFocused(true),
+		table.WithHeight(7),
+	)
+	return *customTable.NewTableModel(t)
+}
+
+func BookmarksTableModel() customTable.TableModel {
+	columns := []table.Column{
+		{Title: "Rank", Width: 4},
+		{Title: "City", Width: 10},
+		{Title: "Country", Width: 10},
+		{Title: "Population", Width: 10},
+	}
+	rows := []table.Row{
+		{"1", "Tokyo", "Japan", "37,274,000"},
+		{"2", "Delhi", "India", "32,065,760"},
+	}
+	t := table.New(
+		table.WithColumns(columns),
+		table.WithRows(rows),
+		table.WithFocused(true),
+		table.WithHeight(7),
+	)
+	return *customTable.NewTableModel(t)
+}
+
 func main() {
-	tabsTitle := []string{"Search", "History", "Bookmarks"}
-	tabContent := []string{"Search Tab", "History Tab", "Bookmarks Tab"}
+	myTabs := []tabs.Tab{
+		{
+			Title: "Search",
+			Model: SearchTableModel(),
+		},
+		{
+			Title: "History",
+			Model: BookmarksTableModel(),
+		},
+		{
+			Title: "Bookmarks",
+			Model: BookmarksTableModel(),
+		},
+	}
 	m := model{
 		keys: keys,
 		help: help.New(),
 		TabsComponent: tabs.NewTabs(
-			tabsTitle,
-			tabContent,
+			myTabs,
 			windowStyle,
 			highlightColor,
 		),
