@@ -85,11 +85,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.width = msg.Width
 		m.height = msg.Height
 	case tea.KeyMsg:
+		m.lastKey = msg.String()
 		switch {
-		case key.Matches(msg, m.keys.Up):
-			m.lastKey = m.keys.Up.Help().Key
-		case key.Matches(msg, m.keys.Down):
-			m.lastKey = m.keys.Down.Help().Key
 		case key.Matches(msg, m.keys.Quit):
 			m.lastKey = m.keys.Quit.Help().Key
 			cmds = append(cmds, tea.Quit)
