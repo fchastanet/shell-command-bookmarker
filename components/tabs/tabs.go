@@ -86,6 +86,10 @@ func (t Tabs) GetInnerFocusableComponents() []focus.Focusable {
 	return nil
 }
 
+func (t Tabs) GetFocusableUniqueId() string {
+	return "tabs"
+}
+
 func tabBorderWithBottom(left, middle, right string) lipgloss.Border {
 	border := lipgloss.RoundedBorder()
 	border.BottomLeft = left

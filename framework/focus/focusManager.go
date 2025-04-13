@@ -42,6 +42,7 @@ func (fm FocusManager) GetKeyBindings() []key.Binding {
 type Focusable interface {
 	IsFocusable() bool
 	GetInnerFocusableComponents() []Focusable
+	GetFocusableUniqueId() string
 	//GetNextFocusableInnerComponent(currentFocusedComponent *string) string
 	//GetPreviousFocusableInnerComponent(currentFocusedComponent *string) string
 }
@@ -189,7 +190,7 @@ func (fm *FocusManager) findNextInLevel(components []Focusable, depth int, curre
 	if depth < len(currentPath) {
 		currentComponent := currentPath[depth]
 		for i, comp := range components {
-			if comp == currentComponent {
+			if comp.GetFocusableUniqueId() == currentComponent.GetFocusableUniqueId() {
 				currentIndex = i
 				break
 			}
