@@ -45,7 +45,7 @@ func TestFindNextFocusableComponent(t *testing.T) {
 	t.Run("single component", func(t *testing.T) {
 		fm := NewFocusManager()
 		root := createFocusable("root", true, nil)
-		fm.focusableHierarchy = []Focusable{root}
+		fm.rootComponents = []Focusable{root}
 
 		next := fm.findNextFocusableComponent()
 		assert.Equal(t, root, next)
@@ -56,7 +56,7 @@ func TestFindNextFocusableComponent(t *testing.T) {
 		fm := NewFocusManager()
 		root1 := createFocusable("root1", true, nil)
 		root2 := createFocusable("root2", true, nil)
-		fm.focusableHierarchy = []Focusable{root1, root2}
+		fm.rootComponents = []Focusable{root1, root2}
 
 		next := fm.findNextFocusableComponent()
 		assert.Equal(t, root1, next)
@@ -67,7 +67,7 @@ func TestFindNextFocusableComponent(t *testing.T) {
 		fm := NewFocusManager()
 		root1 := createFocusable("root1", true, nil)
 		root2 := createFocusable("root2", true, nil)
-		fm.focusableHierarchy = []Focusable{root1, root2}
+		fm.rootComponents = []Focusable{root1, root2}
 		fm.focusedHierarchy = []Focusable{root1}
 
 		next := fm.findNextFocusableComponent()
@@ -80,7 +80,7 @@ func TestFindNextFocusableComponent(t *testing.T) {
 		root1 := createFocusable("root1", true, nil)
 		root2 := createFocusable("root2", false, nil) // Not focusable
 		root3 := createFocusable("root3", true, nil)
-		fm.focusableHierarchy = []Focusable{root1, root2, root3}
+		fm.rootComponents = []Focusable{root1, root2, root3}
 		fm.focusedHierarchy = []Focusable{root1}
 
 		next := fm.findNextFocusableComponent()
@@ -92,7 +92,7 @@ func TestFindNextFocusableComponent(t *testing.T) {
 		fm := NewFocusManager()
 		root1 := createFocusable("root1", true, nil)
 		root2 := createFocusable("root2", true, nil)
-		fm.focusableHierarchy = []Focusable{root1, root2}
+		fm.rootComponents = []Focusable{root1, root2}
 		fm.focusedHierarchy = []Focusable{root2}
 
 		next := fm.findNextFocusableComponent()
@@ -106,7 +106,7 @@ func TestFindNextFocusableComponent(t *testing.T) {
 		child2 := createFocusable("child2", true, nil)
 		parent := createFocusable("parent", true, []Focusable{child1, child2})
 		root2 := createFocusable("root2", true, nil)
-		fm.focusableHierarchy = []Focusable{parent, root2}
+		fm.rootComponents = []Focusable{parent, root2}
 		fm.focusedHierarchy = []Focusable{}
 
 		next := fm.findNextFocusableComponent()
@@ -120,7 +120,7 @@ func TestFindNextFocusableComponent(t *testing.T) {
 		child2 := createFocusable("child2", true, nil)
 		parent := createFocusable("parent", true, []Focusable{child1, child2})
 		root2 := createFocusable("root2", true, nil)
-		fm.focusableHierarchy = []Focusable{parent, root2}
+		fm.rootComponents = []Focusable{parent, root2}
 		fm.focusedHierarchy = []Focusable{parent, child1}
 
 		next := fm.findNextFocusableComponent()
@@ -134,7 +134,7 @@ func TestFindNextFocusableComponent(t *testing.T) {
 		child2 := createFocusable("child2", true, nil)
 		parent := createFocusable("parent", true, []Focusable{child1, child2})
 		root2 := createFocusable("root2", true, nil)
-		fm.focusableHierarchy = []Focusable{parent, root2}
+		fm.rootComponents = []Focusable{parent, root2}
 		fm.focusedHierarchy = []Focusable{parent, child2}
 
 		next := fm.findNextFocusableComponent()
@@ -154,7 +154,7 @@ func TestFindNextFocusableComponent(t *testing.T) {
 		parent := createFocusable("parent", true, []Focusable{child1, child2})
 		root2 := createFocusable("root2", true, nil)
 
-		fm.focusableHierarchy = []Focusable{parent, root2}
+		fm.rootComponents = []Focusable{parent, root2}
 		fm.focusedHierarchy = []Focusable{}
 
 		next := fm.findNextFocusableComponent()
@@ -173,7 +173,7 @@ func TestFindNextFocusableComponent(t *testing.T) {
 		child2 := createFocusable("child2", true, nil)
 		parent := createFocusable("parent", true, []Focusable{child1, child2})
 		root2 := createFocusable("root2", true, nil)
-		fm.focusableHierarchy = []Focusable{parent, root2}
+		fm.rootComponents = []Focusable{parent, root2}
 		fm.focusedHierarchy = []Focusable{parent, child1, grandchild}
 
 		next := fm.findNextFocusableComponent()

@@ -8,11 +8,11 @@ import (
 )
 
 type FocusManager struct {
-	keys               keyMap
-	lastKey            string
-	focusedHierarchy   []Focusable
-	focusableHierarchy []Focusable
-	terminalFocused    bool
+	keys             keyMap
+	lastKey          string
+	focusedHierarchy []Focusable
+	rootComponents   []Focusable
+	terminalFocused  bool
 }
 
 // keyMap defines a set of keybindings. To work for help it must satisfy
@@ -59,11 +59,11 @@ type ComponentBlurMsg struct {
 
 func NewFocusManager() *FocusManager {
 	return &FocusManager{
-		keys:               keys,
-		lastKey:            "",
-		terminalFocused:    true,
-		focusedHierarchy:   []Focusable{},
-		focusableHierarchy: []Focusable{},
+		keys:             keys,
+		lastKey:          "",
+		terminalFocused:  true,
+		focusedHierarchy: []Focusable{},
+		rootComponents:   []Focusable{},
 	}
 }
 
@@ -71,14 +71,15 @@ func (fm *FocusManager) IsTerminalFocused() bool {
 	return fm.terminalFocused
 }
 
-func (fm *FocusManager) SetFocusableHierarchy(hierarchy []Focusable) {
-	fm.focusableHierarchy = hierarchy
+func (fm *FocusManager) SetRootComponents(hierarchy []Focusable) {
+	fm.rootComponents = hierarchy
 }
+func (fm *FocusManager) GetRootComponents() []Focusable {
+	return fm.rootComponents
+}
+
 func (fm *FocusManager) SetFocusedHierarchy(hierarchy []Focusable) {
 	fm.focusedHierarchy = hierarchy
-}
-func (fm *FocusManager) GetFocusableHierarchy() []Focusable {
-	return fm.focusableHierarchy
 }
 func (fm *FocusManager) GetFocusedHierarchy() []Focusable {
 	return fm.focusedHierarchy
@@ -137,7 +138,7 @@ func (fm *FocusManager) FocusNextComponent() tea.Cmd {
 
 // findNextFocusableComponent uses recursion to find the next component to focus
 func (fm *FocusManager) findNextFocusableComponent() Focusable {
-	return fm.findNextInLevel(fm.focusableHierarchy, 0, fm.focusedHierarchy)
+	return fm.findNextInLevel(fm.rootComponents, 0, fm.focusedHierarchy)
 }
 
 // findNextInLevel recursively searches for the next focusable component
