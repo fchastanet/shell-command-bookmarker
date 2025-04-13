@@ -23,7 +23,7 @@ type model struct {
 	height        int
 	help          help.Model
 	TabsComponent tabs.Tabs
-	FocusManager  focus.FocusManager
+	FocusManager  *focus.FocusManager
 }
 
 // keyMap defines a set of keybindings. To work for help it must satisfy
@@ -71,6 +71,20 @@ var keys = keyMap{
 	),
 }
 
+func (m model) IsFocusable() bool {
+	return true
+}
+
+func (m model) GetInnerFocusableComponents() []focus.Focusable {
+	return []focus.Focusable{
+		m.TabsComponent,
+	}
+}
+
+func (m model) GetFocusableUniqueId() string {
+	return "main"
+}
+
 func (m model) Init() tea.Cmd {
 	// Initialize sub-models
 	return tea.Batch(
@@ -83,7 +97,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmds []tea.Cmd
 	//Update focus manager model
 	focusManagerModel, cmd := m.FocusManager.Update(msg)
-	m.FocusManager = focusManagerModel.(focus.FocusManager)
+	focusModel := focusManagerModel.(focus.FocusManager)
+	m.FocusManager = &focusModel
 	cmds = append(cmds, cmd)
 
 	// Update tabs model
@@ -203,13 +218,13 @@ func main() {
 		highlightColor,
 		*focusManager,
 	)
-	focusManager.SetFocusableHierarchy([]focus.Focusable{tabsModel})
 	m := model{
 		keys:          keys,
 		help:          help.New(),
 		TabsComponent: *tabsModel,
-		FocusManager:  *focusManager,
+		FocusManager:  focusManager,
 	}
+	focusManager.SetRootComponents([]focus.Focusable{&m})
 	if _, err := tea.NewProgram(
 		m,
 		tea.WithReportFocus(),
