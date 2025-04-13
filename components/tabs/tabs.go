@@ -15,11 +15,12 @@ type Tab struct {
 }
 
 type Tabs struct {
-	Tabs      []Tab
-	width     int
-	height    int
-	activeTab int
-	Keys      keyMap
+	Tabs            []Tab
+	width           int
+	height          int
+	activeTab       int
+	Keys            keyMap
+	terminalFocused bool
 	// styles
 	windowStyle       lipgloss.Style
 	highlightColor    lipgloss.AdaptiveColor
@@ -39,17 +40,18 @@ func NewTabs(
 	activeTabBorder := tabBorderWithBottom("┘", " ", "└")
 	inactiveTabStyle := lipgloss.NewStyle().Border(inactiveTabBorder, true).BorderForeground(highlightColor).Padding(0, 1)
 	return &Tabs{
-		Tabs:        tabs,
-		windowStyle: windowStyle,
-		activeTab:   0,
+		Tabs:            tabs,
+		windowStyle:     windowStyle,
+		activeTab:       0,
+		terminalFocused: false,
 		Keys: keyMap{
 			Left: key.NewBinding(
-				key.WithKeys("left", "p", "shift+tab"),
-				key.WithHelp("←/p/Shift-↔", "move tab left"),
+				key.WithKeys("left", "p"),
+				key.WithHelp("←/p", "move tab left"),
 			),
 			Right: key.NewBinding(
-				key.WithKeys("right", "n", "tab"),
-				key.WithHelp("→/n/↔", "move tab right"),
+				key.WithKeys("right", "n"),
+				key.WithHelp("→/n", "move tab right"),
 			),
 		},
 		inactiveTabBorder: inactiveTabBorder,
@@ -98,7 +100,14 @@ func (m Tabs) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
 		m.height = msg.Height
+	case tea.FocusMsg:
+		m.terminalFocused = true
+	case tea.BlurMsg:
+		m.terminalFocused = false
 	case tea.KeyMsg:
+		if !m.terminalFocused {
+			return m, nil
+		}
 		switch {
 		case key.Matches(msg, m.Keys.Right):
 			if m.activeTab == len(m.Tabs)-1 {

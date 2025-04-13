@@ -15,13 +15,14 @@ import (
 )
 
 type model struct {
-	keys          keyMap
-	mouseEvent    tea.MouseEvent
-	lastKey       string
-	width         int
-	height        int
-	help          help.Model
-	TabsComponent *tabs.Tabs
+	keys            keyMap
+	mouseEvent      tea.MouseEvent
+	lastKey         string
+	width           int
+	height          int
+	help            help.Model
+	TabsComponent   *tabs.Tabs
+	terminalFocused bool
 }
 
 // keyMap defines a set of keybindings. To work for help it must satisfy
@@ -89,6 +90,10 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.help.Width = msg.Width
 		m.width = msg.Width
 		m.height = msg.Height
+	case tea.FocusMsg:
+		m.terminalFocused = true
+	case tea.BlurMsg:
+		m.terminalFocused = false
 	case tea.KeyMsg:
 		m.lastKey = msg.String()
 		switch {
@@ -188,8 +193,12 @@ func main() {
 			windowStyle,
 			highlightColor,
 		),
+		terminalFocused: true, // assume we start focused
 	}
-	if _, err := tea.NewProgram(m).Run(); err != nil {
+	if _, err := tea.NewProgram(
+		m,
+		tea.WithReportFocus(),
+	).Run(); err != nil {
 		fmt.Println("Error running program:", err)
 		os.Exit(1)
 	}
