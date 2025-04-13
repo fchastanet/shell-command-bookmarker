@@ -12,17 +12,17 @@ import (
 	"github.com/charmbracelet/lipgloss"
 	"github.com/fchastanet/shell-command-bookmarker/components/customTable"
 	"github.com/fchastanet/shell-command-bookmarker/components/tabs"
+	"github.com/fchastanet/shell-command-bookmarker/framework/focus"
 )
 
 type model struct {
-	keys            keyMap
-	mouseEvent      tea.MouseEvent
-	lastKey         string
-	width           int
-	height          int
-	help            help.Model
-	TabsComponent   *tabs.Tabs
-	terminalFocused bool
+	keys          keyMap
+	mouseEvent    tea.MouseEvent
+	width         int
+	height        int
+	help          help.Model
+	TabsComponent tabs.Tabs
+	FocusManager  focus.FocusManager
 }
 
 // keyMap defines a set of keybindings. To work for help it must satisfy
@@ -45,8 +45,9 @@ func (m model) ShortHelp() []key.Binding {
 func (m model) FullHelp() [][]key.Binding {
 	return [][]key.Binding{
 		{m.keys.Up, m.keys.Down}, // first column
+		m.FocusManager.GetKeyBindings(),
 		m.TabsComponent.GetKeyBindings(),
-		{m.keys.Help, m.keys.Quit}, // second column
+		{m.keys.Help, m.keys.Quit}, // last column
 	}
 }
 
@@ -72,15 +73,21 @@ var keys = keyMap{
 func (m model) Init() tea.Cmd {
 	// Initialize sub-models
 	return tea.Batch(
+		m.FocusManager.Init(),
 		m.TabsComponent.Init(),
 	)
 }
 
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmds []tea.Cmd
+	//Update focus manager model
+	focusManagerModel, cmd := m.FocusManager.Update(msg)
+	m.FocusManager = focusManagerModel.(focus.FocusManager)
+	cmds = append(cmds, cmd)
+
+	// Update tabs model
 	tabsModel, cmd := m.TabsComponent.Update(msg)
-	tabsModelConverted := tabsModel.(tabs.Tabs)
-	m.TabsComponent = &tabsModelConverted
+	m.TabsComponent = tabsModel.(tabs.Tabs)
 	cmds = append(cmds, cmd)
 
 	switch msg := msg.(type) {
@@ -90,18 +97,11 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.help.Width = msg.Width
 		m.width = msg.Width
 		m.height = msg.Height
-	case tea.FocusMsg:
-		m.terminalFocused = true
-	case tea.BlurMsg:
-		m.terminalFocused = false
 	case tea.KeyMsg:
-		m.lastKey = msg.String()
 		switch {
 		case key.Matches(msg, m.keys.Quit):
-			m.lastKey = m.keys.Quit.Help().Key
 			cmds = append(cmds, tea.Quit)
 		case key.Matches(msg, m.keys.Help):
-			m.lastKey = m.keys.Help.Help().Key
 			m.help.ShowAll = !m.help.ShowAll
 		}
 	}
@@ -167,6 +167,7 @@ func BookmarksTableModel() customTable.TableModel {
 		table.WithFocused(true),
 		table.WithHeight(7),
 	)
+	t.Focus()
 	return *customTable.NewTableModel(t)
 }
 
@@ -185,15 +186,19 @@ func main() {
 			Model: BookmarksTableModel(),
 		},
 	}
+	focusManager := focus.NewFocusManager()
+	tabsModel := tabs.NewTabs(
+		myTabs,
+		windowStyle,
+		highlightColor,
+		*focusManager,
+	)
+	focusManager.SetFocusableHierarchy([]focus.Focusable{tabsModel})
 	m := model{
-		keys: keys,
-		help: help.New(),
-		TabsComponent: tabs.NewTabs(
-			myTabs,
-			windowStyle,
-			highlightColor,
-		),
-		terminalFocused: true, // assume we start focused
+		keys:          keys,
+		help:          help.New(),
+		TabsComponent: *tabsModel,
+		FocusManager:  *focusManager,
 	}
 	if _, err := tea.NewProgram(
 		m,

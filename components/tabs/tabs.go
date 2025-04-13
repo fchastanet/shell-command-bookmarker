@@ -4,6 +4,7 @@ import (
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/fchastanet/shell-command-bookmarker/framework/focus"
 
 	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/lipgloss"
@@ -15,12 +16,12 @@ type Tab struct {
 }
 
 type Tabs struct {
-	Tabs            []Tab
-	width           int
-	height          int
-	activeTab       int
-	Keys            keyMap
-	terminalFocused bool
+	Tabs         []Tab
+	width        int
+	height       int
+	activeTab    int
+	Keys         keyMap
+	focusManager focus.FocusManager
 	// styles
 	windowStyle       lipgloss.Style
 	highlightColor    lipgloss.AdaptiveColor
@@ -35,15 +36,16 @@ func NewTabs(
 	tabs []Tab,
 	windowStyle lipgloss.Style,
 	highlightColor lipgloss.AdaptiveColor,
+	focusManager focus.FocusManager,
 ) *Tabs {
 	inactiveTabBorder := tabBorderWithBottom("┴", "─", "┴")
 	activeTabBorder := tabBorderWithBottom("┘", " ", "└")
 	inactiveTabStyle := lipgloss.NewStyle().Border(inactiveTabBorder, true).BorderForeground(highlightColor).Padding(0, 1)
 	return &Tabs{
-		Tabs:            tabs,
-		windowStyle:     windowStyle,
-		activeTab:       0,
-		terminalFocused: false,
+		Tabs:         tabs,
+		windowStyle:  windowStyle,
+		activeTab:    0,
+		focusManager: focusManager,
 		Keys: keyMap{
 			Left: key.NewBinding(
 				key.WithKeys("left", "p"),
@@ -76,6 +78,14 @@ func (t Tabs) GetKeyBindings() []key.Binding {
 	}
 }
 
+func (t Tabs) IsFocusable() bool {
+	return true
+}
+
+func (t Tabs) GetInnerFocusableComponents() []focus.Focusable {
+	return nil
+}
+
 func tabBorderWithBottom(left, middle, right string) lipgloss.Border {
 	border := lipgloss.RoundedBorder()
 	border.BottomLeft = left
@@ -100,12 +110,8 @@ func (m Tabs) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
 		m.height = msg.Height
-	case tea.FocusMsg:
-		m.terminalFocused = true
-	case tea.BlurMsg:
-		m.terminalFocused = false
 	case tea.KeyMsg:
-		if !m.terminalFocused {
+		if !m.focusManager.IsTerminalFocused() {
 			return m, nil
 		}
 		switch {

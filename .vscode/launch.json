@@ -5,18 +5,15 @@
   "version": "0.2.0",
   "configurations": [
     {
-      "name": "Launch Main",
+      "name": "Attach to shell command bookmarker",
       "type": "go",
-      "request": "launch",
-      "mode": "auto",
-      "cwd": "${workspaceFolder}",
-      "program": "${workspaceFolder}/main/main.go",
-      "console": "internalConsole",
-      "dlvFlags": [
-        "--check-go-version=false"
-      ],
-      "apiVersion": 2,
-      "showGlobalVariables": false
-    }
+      "debugAdapter": "dlv-dap",
+      "request": "attach",
+      "mode": "remote",
+      "remotePath": "${workspaceFolder}/main/",
+      "port": 2345,
+      "host": "127.0.0.1",
+      "preLaunchTask": "Run simple headless dlv"
+    },
   ]
 }
