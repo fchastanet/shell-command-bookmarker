@@ -1,0 +1,21 @@
+{
+  "threshold": 0,
+  "reporters": ["html", "markdown"],
+  "ignore": [
+    "**/node_modules/**",
+    "**/.git/**",
+    "**/.history/**",
+    "**/backup/**",
+    "**/logs/**",
+    "**/megalinter-reports/**",
+    "pages/README.md",
+    "**/*cache*/**",
+    "**/.github/**",
+    "**/.idea/**",
+    "**/*.svg",
+    ".pre-commit-config-github.yaml",
+    "**/testsData/**",
+    "framework/focus/FindNextFocusableComponent_test.go",
+    "pages/doc/**"
+  ]
+}

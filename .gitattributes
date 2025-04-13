@@ -1,0 +1,3 @@
+core.whitespace=blank-at-eof,indent-with-non-tab
+eol=lf
+tabwidth=2

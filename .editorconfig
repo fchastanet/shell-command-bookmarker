@@ -1,0 +1,20 @@
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+indent_size = 2
+indent_style = space
+insert_final_newline = true
+trim_trailing_whitespace = true
+
+[.vscode/*.json]
+indent_size = unset
+
+[{*.go,Makefile,.gitmodules,go.mod,go.sum}]
+indent_style = tab
+
+[{*.sh}]
+# we choose the google style guide here: https://google.github.io/styleguide/shellguide.html
+indent_style = space
+indent_size = 2

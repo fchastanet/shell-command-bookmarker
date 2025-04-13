@@ -1,0 +1,7 @@
+---
+scan:
+  # Same as '--skip-dirs'
+  # Default is empty
+  skip-dirs:
+    - bin/
+    - logs/

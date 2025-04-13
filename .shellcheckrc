@@ -1,0 +1,7 @@
+external-sources=true
+enable=require-variable-braces
+enable=avoid-nullary-conditions
+enable=add-default-case
+enable=quote-safe-variables
+enable=require-double-brackets
+source-path=SCRIPTDIR

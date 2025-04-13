@@ -150,6 +150,7 @@ func (m model) View() string {
 	return docStyle.Render(doc.String())
 }
 
+// jscpd:ignore-start
 func SearchTableModel() customTable.TableModel {
 	columns := []table.Column{
 		{Title: "Rank", Width: 4},
@@ -187,6 +188,8 @@ func BookmarksTableModel() customTable.TableModel {
 	t.Focus()
 	return *customTable.NewTableModel(t)
 }
+
+// jscpd:ignore-end
 
 func initLogger(level slog.Level, logFileHandler io.Writer) {
 	slogLevel := slog.Level(level)

@@ -26,6 +26,7 @@ megalinter
 Parens
 pipx
 plantuml
+podman
 shellcheck
 SHELLCHECK
 shellcheckrc

@@ -1,0 +1,56 @@
+ignoreGeneratedHeader = false
+severity = "warning"
+confidence = 0.8
+errorCode = 0
+warningCode = 0
+
+# Enable all available rules
+enableAllRules = true
+
+[rule.blank-imports]
+[rule.context-as-argument]
+[rule.context-keys-type]
+[rule.dot-imports]
+[rule.error-return]
+[rule.error-strings]
+[rule.error-naming]
+[rule.increment-decrement]
+[rule.var-naming]
+[rule.var-declaration]
+[rule.range]
+[rule.receiver-naming]
+[rule.time-naming]
+[rule.unexported-return]
+[rule.indent-error-flow]
+[rule.errorf]
+[rule.empty-block]
+[rule.superfluous-else]
+[rule.unused-parameter]
+[rule.unreachable-code]
+[rule.redefines-builtin-id]
+
+[rule.package-comments]
+  Disabled = true
+
+[rule.exported]
+  Disabled = true
+
+[rule.line-length-limit]
+  arguments = [120]
+
+[rule.add-constant]
+  arguments = [{ allowStrs = "\"\"", allowInts = "0,1", allowFloats = "0.0,1.0", ignoreFuncs = "os\\.*,fmt\\.Println,make" }]
+
+[rule.unhandled-error]
+  arguments = [
+    "os\\.Setenv",
+    "os\\.File\\.Seek",
+    "fmt\\.Print",
+    "fmt\\.Printf",
+    "bytes\\.Buffer\\.Write",
+    "bytes\\.Buffer\\.WriteByte"
+  ]
+  Exclude = ["**/*_test.go"]
+
+[rule.import-alias-naming]
+  arguments = ["^[a-z][A-Za-z0-9]{0,}$"]

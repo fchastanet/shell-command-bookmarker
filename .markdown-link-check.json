@@ -1,0 +1,12 @@
+{
+  "retryOn429": true,
+  "retryCount": 5,
+  "ignorePatterns": [
+    {
+      "pattern": "^https://tinyurl.com/"
+    },
+    {
+      "pattern": "^#.*"
+    }
+  ]
+}

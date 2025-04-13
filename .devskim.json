@@ -1,0 +1,13 @@
+{
+  "Glob": [
+    ".git/**",
+    "**/.git/**",
+    "megalinter-reports/**",
+    "**/megalinter-reports/**",
+    "node_modules/**",
+    "**/node_modules/**",
+    "logs/**",
+    "**/logs/**"
+  ],
+  "OutputTextFormat": "sarif"
+}

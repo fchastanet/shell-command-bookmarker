@@ -1,0 +1,19 @@
+# editor files
+.vscode/
+.idea/
+
+# git
+.git/
+.githooks/
+.gitignore
+
+# generated
+bin/
+logs/
+
+# docs
+**/*.md
+
+# other files not needed for build
+.editorconfig
+.*

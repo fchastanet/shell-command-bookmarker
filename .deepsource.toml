@@ -1,0 +1,40 @@
+version = 1
+
+test_patterns = ["tests/**"]
+
+exclude_patterns = [
+  "doc/**",
+  "**/testsData/**"
+]
+
+[[analyzers]]
+name = "test-coverage"
+enabled = true
+
+[[analyzers]]
+name = "go"
+enabled = true
+  [analyzers.meta]
+  import_root = "github.com/fchastanet/bash-tools-command-bookmarker"
+  import_paths = [
+    "github.com/fchastanet/bash-tools-command-bookmarker/internal"
+  ]
+
+[[analyzers]]
+name = "shell"
+enabled = true
+  [analyzers.meta]
+    dialect = "bash"
+
+[[analyzers]]
+name = "secrets"
+enabled = true
+
+[[analyzers]]
+name = "docker"
+enabled = true
+
+  [analyzers.meta]
+  dockerfile_paths = [
+    "Dockerfile"
+  ]
