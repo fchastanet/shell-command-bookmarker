@@ -2,7 +2,9 @@ package main
 
 import (
 	"fmt"
+	"io"
 	"log"
+	"log/slog"
 	"os"
 	"strings"
 
@@ -187,15 +189,31 @@ func BookmarksTableModel() customTable.TableModel {
 	return *customTable.NewTableModel(t)
 }
 
-func main() {
-	if len(os.Getenv("DEBUG")) > 0 {
-		f, err := tea.LogToFile("debug.log", "debug")
-		if err != nil {
-			fmt.Println("fatal:", err)
-			os.Exit(1)
-		}
-		defer f.Close()
+func initLogger(level slog.Level, logFileHandler io.Writer) {
+	slogLevel := slog.Level(level)
+	opts := &slog.HandlerOptions{
+		AddSource:   slogLevel == slog.LevelDebug,
+		Level:       slogLevel,
+		ReplaceAttr: nil,
 	}
+	handler := slog.NewTextHandler(logFileHandler, opts)
+
+	logger := slog.New(handler)
+	slog.SetDefault(logger)
+}
+
+func main() {
+	f, err := tea.LogToFile("debug.log", "debug")
+	if err != nil {
+		fmt.Println("fatal:", err)
+		os.Exit(1)
+	}
+	defer f.Close()
+	level := slog.LevelError
+	if len(os.Getenv("DEBUG")) > 0 {
+		level = slog.LevelDebug
+	}
+	initLogger(level, f)
 
 	myTabs := []tabs.Tab{
 		{
