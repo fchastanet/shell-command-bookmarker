@@ -1,6 +1,8 @@
 package focus
 
 import (
+	"log"
+
 	"github.com/charmbracelet/bubbles/key"
 	tea "github.com/charmbracelet/bubbletea"
 )
@@ -122,8 +124,10 @@ func (fm *FocusManager) FocusPreviousComponent() tea.Cmd {
 func (fm *FocusManager) FocusNextComponent() tea.Cmd {
 	nextComponent := fm.findNextFocusableComponent()
 	if nextComponent == nil {
+		log.Println("No next focusable component found")
 		return nil
 	}
+	log.Printf("Found next component: %v\n", nextComponent.GetFocusableUniqueId())
 
 	return func() tea.Msg {
 		return ComponentFocusMsg{Target: nextComponent}

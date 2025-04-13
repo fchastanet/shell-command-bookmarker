@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"log"
 	"os"
 	"strings"
 
@@ -172,6 +173,15 @@ func BookmarksTableModel() customTable.TableModel {
 }
 
 func main() {
+	if len(os.Getenv("DEBUG")) > 0 {
+		f, err := tea.LogToFile("debug.log", "debug")
+		if err != nil {
+			fmt.Println("fatal:", err)
+			os.Exit(1)
+		}
+		defer f.Close()
+	}
+
 	myTabs := []tabs.Tab{
 		{
 			Title: "Search",
@@ -204,7 +214,7 @@ func main() {
 		m,
 		tea.WithReportFocus(),
 	).Run(); err != nil {
-		fmt.Println("Error running program:", err)
+		log.Printf("Error running program: %v", err)
 		os.Exit(1)
 	}
 }
