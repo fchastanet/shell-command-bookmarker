@@ -20,7 +20,6 @@ import (
 
 type model struct {
 	keys          keyMap
-	mouseEvent    tea.MouseEvent
 	width         int
 	height        int
 	help          help.Model
@@ -97,7 +96,7 @@ func (m model) Init() tea.Cmd {
 
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmds []tea.Cmd
-	//Update focus manager model
+	// Update focus manager model
 	focusManagerModel, cmd := m.FocusManager.Update(msg)
 	focusModel := focusManagerModel.(focus.FocusManager)
 	m.FocusManager = &focusModel

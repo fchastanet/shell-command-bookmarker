@@ -1,0 +1,203 @@
+---
+$schema: https://raw.githubusercontent.com/streetsidesoftware/cspell/main/cspell.schema.json
+version: "0.2"
+language: en
+noConfigSearch: true
+caseSensitive: true
+useGitignore: true
+enableGlobDot: true
+ignorePaths:
+  - "bin/**"
+  - "logs/**"
+  - "**/testsData/**"
+  - package-lock.json
+  - "**/*/svg"
+  - .vscode
+  - ".cspell/**"
+  - .git/**
+  - "**/.git/**"
+  - ".history/**"
+  - "**/node_modules/**"
+  - "**/vscode-extension/**"
+  - "**/logs/**"
+  - "**/*.svg"
+  - megalinter-reports
+  - report
+  - .jscpd.json
+  - "*-megalinter_file_names_cspell.txt"
+  - "**/*megalinter_file_names_cspell.txt"
+  - .shellcheckrc
+  - "**/bin/**"
+  - "vendor/**"
+  - "**/backup/**"
+  - commit-msg.md
+  - ".mega-linter*.yml"
+  - ".env"
+  - "go.sum"
+  - internal/utils/encoding/testsData/content.txt
+
+dictionaryDefinitions:
+  - name: myBash
+    path: ".cspell/bash.txt"
+    addWords: true
+  - name: githubWorkflow
+    path: ".cspell/githubWorkflow.txt"
+    addWords: true
+  - name: go
+    path: ".cspell/go.txt"
+    addWords: false
+  - name: dotFiles
+    path: ".cspell/dotFiles.txt"
+    addWords: true
+  - name: mySoftwares
+    path: ".cspell/softwares.txt"
+    addWords: true
+  - name: markdown
+    path: ".cspell/markdown.txt"
+    addWords: true
+  - name: docker
+    path: ".cspell/docker.txt"
+    addWords: true
+  - name: golangYml
+    path: ".cspell/golangYml.txt"
+    addWords: true
+  - name: test
+    path: ".cspell/test.txt"
+    addWords: true
+
+# https://github.com/streetsidesoftware/cspell/blob/main/packages/cspell/README.md#languagesettings
+languageSettings:
+  - languageId: shellscript
+    locale: "*"
+    dictionaries:
+      - bash
+      - myBash
+      - mySoftwares
+      - software
+
+  - languageId: dockerFiles
+    locale: "*"
+    dictionaries:
+      - bash
+      - myBash
+      - docker
+      - go
+      - mySoftwares
+      - software
+
+  - languageId: dotFiles
+    locale: "*"
+    caseSensitive: true
+    dictionaries:
+      - dotFiles
+      - mySoftwares
+      - software
+
+  - languageId: githubWorkflow
+    locale: "*"
+    dictionaries:
+      - githubWorkflow
+      - bash
+      - go
+      - myBash
+      - mySoftwares
+      - software
+
+  - languageId: markdown
+    locale: "*"
+    dictionaries:
+      - markdown
+      - bash
+      - myBash
+      - go
+      - mySoftwares
+      - softwareTerms
+      - software
+
+  - languageId: go
+    locale: "*"
+    caseSensitive: true
+    dictionaries:
+      - go
+      - mySoftwares
+      - softwareTerms
+      - software
+
+  - languageId: kcl
+    locale: "*"
+    dictionaries:
+      - mySoftwares
+      - softwareTerms
+      - software
+
+# OVERRIDES
+overrides:
+  - filename:
+      - "/.*"
+      - "/*.yml"
+      - "/*.yaml"
+      - "/*.toml"
+      - "/package.json"
+      - "!.golangci.yml"
+    languageId: dotFiles
+
+  - filename:
+      - "**/Dockerfile"
+    languageId: dockerFiles
+
+  - filename:
+      - ".github/**/*.yml"
+    languageId: githubWorkflow
+
+  - filename: "**/*.puml"
+    dictionaries:
+      - plantuml
+
+  - filename: "**/*.html"
+    dictionaries:
+      - mySoftwares
+      - software
+
+  - filename:
+      - LICENSE
+      - "**/*.md"
+    languageId: markdown
+
+  - filename:
+      - "**/*.sh"
+    languageId: shellscript
+
+  - filename:
+      - "**/*.go"
+      - "go.mod"
+    languageId: go
+
+  - filename:
+      - "**/*_test.go"
+    languageId: go
+    dictionaries:
+      - test
+
+  - filename:
+      - ".golangci.yml"
+    dictionaries:
+      - golangYml
+      - go
+      - mySoftwares
+      - software
+
+patterns:
+  - name: urls
+    pattern: "/https?://([^ \t\"'()]+)/g"
+  - name: packages
+    pattern: "/[-A-Za-z0-9.]+/[-A-Za-z0-9.]+/g"
+  - name: markdownToc
+    pattern: "\\]\\(#[^)]+\\)$"
+
+ignoreRegExpList:
+  - urls
+  - packages
+  - markdownToc
+
+enableFiletypes:
+  - shellscript

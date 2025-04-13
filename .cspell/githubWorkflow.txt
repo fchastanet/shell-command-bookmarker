@@ -1,0 +1,17 @@
+autoupdate
+COND
+DOCKERHUB
+fchastanet
+friday
+goimports
+GOTOOLCHAIN
+gpgsign
+precommit
+Sarif
+SARIF
+sarif
+Semgrep
+SEMGREP
+semgrep
+shellcheckrc
+signingkey

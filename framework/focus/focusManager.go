@@ -43,8 +43,8 @@ type Focusable interface {
 	IsFocusable() bool
 	GetInnerFocusableComponents() []Focusable
 	GetFocusableUniqueId() string
-	//GetNextFocusableInnerComponent(currentFocusedComponent *string) string
-	//GetPreviousFocusableInnerComponent(currentFocusedComponent *string) string
+	// GetNextFocusableInnerComponent(currentFocusedComponent *string) string
+	// GetPreviousFocusableInnerComponent(currentFocusedComponent *string) string
 }
 
 type ComponentFocusMsg struct {
@@ -74,6 +74,7 @@ func (fm *FocusManager) IsTerminalFocused() bool {
 func (fm *FocusManager) SetRootComponents(hierarchy []Focusable) {
 	fm.rootComponents = hierarchy
 }
+
 func (fm *FocusManager) GetRootComponents() []Focusable {
 	return fm.rootComponents
 }
@@ -81,6 +82,7 @@ func (fm *FocusManager) GetRootComponents() []Focusable {
 func (fm *FocusManager) SetFocusedHierarchy(hierarchy []Focusable) {
 	fm.focusedHierarchy = hierarchy
 }
+
 func (fm *FocusManager) GetFocusedHierarchy() []Focusable {
 	return fm.focusedHierarchy
 }

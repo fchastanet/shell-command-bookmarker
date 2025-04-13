@@ -1,4 +1,3 @@
 {
-  "terminal.integrated.defaultProfile.windows": "WSL",
-  "terminal.external.windowsExec": "wt.exe"  // For Windows Terminal
+  "terminal.integrated.defaultProfile.windows": "WSL"
 }

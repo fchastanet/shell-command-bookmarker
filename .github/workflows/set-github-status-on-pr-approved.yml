@@ -1,0 +1,28 @@
+---
+# set git commit status when PR is approved
+name: Set PR approved git status
+on: # yamllint disable-line rule:truthy
+  pull_request_review:
+    types: [submitted]
+
+permissions: read-all
+
+jobs:
+  build:
+    # only review approved and
+    # the event is not triggered by a fork
+    if: |
+      github.event.review.state == 'approved' &&
+      github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run the action # You would run your tests before this using the output to set state/desc
+        uses: Sibz/github-status-action@v1
+        with:
+          authToken: ${{secrets.GITHUB_TOKEN}}
+          context: "PR approved"
+          description: "Passed"
+          state: "success"
+          sha: ${{github.event.pull_request.head.sha || github.sha}}

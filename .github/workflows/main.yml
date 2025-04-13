@@ -1,0 +1,381 @@
+---
+# based on https://github.com/mvdan/github-actions-golang
+name: CI
+on: # yamllint disable-line rule:truthy
+  pull_request:
+    branches: ["**"]
+    paths-ignore: ["docs/**"]
+
+  push:
+    branches: ["master"]
+    paths-ignore: ["docs/**"]
+
+  # Allows you to run this workflow manually from the Actions tab
+  workflow_dispatch:
+
+# cancel previous build if several pushes
+concurrency:
+  group: >-
+    ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # -------------------------------------------------------
+  # Build docker images
+  # -------------------------------------------------------
+  build-docker-images:
+    runs-on: ubuntu-22.04
+    strategy:
+      matrix:
+        go-version: [1.23.1]
+        os: [ubuntu-latest]
+    permissions:
+      # needed by akatov/commit-status-updater@a9e988ec5454692ff7745a509452422a35172ad6
+      statuses: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to DockerHub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      # overall process
+      - uses: akatov/commit-status-updater@a9e988ec5454692ff7745a509452422a35172ad6
+        with:
+          name: build-docker
+          status: pending
+
+      - name: Set env vars
+        id: vars
+        # shellcheck disable=SC2129
+        run: |
+          (
+            echo "job_tag=${{github.run_id}}-${{matrix.os}}"
+            echo "image_tag=bash-shell-command-bookmarker-${{matrix.os}}"
+            echo "image_name=scrasnups/bash-shell-command-bookmarker"
+            echo "branch_name=${GITHUB_REF##*/}"
+          ) >> "${GITHUB_ENV}"
+
+      - uses: akatov/commit-status-updater@a9e988ec5454692ff7745a509452422a35172ad6
+        with:
+          name: build-docker-${{ env.image_tag }}
+          status: pending
+
+      - name: Docker meta
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          # list of Docker images to use as base name for tags
+          images: |
+            ${{env.image_name}}
+          # generate Docker tags based on the following events/attributes
+          tags: |
+            type=schedule
+            type=ref,event=branch
+            type=ref,event=pr
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=semver,pattern={{major}}
+            type=sha
+
+      - uses: docker/build-push-action@v6
+        continue-on-error: false
+        with:
+          load: true
+          context: .
+          file: Dockerfile
+          pull: true
+          push: true
+          github-token: ${{ github.token }}
+          tags: |
+            ${{ env.image_name }}:${{ env.image_tag }}
+          cache-from: type=gha,scope=${{ env.image_tag }}
+          cache-to: type=gha,mode=max,scope=${{ env.image_tag }}
+
+      - uses: akatov/commit-status-updater@a9e988ec5454692ff7745a509452422a35172ad6
+        if: ${{ always() }}
+        with:
+          name: build-docker-${{ env.image_tag }}
+          status: ${{ job.status }}
+
+      - uses: akatov/commit-status-updater@a9e988ec5454692ff7745a509452422a35172ad6
+        with:
+          name: build-docker
+          status: ${{ job.status }}
+
+  # -------------------------------------------------------
+  # Pre-commit
+  # -------------------------------------------------------
+
+  pre-commit:
+    runs-on: ubuntu-22.04
+    permissions:
+      # needed by akatov/commit-status-updater@a9e988ec5454692ff7745a509452422a35172ad6
+      statuses: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to DockerHub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - uses: crazy-max/ghaction-import-gpg@v6
+        if: ${{ success() }}
+        with:
+          gpg_private_key: ${{ secrets.GPG_PRIVATE_KEY }}
+          passphrase: ${{ secrets.GPG_PASSPHRASE }}
+          git_user_signingkey: true
+          git_commit_gpgsign: true
+
+      - uses: tibdex/github-app-token@v2
+        if: ${{ success() }}
+        id: generate-token
+        with:
+          app_id: ${{ secrets.APP_ID }}
+          private_key: ${{ secrets.APP_PRIVATE_KEY }}
+
+      - uses: akatov/commit-status-updater@a9e988ec5454692ff7745a509452422a35172ad6
+        with:
+          name: pre-commit-megalinter
+          status: pending
+
+      - name: Set env vars
+        id: vars
+        # shellcheck disable=SC2129
+        run: |
+          (
+            echo "branch_name=${GITHUB_REF##*/}"
+          ) >> "${GITHUB_ENV}"
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: 3.9
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.23.1"
+          check-latest: false
+
+      - run: |
+          go install mvdan.cc/gofumpt@latest
+          go install golang.org/x/tools/cmd/goimports@latest
+          go install github.com/mgechev/revive@latest
+
+      - uses: fchastanet/github-action-setup-shfmt@v4.0.0
+
+      - name: Run pre-commit
+        uses: pre-commit/action@v3.0.1
+        if: false
+        id: preCommit
+        with:
+          extra_args: >-
+            -c .pre-commit-config-github.yaml -a --hook-stage manual
+
+      - name: MegaLinter
+        id: ml
+        if: ${{ always() }}
+        # You can override MegaLinter flavor used to have faster performances
+        # More info at https://megalinter.io/flavors/
+        uses: oxsecurity/megalinter/flavors/go@v8
+        # All available variables are described in documentation
+        # https://megalinter.io/configuration/
+        env:
+          # Validates all source when push on master,
+          # else just the git diff with master.
+          # Override with true if you always want to lint all sources
+          VALIDATE_ALL_CODEBASE: true
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          MEGALINTER_CONFIG: .mega-linter-githubAction.yml
+          CI_MODE: 1
+          GOTOOLCHAIN: go1.23.1+auto
+
+      - name: Upload MegaLinter artifacts
+        if: success() || failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: MegaLinter reports
+          path: |
+            megalinter-reports
+            mega-linter.log
+
+      - name: MegaLinter/Precommit has updated sources
+        if: >
+          steps.preCommit.outcome == 'failure' || (
+            steps.ml.outputs.has_updated_sources == 1 && (
+              env.APPLY_FIXES_EVENT == 'all' ||
+              env.APPLY_FIXES_EVENT == github.event_name
+            )
+          )
+        run: |
+          echo "COND_UPDATED_SOURCES=true" >> "${GITHUB_ENV}"
+
+      - name: is apply fixes needed ?
+        if: >
+          env.APPLY_FIXES_MODE == 'pull_request' && (
+            github.event_name == 'push' ||
+            github.event.pull_request.head.repo.full_name ==
+            github.repository
+          )
+        run: |
+          echo "COND_APPLY_FIXES_NEEDED=true" >> "${GITHUB_ENV}"
+
+      - name: Create Pull Request
+        id: cpr
+        # prettier-ignore
+        if: >
+          env.COND_UPDATED_SOURCES == 'true' &&
+          env.COND_APPLY_FIXES_NEEDED == 'true' &&
+          !contains(github.event.head_commit.message, 'skip fix')
+        uses: peter-evans/create-pull-request@v7
+        with:
+          token: ${{ steps.generate-token.outputs.token }}
+          committer: fchastanet <fchastanet@gmail.com>
+          branch: update/pre-commit-fixes-${{ env.branch_name }}
+          delete-branch: true
+          title: lint fixes
+          commit-message: Auto-update lint fixes
+          body: |
+            some auto fixes have been generated during pre-commit run
+          labels: pre-commit-fixes
+
+      - name: Print Pull request created
+        if: |
+          steps.cpr.outputs.pull-request-number &&
+          steps.cpr.outcome == 'success'
+        run: |
+          echo "Pull Request Number - ${{ steps.cpr.outputs.pull-request-number }}"
+          echo "Pull Request URL - ${{ steps.cpr.outputs.pull-request-url }}"
+
+      - uses: akatov/commit-status-updater@a9e988ec5454692ff7745a509452422a35172ad6
+        if: ${{ always() }}
+        with:
+          name: pre-commit-megalinter
+          status: ${{ job.status }}
+
+  # -------------------------------------------------------
+  # Unit tests
+  # -------------------------------------------------------
+  test:
+    strategy:
+      matrix:
+        go-version: [1.23.1]
+        os: [ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    permissions:
+      # needed by akatov/commit-status-updater@a9e988ec5454692ff7745a509452422a35172ad6
+      statuses: write
+      # needed by marocchino/sticky-pull-request-comment
+      pull-requests: write
+
+    steps:
+      - name: Install Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ matrix.go-version }}
+
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Downloads the dependencies
+        run: go mod download
+
+      - name: Lints all code with golangci-lint
+        run: |
+          set -exo pipefail
+          go fmt ./...
+          mkdir -p logs || true
+
+      - uses: akatov/commit-status-updater@a9e988ec5454692ff7745a509452422a35172ad6
+        with:
+          name: build-${{matrix.os}}
+          status: pending
+
+      - name: build the binary
+        run: |
+          set -exo pipefail
+          ./build/build-local.sh
+
+      - uses: akatov/commit-status-updater@a9e988ec5454692ff7745a509452422a35172ad6
+        if: ${{ always() }}
+        with:
+          name: build-${{matrix.os}}
+          status: ${{ job.status }}
+
+      - uses: akatov/commit-status-updater@a9e988ec5454692ff7745a509452422a35172ad6
+        with:
+          name: unit-tests-${{matrix.os}}
+          status: pending
+
+      - name: Install gocover-cobertura
+        run: |
+          set -exo pipefail
+          go get github.com/boumenot/gocover-cobertura
+          go install github.com/boumenot/gocover-cobertura
+
+      # Install gotestfmt on the VM running the action.
+      - name: Set up gotestfmt
+        uses: GoTestTools/gotestfmt-action@v2
+        with:
+          token: ${{ github.token }}
+          # Optional: pass the gotestfmt version you want to run.
+          version: v2.0.0
+          # Optional: pass an organization name and repo to use a fork
+          org: GoTestTools
+          repo: gotestfmt
+
+      - name: Run tests
+        run: |
+          go test -race -json -v -coverprofile=logs/coverage.log ./... 2>&1 |
+            tee logs/tests.log |
+            gotestfmt
+
+      # Upload the original go test log as an artifact for later review.
+      - name: Upload test log
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: test-log
+          path: logs/coverage.log
+          if-no-files-found: error
+
+      - name: Convert go coverage to cobertura format
+        run: gocover-cobertura < logs/coverage.log > logs/coverage.xml
+
+      - name: Generate code coverage report
+        uses: irongut/CodeCoverageSummary@v1.3.0
+        with:
+          filename: logs/coverage.xml
+          badge: false
+          fail_below_min: false
+          format: markdown
+          hide_branch_rate: false
+          hide_complexity: true
+          indicators: true
+          output: both
+          thresholds: "60 80"
+
+      - name: Add Coverage PR Comment
+        uses: marocchino/sticky-pull-request-comment@v2
+        if: github.event_name == 'pull_request'
+        with:
+          recreate: true
+          path: code-coverage-results.md
+
+      - uses: akatov/commit-status-updater@a9e988ec5454692ff7745a509452422a35172ad6
+        if: ${{ always() }}
+        with:
+          name: unit-tests-${{matrix.os}}
+          status: ${{ job.status }}
