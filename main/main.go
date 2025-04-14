@@ -1,30 +1,37 @@
 package main
 
 import (
-	"fmt"
 	"io"
-	"log"
 	"log/slog"
 	"os"
 	"strings"
 
 	"github.com/charmbracelet/bubbles/help"
 	"github.com/charmbracelet/bubbles/key"
-	"github.com/charmbracelet/bubbles/table"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
-	"github.com/fchastanet/shell-command-bookmarker/components/customTable"
 	"github.com/fchastanet/shell-command-bookmarker/components/tabs"
 	"github.com/fchastanet/shell-command-bookmarker/framework/focus"
 )
 
+type settings struct {
+	keys keyMap
+}
+
+type styles struct {
+	docStyle       lipgloss.Style
+	windowStyle    lipgloss.Style
+	highlightColor lipgloss.AdaptiveColor
+}
+
 type model struct {
-	keys          keyMap
 	width         int
 	height        int
-	help          help.Model
-	TabsComponent tabs.Tabs
-	FocusManager  *focus.FocusManager
+	help          *help.Model
+	TabsComponent *tabs.Tabs
+	FocusManager  *focus.Manager
+	settings      *settings
+	styles        *styles
 }
 
 // keyMap defines a set of keybindings. To work for help it must satisfy
@@ -39,37 +46,39 @@ type keyMap struct {
 // ShortHelp returns keybindings to be shown in the mini help view. It's part
 // of the key.Map interface.
 func (m model) ShortHelp() []key.Binding {
-	return []key.Binding{m.keys.Help, m.keys.Quit}
+	return []key.Binding{m.settings.keys.Help, m.settings.keys.Quit}
 }
 
 // FullHelp returns keybindings for the expanded help view. It's part of the
 // key.Map interface.
 func (m model) FullHelp() [][]key.Binding {
 	return [][]key.Binding{
-		{m.keys.Up, m.keys.Down}, // first column
+		{m.settings.keys.Up, m.settings.keys.Down}, // first column
 		m.FocusManager.GetKeyBindings(),
 		m.TabsComponent.GetKeyBindings(),
-		{m.keys.Help, m.keys.Quit}, // last column
+		{m.settings.keys.Help, m.settings.keys.Quit}, // last column
 	}
 }
 
-var keys = keyMap{
-	Up: key.NewBinding(
-		key.WithKeys("up", "k"),
-		key.WithHelp("↑/k", "move up"),
-	),
-	Down: key.NewBinding(
-		key.WithKeys("down", "j"),
-		key.WithHelp("↓/j", "move down"),
-	),
-	Help: key.NewBinding(
-		key.WithKeys("?", "h"),
-		key.WithHelp("?/h", "toggle help"),
-	),
-	Quit: key.NewBinding(
-		key.WithKeys("q", "esc", "ctrl+c"),
-		key.WithHelp("q/Escape", "quit"),
-	),
+func defaultKeyMap() keyMap {
+	return keyMap{
+		Up: key.NewBinding(
+			key.WithKeys("up", "k"),
+			key.WithHelp("↑/k", "move up"),
+		),
+		Down: key.NewBinding(
+			key.WithKeys("down", "j"),
+			key.WithHelp("↓/j", "move down"),
+		),
+		Help: key.NewBinding(
+			key.WithKeys("?", "h"),
+			key.WithHelp("?/h", "toggle help"),
+		),
+		Quit: key.NewBinding(
+			key.WithKeys("q", "esc", "ctrl+c"),
+			key.WithHelp("q/Escape", "quit"),
+		),
+	}
 }
 
 func (m model) IsFocusable() bool {
@@ -82,7 +91,7 @@ func (m model) GetInnerFocusableComponents() []focus.Focusable {
 	}
 }
 
-func (m model) GetFocusableUniqueId() string {
+func (m model) GetFocusableUniqueID() string {
 	return "main"
 }
 
@@ -98,13 +107,14 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmds []tea.Cmd
 	// Update focus manager model
 	focusManagerModel, cmd := m.FocusManager.Update(msg)
-	focusModel := focusManagerModel.(focus.FocusManager)
+	focusModel := focusManagerModel.(focus.Manager)
 	m.FocusManager = &focusModel
 	cmds = append(cmds, cmd)
 
 	// Update tabs model
-	tabsModel, cmd := m.TabsComponent.Update(msg)
-	m.TabsComponent = tabsModel.(tabs.Tabs)
+	tabsTeaModel, cmd := m.TabsComponent.Update(msg)
+	tabsModel := tabsTeaModel.(tabs.Tabs)
+	m.TabsComponent = &tabsModel
 	cmds = append(cmds, cmd)
 
 	switch msg := msg.(type) {
@@ -116,9 +126,9 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.height = msg.Height
 	case tea.KeyMsg:
 		switch {
-		case key.Matches(msg, m.keys.Quit):
+		case key.Matches(msg, m.settings.keys.Quit):
 			cmds = append(cmds, tea.Quit)
-		case key.Matches(msg, m.keys.Help):
+		case key.Matches(msg, m.settings.keys.Help):
 			m.help.ShowAll = !m.help.ShowAll
 		}
 	}
@@ -126,11 +136,24 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, tea.Batch(cmds...)
 }
 
-var (
-	docStyle       = lipgloss.NewStyle().Padding(1, 2, 1, 2)
-	highlightColor = lipgloss.AdaptiveColor{Light: "#874BFD", Dark: "#7D56F4"}
-	windowStyle    = lipgloss.NewStyle().BorderForeground(highlightColor).Padding(2, 0).Align(lipgloss.Center).Border(lipgloss.NormalBorder()).UnsetBorderTop()
-)
+//nolint:mnd // no need to check magic numbers
+func getDefaultStyles(
+	highlightColor *lipgloss.AdaptiveColor,
+) *styles {
+	if highlightColor == nil {
+		highlightColor = &lipgloss.AdaptiveColor{Light: "#874BFD", Dark: "#7D56F4"}
+	}
+	return &styles{
+		highlightColor: *highlightColor,
+		docStyle:       lipgloss.NewStyle().Padding(1, 2, 1, 2),
+		windowStyle: lipgloss.NewStyle().
+			BorderForeground(highlightColor).
+			Padding(2, 0).
+			Align(lipgloss.Center).
+			Border(lipgloss.NormalBorder()).
+			UnsetBorderTop(),
+	}
+}
 
 func (m model) View() string {
 	doc := strings.Builder{}
@@ -144,55 +167,14 @@ func (m model) View() string {
 	}
 
 	renderedTabs := m.TabsComponent.View()
-	tabs := lipgloss.JoinHorizontal(lipgloss.Top, renderedTabs)
-	doc.WriteString(tabs)
+	tabsStr := lipgloss.JoinHorizontal(lipgloss.Top, renderedTabs)
+	doc.WriteString(tabsStr)
 	doc.WriteString(strings.Repeat("\n", height) + helpView)
-	return docStyle.Render(doc.String())
+	return m.styles.docStyle.Render(doc.String())
 }
-
-// jscpd:ignore-start
-func SearchTableModel() customTable.TableModel {
-	columns := []table.Column{
-		{Title: "Rank", Width: 4},
-		{Title: "City", Width: 10},
-		{Title: "Country", Width: 10},
-		{Title: "Population", Width: 10},
-	}
-	rows := []table.Row{}
-	t := table.New(
-		table.WithColumns(columns),
-		table.WithRows(rows),
-		table.WithFocused(true),
-		table.WithHeight(7),
-	)
-	return *customTable.NewTableModel(t)
-}
-
-func BookmarksTableModel() customTable.TableModel {
-	columns := []table.Column{
-		{Title: "Rank", Width: 4},
-		{Title: "City", Width: 10},
-		{Title: "Country", Width: 10},
-		{Title: "Population", Width: 10},
-	}
-	rows := []table.Row{
-		{"1", "Tokyo", "Japan", "37,274,000"},
-		{"2", "Delhi", "India", "32,065,760"},
-	}
-	t := table.New(
-		table.WithColumns(columns),
-		table.WithRows(rows),
-		table.WithFocused(true),
-		table.WithHeight(7),
-	)
-	t.Focus()
-	return *customTable.NewTableModel(t)
-}
-
-// jscpd:ignore-end
 
 func initLogger(level slog.Level, logFileHandler io.Writer) {
-	slogLevel := slog.Level(level)
+	slogLevel := slog.SetLogLoggerLevel(level)
 	opts := &slog.HandlerOptions{
 		AddSource:   slogLevel == slog.LevelDebug,
 		Level:       slogLevel,
@@ -205,14 +187,20 @@ func initLogger(level slog.Level, logFileHandler io.Writer) {
 }
 
 func main() {
+	if err := mainImpl(); err != nil {
+		slog.Error("critical error", "error", err)
+		os.Exit(1)
+	}
+}
+
+func mainImpl() error {
 	f, err := tea.LogToFile("debug.log", "debug")
 	if err != nil {
-		fmt.Println("fatal:", err)
-		os.Exit(1)
+		return err
 	}
 	defer f.Close()
 	level := slog.LevelError
-	if len(os.Getenv("DEBUG")) > 0 {
+	if os.Getenv("DEBUG") != "" {
 		level = slog.LevelDebug
 	}
 	initLogger(level, f)
@@ -231,25 +219,34 @@ func main() {
 			Model: BookmarksTableModel(),
 		},
 	}
+	styles := getDefaultStyles(nil)
 	focusManager := focus.NewFocusManager()
 	tabsModel := tabs.NewTabs(
 		myTabs,
-		windowStyle,
-		highlightColor,
-		*focusManager,
+		focusManager,
+		&styles.highlightColor,
+		&styles.windowStyle,
 	)
+
+	helpModel := help.New()
 	m := model{
-		keys:          keys,
-		help:          help.New(),
-		TabsComponent: *tabsModel,
+		width:         0,
+		height:        0,
+		help:          &helpModel,
+		TabsComponent: tabsModel,
 		FocusManager:  focusManager,
+		settings: &settings{
+			keys: defaultKeyMap(),
+		},
+		styles: styles,
 	}
 	focusManager.SetRootComponents([]focus.Focusable{&m})
 	if _, err := tea.NewProgram(
 		m,
 		tea.WithReportFocus(),
 	).Run(); err != nil {
-		log.Printf("Error running program: %v", err)
-		os.Exit(1)
+		slog.Error("Error running program", "error", err)
+		return err
 	}
+	return nil
 }

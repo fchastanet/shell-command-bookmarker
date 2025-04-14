@@ -13,7 +13,7 @@ type MockFocusable struct {
 	innerComponents []Focusable
 }
 
-func (m *MockFocusable) GetFocusableUniqueId() string {
+func (m *MockFocusable) GetFocusableUniqueID() string {
 	return m.name
 }
 

@@ -1,15 +1,20 @@
 package focus
 
 import (
+	"iter"
 	"log"
 
 	"github.com/charmbracelet/bubbles/key"
 	tea "github.com/charmbracelet/bubbletea"
 )
 
-type FocusManager struct {
-	keys             keyMap
-	lastKey          string
+type settings struct {
+	keys keyMap
+}
+
+type Manager struct {
+	settings         *settings
+	lastKey          *string
 	focusedHierarchy []Focusable
 	rootComponents   []Focusable
 	terminalFocused  bool
@@ -22,27 +27,29 @@ type keyMap struct {
 	ShiftTab key.Binding
 }
 
-var keys = keyMap{
-	Tab: key.NewBinding(
-		key.WithKeys("tab"),
-		key.WithHelp("↔", "focus next component"),
-	),
-	ShiftTab: key.NewBinding(
-		key.WithKeys("shift+tab"),
-		key.WithHelp("Shift-↔", "focus previous component"),
-	),
+func defaultKeyMap() keyMap {
+	return keyMap{
+		Tab: key.NewBinding(
+			key.WithKeys("tab"),
+			key.WithHelp("↔", "focus next component"),
+		),
+		ShiftTab: key.NewBinding(
+			key.WithKeys("shift+tab"),
+			key.WithHelp("Shift-↔", "focus previous component"),
+		),
+	}
 }
 
-func (fm FocusManager) GetKeyBindings() []key.Binding {
+func (fm Manager) GetKeyBindings() []key.Binding {
 	return []key.Binding{
-		fm.keys.Tab, fm.keys.ShiftTab,
+		fm.settings.keys.Tab, fm.settings.keys.ShiftTab,
 	}
 }
 
 type Focusable interface {
 	IsFocusable() bool
 	GetInnerFocusableComponents() []Focusable
-	GetFocusableUniqueId() string
+	GetFocusableUniqueID() string
 	// GetNextFocusableInnerComponent(currentFocusedComponent *string) string
 	// GetPreviousFocusableInnerComponent(currentFocusedComponent *string) string
 }
@@ -57,58 +64,60 @@ type ComponentBlurMsg struct {
 	Target Focusable
 }
 
-func NewFocusManager() *FocusManager {
-	return &FocusManager{
-		keys:             keys,
-		lastKey:          "",
+func NewFocusManager() *Manager {
+	return &Manager{
+		settings: &settings{
+			keys: defaultKeyMap(),
+		},
+		lastKey:          nil,
 		terminalFocused:  true,
 		focusedHierarchy: []Focusable{},
 		rootComponents:   []Focusable{},
 	}
 }
 
-func (fm *FocusManager) IsTerminalFocused() bool {
+func (fm *Manager) IsTerminalFocused() bool {
 	return fm.terminalFocused
 }
 
-func (fm *FocusManager) SetRootComponents(hierarchy []Focusable) {
+func (fm *Manager) SetRootComponents(hierarchy []Focusable) {
 	fm.rootComponents = hierarchy
 }
 
-func (fm *FocusManager) GetRootComponents() []Focusable {
+func (fm *Manager) GetRootComponents() []Focusable {
 	return fm.rootComponents
 }
 
-func (fm *FocusManager) SetFocusedHierarchy(hierarchy []Focusable) {
+func (fm *Manager) SetFocusedHierarchy(hierarchy []Focusable) {
 	fm.focusedHierarchy = hierarchy
 }
 
-func (fm *FocusManager) GetFocusedHierarchy() []Focusable {
+func (fm *Manager) GetFocusedHierarchy() []Focusable {
 	return fm.focusedHierarchy
 }
 
-func (fm FocusManager) Init() tea.Cmd {
+func (fm Manager) Init() tea.Cmd {
 	return nil
 }
 
-func (fm FocusManager) GetLastKey() string {
-	return fm.lastKey
+func (fm Manager) GetLastKey() string {
+	return *fm.lastKey
 }
 
-func (fm FocusManager) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+func (fm Manager) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmds []tea.Cmd
-
 	switch msg := msg.(type) {
 	case tea.FocusMsg:
 		fm.terminalFocused = true
 	case tea.BlurMsg:
 		fm.terminalFocused = false
 	case tea.KeyMsg:
-		fm.lastKey = msg.String()
+		lastKey := msg.String()
+		fm.lastKey = &lastKey
 		switch {
-		case key.Matches(msg, fm.keys.Tab):
+		case key.Matches(msg, fm.settings.keys.Tab):
 			cmds = append(cmds, fm.FocusNextComponent())
-		case key.Matches(msg, fm.keys.ShiftTab):
+		case key.Matches(msg, fm.settings.keys.ShiftTab):
 			cmds = append(cmds, fm.FocusPreviousComponent())
 		}
 	}
@@ -116,129 +125,154 @@ func (fm FocusManager) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return fm, tea.Batch(cmds...)
 }
 
-func (fm FocusManager) View() string {
+func (fm Manager) View() string {
 	return ""
 }
 
-func (fm *FocusManager) FocusPreviousComponent() tea.Cmd {
+func (fm *Manager) FocusPreviousComponent() tea.Cmd {
 	return nil
 }
 
 // FocusNextComponent returns a command to focus the next component in the hierarchy
-func (fm *FocusManager) FocusNextComponent() tea.Cmd {
+func (fm *Manager) FocusNextComponent() tea.Cmd {
 	nextComponent := fm.findNextFocusableComponent()
 	if nextComponent == nil {
 		log.Println("No next focusable component found")
 		return nil
 	}
-	log.Printf("Found next component: %v\n", nextComponent.GetFocusableUniqueId())
+	log.Printf("Found next component: %v\n", nextComponent.GetFocusableUniqueID())
 
 	return func() tea.Msg {
-		return ComponentFocusMsg{Target: nextComponent}
+		return ComponentFocusMsg{
+			FocusMsg: tea.FocusMsg{},
+			Target:   nextComponent,
+		}
 	}
 }
 
 // findNextFocusableComponent uses recursion to find the next component to focus
-func (fm *FocusManager) findNextFocusableComponent() Focusable {
+func (fm *Manager) findNextFocusableComponent() Focusable {
 	return fm.findNextInLevel(fm.rootComponents, 0, fm.focusedHierarchy)
 }
 
+func findComponentIndex(components []Focusable, component Focusable) int {
+	for i, comp := range components {
+		if comp.GetFocusableUniqueID() == component.GetFocusableUniqueID() {
+			return i
+		}
+	}
+	return -1
+}
+
 // findNextInLevel recursively searches for the next focusable component
-func (fm *FocusManager) findNextInLevel(components []Focusable, depth int, currentPath []Focusable) Focusable {
-	// Base case 1: No components at this level
+func (fm *Manager) findNextInLevel(components []Focusable, depth int, currentPath []Focusable) Focusable {
+	// Base case: No components at this level
 	if len(components) == 0 {
 		return nil
 	}
 
-	// If we're not at the current focus depth yet, go deeper
+	// Case 1: We're still navigating down to current focus depth
 	if depth < len(currentPath)-1 {
-		currentFocused := currentPath[depth]
-		// Find current component in this level
-		for i, comp := range components {
-			if comp == currentFocused {
-				// Recurse to next level with current component's inner elements
-				inner := (currentFocused).GetInnerFocusableComponents()
-				// Check inner components
-				nextInner := fm.findNextInLevel(inner, depth+1, currentPath)
-				if nextInner != nil {
-					return nextInner
-				}
-
-				// If nothing found inner, remove children at depth+1
-				fm.focusedHierarchy = fm.focusedHierarchy[:depth+1]
-
-				// If nothing found inner, try next sibling
-				if i < len(components)-1 {
-					// Try next sibling
-					for j := i + 1; j < len(components); j++ {
-						if (components[j]).IsFocusable() {
-							// Update focus path
-							fm.focusedHierarchy = currentPath[:depth+1]
-							fm.focusedHierarchy[depth] = components[j]
-							return components[j]
-						}
-					}
-				}
-
-				// Nothing found at this level, go up and try next
-				return nil
-			}
-		}
+		return fm.navigateCurrentBranch(components, depth, currentPath)
 	}
 
-	// We're at the right depth, or no specific focus yet
+	// Case 2: We're at the target depth or no specific focus yet
+	return fm.findNextAtCurrentLevel(components, depth, currentPath)
+}
+
+// navigateCurrentBranch handles navigation within the current focus branch
+func (fm *Manager) navigateCurrentBranch(components []Focusable, depth int, currentPath []Focusable) Focusable {
+	currentFocused := currentPath[depth]
+	currentIndex := findComponentIndex(components, currentFocused)
+
+	if currentIndex == -1 {
+		return nil // Component not found at this level
+	}
+
+	// First try inner components of the focused component
+	inner := currentFocused.GetInnerFocusableComponents()
+	nextInner := fm.findNextInLevel(inner, depth+1, currentPath)
+	if nextInner != nil {
+		return nextInner
+	}
+
+	// No focusable inner components found, truncate hierarchy and try siblings
+	fm.focusedHierarchy = fm.focusedHierarchy[:depth+1]
+
+	// Look for next focusable sibling
+	for _, focusableComponent := range iterateFocusableComponents(components, currentIndex+1) {
+		fm.focusedHierarchy[depth] = focusableComponent
+		return focusableComponent
+	}
+
+	return nil
+}
+
+// findNextAtCurrentLevel finds the next component at the current level
+func (fm *Manager) findNextAtCurrentLevel(components []Focusable, depth int, currentPath []Focusable) Focusable {
 	currentIndex := -1
 
-	// If we have current focus at this depth, find its index
+	// If we have focus at this depth, find the current component's index
 	if depth < len(currentPath) {
 		currentComponent := currentPath[depth]
-		for i, comp := range components {
-			if comp.GetFocusableUniqueId() == currentComponent.GetFocusableUniqueId() {
-				currentIndex = i
-				break
-			}
-		}
+		currentIndex = findComponentIndex(components, currentComponent)
 	}
 
-	// remove component at this depth
+	// Truncate hierarchy to this depth
 	fm.focusedHierarchy = currentPath[:depth]
 
-	// Look for next component at this level
+	// Start searching from next component or beginning
 	startIndex := 0
 	if currentIndex >= 0 {
 		startIndex = currentIndex + 1
 	}
 
-	// Check next components at this level
-	for i := startIndex; i < len(components); i++ {
-		if (components[i]).IsFocusable() {
-			// Check inner components first
-			innerComponents := (components[i]).GetInnerFocusableComponents()
-			if len(innerComponents) > 0 {
-				var innerFocusable Focusable = nil
-				for j := 0; j < len(innerComponents); j++ {
-					if (innerComponents[j]).IsFocusable() {
-						innerFocusable = innerComponents[j]
-						break
-					}
-				}
-				if innerFocusable != nil {
-					// add current component to the path
-					fm.focusedHierarchy = append(fm.focusedHierarchy, components[i])
-					return fm.findNextInLevel(innerComponents, depth+1, fm.focusedHierarchy)
-				}
-			} else {
-				// add current component to the path
-				fm.focusedHierarchy = append(fm.focusedHierarchy, components[i])
-				return components[i]
-			}
+	// Look for next focusable component
+	for _, focusableComponent := range iterateFocusableComponents(components, startIndex) {
+		innerComponents := focusableComponent.GetInnerFocusableComponents()
 
-			// No focusable inner components, skip this one
-			return nil
+		if len(innerComponents) > 0 {
+			// Has inner components, add to hierarchy and continue deeper
+			fm.focusedHierarchy = append(fm.focusedHierarchy, focusableComponent)
+
+			// Try to find focusable inner component
+			innerFocusable := firstFocusable(innerComponents)
+			if innerFocusable != nil {
+				return fm.findNextInLevel(innerComponents, depth+1, fm.focusedHierarchy)
+			}
+		} else {
+			// No inner components, focus this component
+			fm.focusedHierarchy = append(fm.focusedHierarchy, focusableComponent)
+			return focusableComponent
 		}
+
+		return nil // No focusable inner components, skip
 	}
 
-	// Nothing focusable at this level
+	// Nothing focusable found, preserve truncated hierarchy
 	fm.focusedHierarchy = currentPath[:depth]
 	return nil
+}
+
+func firstFocusable(components []Focusable) Focusable {
+	for _, comp := range components {
+		if comp.IsFocusable() {
+			return comp
+		}
+	}
+	return nil
+}
+
+func iterateFocusableComponents(components []Focusable, startIndex int) iter.Seq2[int, Focusable] {
+	return func(yield func(int, Focusable) bool) {
+		for i := startIndex; i < len(components); i++ {
+			comp := components[i]
+			if !comp.IsFocusable() {
+				continue
+			}
+			if !yield(i, comp) {
+				break
+			}
+		}
+	}
 }

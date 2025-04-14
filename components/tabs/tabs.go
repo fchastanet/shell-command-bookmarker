@@ -15,53 +15,80 @@ type Tab struct {
 	Model tea.Model
 }
 
+type tabsSettings struct {
+	Keys keyMap
+}
+
+type styles struct {
+	windowStyle      *lipgloss.Style
+	inactiveTabStyle lipgloss.Style
+	activeTabStyle   lipgloss.Style
+	docStyle         lipgloss.Style
+}
+
 type Tabs struct {
 	Tabs         []Tab
+	focusManager *focus.Manager
+	settings     *tabsSettings
+	styles       *styles
 	width        int
 	height       int
 	activeTab    int
-	Keys         keyMap
-	focusManager focus.FocusManager
-	// styles
-	windowStyle       lipgloss.Style
-	highlightColor    lipgloss.AdaptiveColor
-	inactiveTabBorder lipgloss.Border
-	activeTabBorder   lipgloss.Border
-	inactiveTabStyle  lipgloss.Style
-	activeTabStyle    lipgloss.Style
-	docStyle          lipgloss.Style
+}
+
+func defaultKeyMap() keyMap {
+	return keyMap{
+		Left: key.NewBinding(
+			key.WithKeys("left", "p"),
+			key.WithHelp("←/p", "move tab left"),
+		),
+		Right: key.NewBinding(
+			key.WithKeys("right", "n"),
+			key.WithHelp("→/n", "move tab right"),
+		),
+	}
+}
+
+//nolint:mnd // no need to check magic numbers
+func getDefaultStyles(
+	windowStyle *lipgloss.Style,
+	highlightColor *lipgloss.AdaptiveColor,
+) styles {
+	if highlightColor == nil {
+		highlightColor = &lipgloss.AdaptiveColor{Light: "#874BFD", Dark: "#7D56F4"}
+	}
+	inactiveTabBorder := tabBorderWithBottom("┴", "─", "┴")
+	activeTabBorder := tabBorderWithBottom("┘", " ", "└")
+	inactiveTabStyle := lipgloss.NewStyle().
+		Border(inactiveTabBorder, true).
+		BorderForeground(highlightColor).
+		Padding(0, 1)
+
+	return styles{
+		windowStyle:      windowStyle,
+		inactiveTabStyle: inactiveTabStyle,
+		activeTabStyle:   inactiveTabStyle.Border(activeTabBorder, true),
+		docStyle:         lipgloss.NewStyle().Padding(1, 2, 1, 2),
+	}
 }
 
 func NewTabs(
 	tabs []Tab,
-	windowStyle lipgloss.Style,
-	highlightColor lipgloss.AdaptiveColor,
-	focusManager focus.FocusManager,
+	focusManager *focus.Manager,
+	highlightColor *lipgloss.AdaptiveColor,
+	windowStyle *lipgloss.Style,
 ) *Tabs {
-	inactiveTabBorder := tabBorderWithBottom("┴", "─", "┴")
-	activeTabBorder := tabBorderWithBottom("┘", " ", "└")
-	inactiveTabStyle := lipgloss.NewStyle().Border(inactiveTabBorder, true).BorderForeground(highlightColor).Padding(0, 1)
+	styles := getDefaultStyles(windowStyle, highlightColor)
 	return &Tabs{
+		width:        0,
+		height:       0,
 		Tabs:         tabs,
-		windowStyle:  windowStyle,
-		activeTab:    0,
 		focusManager: focusManager,
-		Keys: keyMap{
-			Left: key.NewBinding(
-				key.WithKeys("left", "p"),
-				key.WithHelp("←/p", "move tab left"),
-			),
-			Right: key.NewBinding(
-				key.WithKeys("right", "n"),
-				key.WithHelp("→/n", "move tab right"),
-			),
+		settings: &tabsSettings{
+			Keys: defaultKeyMap(),
 		},
-		inactiveTabBorder: inactiveTabBorder,
-		activeTabBorder:   activeTabBorder,
-		docStyle:          lipgloss.NewStyle().Padding(1, 2, 1, 2),
-		highlightColor:    lipgloss.AdaptiveColor{Light: "#874BFD", Dark: "#7D56F4"},
-		inactiveTabStyle:  inactiveTabStyle,
-		activeTabStyle:    inactiveTabStyle.Border(activeTabBorder, true),
+		styles:    &styles,
+		activeTab: 0,
 	}
 }
 
@@ -74,7 +101,7 @@ type keyMap struct {
 
 func (t Tabs) GetKeyBindings() []key.Binding {
 	return []key.Binding{
-		t.Keys.Left, t.Keys.Right,
+		t.settings.Keys.Left, t.settings.Keys.Right,
 	}
 }
 
@@ -86,7 +113,7 @@ func (t Tabs) GetInnerFocusableComponents() []focus.Focusable {
 	return nil
 }
 
-func (t Tabs) GetFocusableUniqueId() string {
+func (t Tabs) GetFocusableUniqueID() string {
 	return "tabs"
 }
 
@@ -98,9 +125,9 @@ func tabBorderWithBottom(left, middle, right string) lipgloss.Border {
 	return border
 }
 
-func (m Tabs) Init() tea.Cmd {
-	var batches []tea.Cmd
-	for _, tab := range m.Tabs {
+func (t Tabs) Init() tea.Cmd {
+	batches := make([]tea.Cmd, len(t.Tabs))
+	for _, tab := range t.Tabs {
 		if tab.Model == nil {
 			continue
 		}
@@ -109,71 +136,98 @@ func (m Tabs) Init() tea.Cmd {
 	return tea.Batch(batches...)
 }
 
-func (m Tabs) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+func (t Tabs) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
-		m.width = msg.Width
-		m.height = msg.Height
+		t.width = msg.Width
+		t.height = msg.Height
 	case tea.KeyMsg:
-		if !m.focusManager.IsTerminalFocused() {
-			return m, nil
+		if !t.focusManager.IsTerminalFocused() {
+			return t, nil
 		}
 		switch {
-		case key.Matches(msg, m.Keys.Right):
-			if m.activeTab == len(m.Tabs)-1 {
-				m.activeTab = 0
+		case key.Matches(msg, t.settings.Keys.Right):
+			if t.activeTab == len(t.Tabs)-1 {
+				t.activeTab = 0
 			} else {
-				m.activeTab = min(m.activeTab+1, len(m.Tabs)-1)
+				t.activeTab = min(t.activeTab+1, len(t.Tabs)-1)
 			}
-		case key.Matches(msg, m.Keys.Left):
-			if m.activeTab == 0 {
-				m.activeTab = len(m.Tabs) - 1
+		case key.Matches(msg, t.settings.Keys.Left):
+			if t.activeTab == 0 {
+				t.activeTab = len(t.Tabs) - 1
 			} else {
-				m.activeTab = max(m.activeTab-1, 0)
+				t.activeTab = max(t.activeTab-1, 0)
 			}
 		}
 	}
 
-	return m, nil
+	return t, nil
 }
 
-func (m Tabs) View() string {
+func (tab Tab) getBorderStyle(
+	styles *styles, isFirst bool, isLast bool, isActive bool,
+) lipgloss.Style {
+	var style lipgloss.Style
+	if isActive {
+		style = styles.activeTabStyle
+	} else {
+		style = styles.inactiveTabStyle
+	}
+	border := style.GetBorderStyle()
+	switch {
+	case isFirst && isActive:
+		border.BottomLeft = "│"
+	case isFirst && !isActive:
+		border.BottomLeft = "├"
+	case isLast && isActive:
+		border.BottomRight = "│"
+	case isLast && !isActive:
+		border.BottomRight = "┤"
+	}
+	return style.Border(border)
+}
+
+func (tab Tab) View(
+	styles *styles, tabsCount int, width int,
+	isFirst bool, isLast bool, isActive bool,
+) string {
+	if tab.Model == nil {
+		return ""
+	}
+	borderStyle := tab.getBorderStyle(
+		styles, isFirst, isLast, isActive,
+	)
+	borderStyle = borderStyle.Width(
+		width/tabsCount -
+			(borderStyle.GetBorderLeftSize() + borderStyle.GetBorderRightSize() + width%2),
+	)
+	return borderStyle.Render(tab.Title)
+}
+
+func (t Tabs) View() string {
 	doc := strings.Builder{}
 
-	var renderedTabs []string
+	renderedTabs := make([]string, len(t.Tabs))
 
-	for i, tab := range m.Tabs {
-		var style lipgloss.Style
-		isFirst, isLast, isActive := i == 0, i == len(m.Tabs)-1, i == m.activeTab
-		if isActive {
-			style = m.activeTabStyle
-		} else {
-			style = m.inactiveTabStyle
+	for i, tab := range t.Tabs {
+		if tab.Model == nil {
+			continue
 		}
-		border, _, _, _, _ := style.GetBorder()
-		if isFirst && isActive {
-			border.BottomLeft = "│"
-		} else if isFirst && !isActive {
-			border.BottomLeft = "├"
-		} else if isLast && isActive {
-			border.BottomRight = "│"
-		} else if isLast && !isActive {
-			border.BottomRight = "┤"
-		}
-		style = style.Border(border)
-		tabsCount := len(m.Tabs)
-		style = style.Width(
-			m.width/tabsCount -
-				(style.GetBorderLeftSize() + style.GetBorderRightSize() + m.width%2),
+		tabsCount := len(t.Tabs)
+		isFirst, isLast, isActive := i == 0, i == len(t.Tabs)-1, i == t.activeTab
+		renderedTabs[i] = tab.View(
+			t.styles, tabsCount, t.width,
+			isFirst, isLast, isActive,
 		)
-		renderedTabs = append(renderedTabs, style.Render(tab.Title))
 	}
 
 	row := lipgloss.JoinHorizontal(lipgloss.Top, renderedTabs...)
 	doc.WriteString(row)
 	doc.WriteString("\n")
-	doc.WriteString(m.windowStyle.Width((lipgloss.Width(row) - m.windowStyle.GetHorizontalFrameSize())).
-		Render(m.Tabs[m.activeTab].Model.View()),
+	doc.WriteString(
+		t.styles.windowStyle.Width(
+			lipgloss.Width(row) - t.styles.windowStyle.GetHorizontalFrameSize(),
+		).Render(t.Tabs[t.activeTab].Model.View()),
 	)
 	return doc.String()
 }
