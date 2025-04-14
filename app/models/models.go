@@ -1,8 +1,8 @@
-package main
+package models
 
 import (
 	"github.com/charmbracelet/bubbles/table"
-	customTable "github.com/fchastanet/shell-command-bookmarker/components/table"
+	customTable "github.com/fchastanet/shell-command-bookmarker/internal/components/table"
 )
 
 // jscpd:ignore-start

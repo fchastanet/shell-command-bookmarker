@@ -4,7 +4,7 @@ import (
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/fchastanet/shell-command-bookmarker/framework/focus"
+	"github.com/fchastanet/shell-command-bookmarker/internal/framework/focus"
 
 	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/lipgloss"

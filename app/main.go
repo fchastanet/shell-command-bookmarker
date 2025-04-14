@@ -10,8 +10,9 @@ import (
 	"github.com/charmbracelet/bubbles/key"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
-	"github.com/fchastanet/shell-command-bookmarker/components/tabs"
-	"github.com/fchastanet/shell-command-bookmarker/framework/focus"
+	"github.com/fchastanet/shell-command-bookmarker/app/models"
+	"github.com/fchastanet/shell-command-bookmarker/internal/components/tabs"
+	"github.com/fchastanet/shell-command-bookmarker/internal/framework/focus"
 )
 
 type settings struct {
@@ -208,15 +209,15 @@ func mainImpl() error {
 	myTabs := []tabs.Tab{
 		{
 			Title: "Search",
-			Model: SearchTableModel(),
+			Model: models.SearchTableModel(),
 		},
 		{
 			Title: "History",
-			Model: BookmarksTableModel(),
+			Model: models.BookmarksTableModel(),
 		},
 		{
 			Title: "Bookmarks",
-			Model: BookmarksTableModel(),
+			Model: models.BookmarksTableModel(),
 		},
 	}
 	styles := getDefaultStyles(nil)
