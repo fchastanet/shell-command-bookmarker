@@ -42,6 +42,12 @@
 
 ## 1. Excerpt
 
+> [!WARNING]
+>
+> **Development in progress, not functional yet !**
+
+![application preview](doc/preview.png)
+
 This tool provides a terminal-based user interface (TUI) for managing and
 organizing shell commands. It allows users to:
 
