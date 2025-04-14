@@ -31,7 +31,7 @@ jobs:
 
       - name: copy necessary documents
         run: |
-          ./build/doc.sh
+          ./.build/doc.sh
 
       - name: Setup Pages
         uses: actions/configure-pages@v5

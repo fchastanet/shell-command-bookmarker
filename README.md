@@ -100,35 +100,35 @@ Formatting is managed exclusively by pre-commit hooks.
 #### 3.2.1. Build
 
 ```bash
-build/build-docker.sh
+.build/build-docker.sh
 ```
 
 ```bash
-build/build-local.sh
+.build/build-local.sh
 ```
 
 #### 3.2.2. Tests
 
 ```bash
-build/test.sh
+.build/test.sh
 ```
 
 #### 3.2.3. Coverage
 
 ```bash
-build/coverage.sh
+.build/coverage.sh
 ```
 
 #### 3.2.4. run the binary
 
 ```bash
-build/run.sh
+.build/run.sh
 ```
 
 #### 3.2.5. Clean
 
 ```bash
-build/clean.sh
+.build/clean.sh
 ```
 
 ## 4. Commands

@@ -306,7 +306,7 @@ jobs:
       - name: build the binary
         run: |
           set -exo pipefail
-          ./build/build-local.sh
+          ./.build/build-local.sh
 
       - uses: akatov/commit-status-updater@a9e988ec5454692ff7745a509452422a35172ad6
         if: ${{ always() }}
