@@ -5,56 +5,50 @@ import (
 
 	"github.com/charmbracelet/bubbles/key"
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
 	"github.com/fchastanet/shell-command-bookmarker/internal/components/help"
 	"github.com/fchastanet/shell-command-bookmarker/internal/components/tabs"
 	"github.com/fchastanet/shell-command-bookmarker/internal/framework/focus"
+	"github.com/fchastanet/shell-command-bookmarker/internal/framework/style"
 )
-
-type styles struct {
-	docStyle       lipgloss.Style
-	windowStyle    lipgloss.Style
-	highlightColor lipgloss.AdaptiveColor
-}
 
 type AppModel struct {
 	width  int
 	height int
-	styles *styles
 	// sub components
 	appHelpModel  *help.Model
 	TabsComponent *tabs.Tabs
 	FocusManager  *focus.Manager
+	StyleManager  *style.Manager
 }
 
 func NewAppModel(
 	focusManager *focus.Manager,
 ) AppModel {
+	styleManager := style.NewManager()
+
 	myTabs := []tabs.Tab{
 		{
 			Title: "Search",
-			Model: SearchTableModel(),
+			Model: NewSearchTableModel(styleManager),
 		},
 		{
 			Title: "History",
-			Model: BookmarksTableModel(),
+			Model: NewBookmarksTableModel(styleManager),
 		},
 		{
 			Title: "Bookmarks",
-			Model: BookmarksTableModel(),
+			Model: NewBookmarksTableModel(styleManager),
 		},
 	}
-	styles := getDefaultStyles(nil)
 
 	tabsModel := tabs.NewTabs(
 		myTabs,
 		focusManager,
-		&styles.highlightColor,
-		&styles.windowStyle,
+		styleManager,
 	)
 	appHelpModel := help.NewAppHelpModel(
 		focusManager,
-		&styles.docStyle,
+		styleManager,
 	)
 
 	m := AppModel{
@@ -63,7 +57,7 @@ func NewAppModel(
 		appHelpModel:  &appHelpModel,
 		TabsComponent: tabsModel,
 		FocusManager:  focusManager,
-		styles:        styles,
+		StyleManager:  styleManager,
 	}
 
 	shortHelp := func() []key.Binding {
@@ -135,31 +129,11 @@ func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, tea.Batch(cmds...)
 }
 
-//nolint:mnd // no need to check magic numbers
-func getDefaultStyles(
-	highlightColor *lipgloss.AdaptiveColor,
-) *styles {
-	if highlightColor == nil {
-		highlightColor = &lipgloss.AdaptiveColor{Light: "#874BFD", Dark: "#7D56F4"}
-	}
-	return &styles{
-		highlightColor: *highlightColor,
-		docStyle:       lipgloss.NewStyle().Padding(1, 2, 1, 2),
-		windowStyle: lipgloss.NewStyle().
-			BorderForeground(highlightColor).
-			Padding(2, 0).
-			Align(lipgloss.Center).
-			Border(lipgloss.NormalBorder()).
-			UnsetBorderTop(),
-	}
-}
-
 func (m AppModel) View() string {
 	doc := strings.Builder{}
 
 	renderedTabs := m.TabsComponent.View()
-	tabsStr := lipgloss.JoinHorizontal(lipgloss.Top, renderedTabs)
-	doc.WriteString(tabsStr)
+	doc.WriteString(renderedTabs)
 	doc.WriteString(m.appHelpModel.View())
-	return m.styles.docStyle.Render(doc.String())
+	return m.StyleManager.DocStyle.Render(doc.String())
 }

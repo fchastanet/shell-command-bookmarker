@@ -4,29 +4,17 @@ import (
 	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/bubbles/table"
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
+	"github.com/fchastanet/shell-command-bookmarker/internal/framework/style"
 )
 
 type settings struct {
 	keys keyMap
 }
 
-type styles struct {
-	tableStyle lipgloss.Style
-}
-
 type Model struct {
-	table    *table.Model
-	settings *settings
-	styles   *styles
-}
-
-type Option func(*Model)
-
-func WithTableStyle(tableStyle *lipgloss.Style) Option {
-	return func(model *Model) {
-		model.styles.tableStyle = *tableStyle
-	}
+	table        *table.Model
+	settings     *settings
+	styleManager *style.Manager
 }
 
 // keyMap defines a set of keybindings. To work for help it must satisfy
@@ -42,17 +30,13 @@ func (model Model) GetKeyBindings() []key.Binding {
 	}
 }
 
-func getDefaultStyles() *styles {
-	return &styles{
-		tableStyle: lipgloss.NewStyle().
-			BorderStyle(lipgloss.NormalBorder()).
-			BorderForeground(lipgloss.Color("240")),
-	}
-}
-
-func NewModel(tableModel *table.Model, opts ...Option) *Model {
+func NewModel(
+	tableModel *table.Model,
+	styleManager *style.Manager,
+) *Model {
 	model := &Model{
-		table: tableModel,
+		table:        tableModel,
+		styleManager: styleManager,
 		settings: &settings{
 			keys: keyMap{
 				Esc: key.NewBinding(
@@ -65,26 +49,11 @@ func NewModel(tableModel *table.Model, opts ...Option) *Model {
 				),
 			},
 		},
-		styles: getDefaultStyles(),
-	}
-	for _, opt := range opts {
-		opt(model)
 	}
 	return model
 }
 
 func (model Model) Init() tea.Cmd {
-	s := table.DefaultStyles()
-	s.Header = s.Header.
-		BorderStyle(lipgloss.NormalBorder()).
-		BorderForeground(lipgloss.Color("240")).
-		BorderBottom(true).
-		Bold(false)
-	s.Selected = s.Selected.
-		Foreground(lipgloss.Color("229")).
-		Background(lipgloss.Color("57")).
-		Bold(false)
-	model.table.SetStyles(s)
 	return nil
 }
 
@@ -110,5 +79,5 @@ func (model Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (model Model) View() string {
-	return model.styles.tableStyle.Render(model.table.View()) + "\n"
+	return model.styleManager.TableStyle.Render(model.table.View()) + "\n"
 }

@@ -6,8 +6,8 @@ import (
 	"github.com/charmbracelet/bubbles/help"
 	"github.com/charmbracelet/bubbles/key"
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
 	"github.com/fchastanet/shell-command-bookmarker/internal/framework/focus"
+	"github.com/fchastanet/shell-command-bookmarker/internal/framework/style"
 )
 
 type Model struct {
@@ -17,12 +17,8 @@ type Model struct {
 	shortHelpHandler func() []key.Binding
 	fullHelpHandler  func() [][]key.Binding
 	focusManager     *focus.Manager
+	styleManager     *style.Manager
 	settings         *settings
-	styles           *styles
-}
-
-type styles struct {
-	docStyle *lipgloss.Style
 }
 
 // keyMap defines a set of keybindings. To work for help it must satisfy
@@ -63,7 +59,7 @@ func (m Model) GetKeyBindings() []key.Binding {
 
 func NewAppHelpModel(
 	focusManager *focus.Manager,
-	docStyle *lipgloss.Style,
+	styleManager *style.Manager,
 ) Model {
 	helpModel := help.New()
 	m := Model{
@@ -71,6 +67,7 @@ func NewAppHelpModel(
 		height:       0,
 		help:         &helpModel,
 		focusManager: focusManager,
+		styleManager: styleManager,
 		shortHelpHandler: func() []key.Binding {
 			return []key.Binding{}
 		},
@@ -79,9 +76,6 @@ func NewAppHelpModel(
 		},
 		settings: &settings{
 			keys: defaultKeyMap(),
-		},
-		styles: &styles{
-			docStyle: docStyle,
 		},
 	}
 	return m
@@ -146,5 +140,5 @@ func (m Model) View() string {
 	}
 
 	doc.WriteString(strings.Repeat("\n", height) + helpView)
-	return m.styles.docStyle.Render(doc.String())
+	return m.styleManager.DocStyle.Render(doc.String())
 }

@@ -5,32 +5,27 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/fchastanet/shell-command-bookmarker/internal/framework/focus"
+	"github.com/fchastanet/shell-command-bookmarker/internal/framework/style"
 
 	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/lipgloss"
 )
 
 type Tab struct {
-	Title string
-	Model tea.Model
+	Title     string
+	Model     tea.Model
+	tabsModel *Tabs
 }
 
 type tabsSettings struct {
 	Keys keyMap
 }
 
-type styles struct {
-	windowStyle      *lipgloss.Style
-	inactiveTabStyle lipgloss.Style
-	activeTabStyle   lipgloss.Style
-	docStyle         lipgloss.Style
-}
-
 type Tabs struct {
 	Tabs         []Tab
 	focusManager *focus.Manager
+	styleManager *style.Manager
 	settings     *tabsSettings
-	styles       *styles
 	width        int
 	height       int
 	activeTab    int
@@ -49,37 +44,12 @@ func defaultKeyMap() keyMap {
 	}
 }
 
-//nolint:mnd // no need to check magic numbers
-func getDefaultStyles(
-	windowStyle *lipgloss.Style,
-	highlightColor *lipgloss.AdaptiveColor,
-) styles {
-	if highlightColor == nil {
-		highlightColor = &lipgloss.AdaptiveColor{Light: "#874BFD", Dark: "#7D56F4"}
-	}
-	inactiveTabBorder := tabBorderWithBottom("┴", "─", "┴")
-	activeTabBorder := tabBorderWithBottom("┘", " ", "└")
-	inactiveTabStyle := lipgloss.NewStyle().
-		Border(inactiveTabBorder, true).
-		BorderForeground(highlightColor).
-		Padding(0, 1)
-
-	return styles{
-		windowStyle:      windowStyle,
-		inactiveTabStyle: inactiveTabStyle,
-		activeTabStyle:   inactiveTabStyle.Border(activeTabBorder, true),
-		docStyle:         lipgloss.NewStyle().Padding(1, 2, 1, 2),
-	}
-}
-
 func NewTabs(
 	tabs []Tab,
 	focusManager *focus.Manager,
-	highlightColor *lipgloss.AdaptiveColor,
-	windowStyle *lipgloss.Style,
+	styleManager *style.Manager,
 ) *Tabs {
-	styles := getDefaultStyles(windowStyle, highlightColor)
-	return &Tabs{
+	tabsModel := &Tabs{
 		width:        0,
 		height:       0,
 		Tabs:         tabs,
@@ -87,9 +57,15 @@ func NewTabs(
 		settings: &tabsSettings{
 			Keys: defaultKeyMap(),
 		},
-		styles:    &styles,
-		activeTab: 0,
+		styleManager: styleManager,
+		activeTab:    0,
 	}
+
+	// set tabs parent
+	for i := range tabs {
+		tabs[i].tabsModel = tabsModel
+	}
+	return tabsModel
 }
 
 // keyMap defines a set of keybindings. To work for help it must satisfy
@@ -115,14 +91,6 @@ func (t Tabs) GetInnerFocusableComponents() []focus.Focusable {
 
 func (t Tabs) GetFocusableUniqueID() string {
 	return "tabs"
-}
-
-func tabBorderWithBottom(left, middle, right string) lipgloss.Border {
-	border := lipgloss.RoundedBorder()
-	border.BottomLeft = left
-	border.Bottom = middle
-	border.BottomRight = right
-	return border
 }
 
 func (t Tabs) Init() tea.Cmd {
@@ -164,42 +132,16 @@ func (t Tabs) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return t, nil
 }
 
-func (tab Tab) getBorderStyle(
-	styles *styles, isFirst bool, isLast bool, isActive bool,
-) lipgloss.Style {
-	var style lipgloss.Style
-	if isActive {
-		style = styles.activeTabStyle
-	} else {
-		style = styles.inactiveTabStyle
-	}
-	border := style.GetBorderStyle()
-	switch {
-	case isFirst && isActive:
-		border.BottomLeft = "│"
-	case isFirst && !isActive:
-		border.BottomLeft = "├"
-	case isLast && isActive:
-		border.BottomRight = "│"
-	case isLast && !isActive:
-		border.BottomRight = "┤"
-	}
-	return style.Border(border)
-}
-
 func (tab Tab) View(
-	styles *styles, tabsCount int, width int,
+	tabsCount int, width int,
 	isFirst bool, isLast bool, isActive bool,
 ) string {
 	if tab.Model == nil {
 		return ""
 	}
-	borderStyle := tab.getBorderStyle(
-		styles, isFirst, isLast, isActive,
-	)
-	borderStyle = borderStyle.Width(
-		width/tabsCount -
-			(borderStyle.GetBorderLeftSize() + borderStyle.GetBorderRightSize() + width%2),
+	borderStyle := tab.tabsModel.styleManager.GetTabBorderStyle(
+		isFirst, isLast, isActive,
+		width, tabsCount,
 	)
 	return borderStyle.Render(tab.Title)
 }
@@ -216,7 +158,7 @@ func (t Tabs) View() string {
 		tabsCount := len(t.Tabs)
 		isFirst, isLast, isActive := i == 0, i == len(t.Tabs)-1, i == t.activeTab
 		renderedTabs[i] = tab.View(
-			t.styles, tabsCount, t.width,
+			tabsCount, t.width,
 			isFirst, isLast, isActive,
 		)
 	}
@@ -225,8 +167,8 @@ func (t Tabs) View() string {
 	doc.WriteString(row)
 	doc.WriteString("\n")
 	doc.WriteString(
-		t.styles.windowStyle.Width(
-			lipgloss.Width(row) - t.styles.windowStyle.GetHorizontalFrameSize(),
+		t.styleManager.WindowStyle.Width(
+			lipgloss.Width(row) - t.styleManager.WindowStyle.GetHorizontalFrameSize(),
 		).Render(t.Tabs[t.activeTab].Model.View()),
 	)
 	return doc.String()
