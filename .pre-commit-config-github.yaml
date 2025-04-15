@@ -150,9 +150,7 @@ repos:
     rev: v2.1.1
     hooks:
       - id: golangci-lint-config-verify
-      - id: golangci-lint
       - id: golangci-lint-full
-        stages: [pre-push, manual]
 
   - repo: https://github.com/tekwizely/pre-commit-golang
     rev: v1.0.0-rc.1
