@@ -27,6 +27,7 @@ gostub
 gotestfmt
 goutils
 gtpl
+HISTFILE
 httprouter
 hugeparam
 isatty

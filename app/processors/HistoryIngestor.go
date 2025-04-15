@@ -22,23 +22,22 @@ const timestampFieldsCount = 2
 
 // ParseBashHistory reads and parses the bash history file
 // It supports both simple format (just commands) and extended format (`:start:elapsed;command`)
-func ParseBashHistory(historyFilePath string) ([]HistoryCommand, error) {
+func ParseBashHistory(historyFilePath string, callback func(HistoryCommand) error) error {
 	// If no specific path is provided, use the default ~/.bash_history
 	if historyFilePath == "" {
 		homeDir, err := os.UserHomeDir()
 		if err != nil {
-			return nil, err
+			return err
 		}
 		historyFilePath = filepath.Join(homeDir, ".bash_history")
 	}
 
 	file, err := os.Open(historyFilePath)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	defer file.Close()
 
-	var commands []HistoryCommand
 	scanner := bufio.NewScanner(file)
 
 	// Detect format and parse all lines
@@ -51,14 +50,17 @@ func ParseBashHistory(historyFilePath string) ([]HistoryCommand, error) {
 		// Check if this line is in extended format
 		isExtendedFormat := strings.HasPrefix(line, ":")
 		cmd := parseHistoryLine(line, isExtendedFormat)
-		commands = append(commands, cmd)
+		err := callback(cmd)
+		if err != nil {
+			return err
+		}
 	}
 
 	if err := scanner.Err(); err != nil {
-		return nil, err
+		return err
 	}
 
-	return commands, nil
+	return nil
 }
 
 // parseHistoryLine parses a single line from the history file
@@ -81,7 +83,7 @@ func parseHistoryLine(line string, isExtendedFormat bool) HistoryCommand {
 		}
 
 		// Extract timestamps part and command part
-		timestampsPart := line[1:semicolonPos] // Skip the leading colon
+		timestampsPart := line[2:semicolonPos] // Skip the leading colon and space
 		commandPart = line[semicolonPos+1:]
 
 		// Parse timestamps
