@@ -1,14 +1,22 @@
 package main
 
 import (
+	"fmt"
 	"io"
 	"log/slog"
 	"os"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/fchastanet/shell-command-bookmarker/app/models"
+	"github.com/fchastanet/shell-command-bookmarker/internal/db"
 	"github.com/fchastanet/shell-command-bookmarker/internal/framework/focus"
+
+	// Import for side effects
+	_ "embed"
 )
+
+//go:embed resources/sqlite.schema.sql
+var sqliteSchema string
 
 func initLogger(level slog.Level, logFileHandler io.Writer) {
 	slogLevel := slog.SetLogLoggerLevel(level)
@@ -26,6 +34,7 @@ func initLogger(level slog.Level, logFileHandler io.Writer) {
 func main() {
 	if err := mainImpl(); err != nil {
 		slog.Error("critical error", "error", err)
+		fmt.Printf("Error: %v\n", err)
 		os.Exit(1)
 	}
 }
@@ -41,6 +50,16 @@ func mainImpl() error {
 		level = slog.LevelDebug
 	}
 	initLogger(level, f)
+
+	dbPath := "db/shell-command-bookmarker.db"
+	if os.Getenv("SHELL_CMD_BOOK_DB") != "" {
+		dbPath = os.Getenv("SHELL_CMD_BOOK_DB")
+	}
+	dbAdapter := db.NewSQLiteAdapter(dbPath, sqliteSchema)
+	if err := dbAdapter.Open(); err != nil {
+		return err
+	}
+	defer dbAdapter.Close()
 
 	focusManager := focus.NewFocusManager()
 	m := models.NewAppModel(

@@ -2,10 +2,11 @@
 # Project #
 ###########
 
-# make output
-bin/
-logs/
-debug.log
+# app output
+/bin/
+/logs/
+/db/
+/debug.log
 
 ##########
 # Golang #

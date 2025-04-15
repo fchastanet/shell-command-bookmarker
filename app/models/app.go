@@ -21,7 +21,7 @@ type styles struct {
 	highlightColor lipgloss.AdaptiveColor
 }
 
-type model struct {
+type AppModel struct {
 	width         int
 	height        int
 	help          *help.Model
@@ -33,7 +33,7 @@ type model struct {
 
 func NewAppModel(
 	focusManager *focus.Manager,
-) model {
+) AppModel {
 	myTabs := []tabs.Tab{
 		{
 			Title: "Search",
@@ -58,7 +58,7 @@ func NewAppModel(
 	)
 
 	helpModel := help.New()
-	m := model{
+	m := AppModel{
 		width:         0,
 		height:        0,
 		help:          &helpModel,
@@ -83,13 +83,13 @@ type keyMap struct {
 
 // ShortHelp returns keybindings to be shown in the mini help view. It's part
 // of the key.Map interface.
-func (m model) ShortHelp() []key.Binding {
+func (m AppModel) ShortHelp() []key.Binding {
 	return []key.Binding{m.settings.keys.Help, m.settings.keys.Quit}
 }
 
 // FullHelp returns keybindings for the expanded help view. It's part of the
 // key.Map interface.
-func (m model) FullHelp() [][]key.Binding {
+func (m AppModel) FullHelp() [][]key.Binding {
 	return [][]key.Binding{
 		{m.settings.keys.Up, m.settings.keys.Down}, // first column
 		m.FocusManager.GetKeyBindings(),
@@ -119,21 +119,21 @@ func defaultKeyMap() keyMap {
 	}
 }
 
-func (m model) IsFocusable() bool {
+func (m AppModel) IsFocusable() bool {
 	return true
 }
 
-func (m model) GetInnerFocusableComponents() []focus.Focusable {
+func (m AppModel) GetInnerFocusableComponents() []focus.Focusable {
 	return []focus.Focusable{
 		m.TabsComponent,
 	}
 }
 
-func (m model) GetFocusableUniqueID() string {
+func (m AppModel) GetFocusableUniqueID() string {
 	return "main"
 }
 
-func (m model) Init() tea.Cmd {
+func (m AppModel) Init() tea.Cmd {
 	// Initialize sub-models
 	return tea.Batch(
 		m.FocusManager.Init(),
@@ -141,7 +141,7 @@ func (m model) Init() tea.Cmd {
 	)
 }
 
-func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmds []tea.Cmd
 	// Update focus manager model
 	focusManagerModel, cmd := m.FocusManager.Update(msg)
@@ -193,7 +193,7 @@ func getDefaultStyles(
 	}
 }
 
-func (m model) View() string {
+func (m AppModel) View() string {
 	doc := strings.Builder{}
 
 	helpView := m.help.View(m)

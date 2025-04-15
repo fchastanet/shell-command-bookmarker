@@ -10,7 +10,7 @@
         "--headless",
         "--listen=:2345",
         "--api-version=2",
-        "${workspaceFolder}/main/main.go"
+        "${workspaceFolder}/app/main.go"
       ],
       "isBackground": true,
       "problemMatcher": {

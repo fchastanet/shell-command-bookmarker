@@ -1,3 +1,18 @@
 {
-  "terminal.integrated.defaultProfile.windows": "WSL"
+  "terminal.integrated.defaultProfile.windows": "WSL",
+  "dbcode.connections": [
+    {
+      "connectionId": "CR3MyF42MPm8iTPbn8jsZ",
+      "name": "cmd-book",
+      "driver": "sqlite",
+      "color": "#004A37",
+      "socket": "shell-command-bookmarker/db/shell-command-bookmarker.db",
+      "readOnly": false,
+      "role": "development",
+      "driverOptions": {
+        "extensions": []
+      },
+      "connectionType": "socket"
+    }
+  ]
 }

@@ -31,5 +31,6 @@ shellcheck
 SHELLCHECK
 shellcheckrc
 shfmt
+sqlite
 structslop
 stylelint

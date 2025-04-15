@@ -64,6 +64,9 @@ dictionaryDefinitions:
   - name: test
     path: ".cspell/test.txt"
     addWords: true
+  - name: sql
+    path: ".cspell/sql.txt"
+    addWords: true
 
 # https://github.com/streetsidesoftware/cspell/blob/main/packages/cspell/README.md#languagesettings
 languageSettings:
@@ -72,6 +75,13 @@ languageSettings:
     dictionaries:
       - bash
       - myBash
+      - mySoftwares
+      - software
+
+  - languageId: sql
+    locale: "*"
+    dictionaries:
+      - sql
       - mySoftwares
       - software
 
@@ -140,6 +150,10 @@ overrides:
       - "/package.json"
       - "!.golangci.yml"
     languageId: dotFiles
+
+  - filename:
+      - "**/*.sql"
+    languageId: sql
 
   - filename:
       - "**/Dockerfile"
