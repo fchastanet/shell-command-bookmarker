@@ -4,6 +4,7 @@ cancelreader
 colorprofile
 coninput
 copystructure
+cyclop
 difflib
 dotenv
 envsubst
