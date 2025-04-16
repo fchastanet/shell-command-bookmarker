@@ -10,6 +10,13 @@ import (
 	"time"
 )
 
+type HistoryIngestor struct{}
+
+// NewHistoryIngestor creates a new HistoryIngestor instance
+func NewHistoryIngestor() *HistoryIngestor {
+	return &HistoryIngestor{}
+}
+
 // HistoryCommand represents a single command entry from bash history
 type HistoryCommand struct {
 	Command   string
@@ -22,7 +29,7 @@ const timestampFieldsCount = 2
 
 // ParseBashHistory reads and parses the bash history file
 // It supports both simple format (just commands) and extended format (`:start:elapsed;command`)
-func ParseBashHistory(historyFilePath string, callback func(HistoryCommand) error) error {
+func (*HistoryIngestor) ParseBashHistory(historyFilePath string, callback func(HistoryCommand) error) error {
 	// If no specific path is provided, use the default ~/.bash_history
 	if historyFilePath == "" {
 		homeDir, err := os.UserHomeDir()

@@ -30,6 +30,8 @@ gtpl
 HISTFILE
 httprouter
 hugeparam
+Ingestor
+ingestor
 isatty
 jsonv
 ldflags

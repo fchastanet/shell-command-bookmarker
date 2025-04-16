@@ -8,11 +8,11 @@ echo >&2 "Check dependencies ..."
 go mod download
 
 echo >&2 "Building ..."
-go build -tags "fts5" -ldflags="-w -s" ./...
+go build -tags "sqlite_fts5" -ldflags="-w -s" ./...
 
 echo >&2 "Installing ..."
 # Build with a specific output name and move it to GOBIN
-go build -tags "fts5" -ldflags="-w -s" -o "${HOME}/go/bin/bash-shell-command-bookmarker" ./app
+go build -tags "sqlite_fts5" -ldflags="-w -s" -o "${HOME}/go/bin/bash-shell-command-bookmarker" ./app
 
 if [[ -f ${HOME}/go/bin/bash-shell-command-bookmarker ]]; then
   echo >&2 "you can run ${HOME}/go/bin/bash-shell-command-bookmarker"

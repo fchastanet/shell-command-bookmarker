@@ -222,7 +222,8 @@ func TestParseBashHistory(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			var commands []string
 
-			err := ParseBashHistory(tt.historyFile, func(cmd HistoryCommand) error {
+			historyIngestor := &HistoryIngestor{}
+			err := historyIngestor.ParseBashHistory(tt.historyFile, func(cmd HistoryCommand) error {
 				commands = append(commands, cmd.Command)
 				return nil
 			})
@@ -264,7 +265,8 @@ func TestParseBashHistoryWithCallbackError(t *testing.T) {
 	expectedErr := &callbackError{}
 	callCount := 0
 
-	err := ParseBashHistory(testFile, func(_ HistoryCommand) error {
+	historyIngestor := &HistoryIngestor{}
+	err := historyIngestor.ParseBashHistory(testFile, func(_ HistoryCommand) error {
 		callCount++
 		if callCount == 2 {
 			return expectedErr
@@ -291,7 +293,8 @@ func TestParseBashHistoryDefaultPath(t *testing.T) {
 
 	// Just test that the function doesn't error with empty path
 	// We're not actually validating the contents since we don't want to modify the real ~/.bash_history
-	err = ParseBashHistory("", func(_ HistoryCommand) error {
+	historyIngestor := &HistoryIngestor{}
+	err = historyIngestor.ParseBashHistory("", func(_ HistoryCommand) error {
 		// Don't process commands from actual history file
 		return nil
 	})

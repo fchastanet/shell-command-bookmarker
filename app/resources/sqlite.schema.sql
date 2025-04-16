@@ -18,6 +18,7 @@ CREATE TABLE command (
     title TEXT NOT NULL CHECK(length(title) <= 50),
     description TEXT,
     script TEXT NOT NULL,
+    elapsed INTEGER,
     status TEXT NOT NULL CHECK(status IN ('IMPORTED', 'ARCHIVED')),
     folder_id INTEGER,
     FOREIGN KEY (folder_id) REFERENCES folder(id) ON DELETE CASCADE

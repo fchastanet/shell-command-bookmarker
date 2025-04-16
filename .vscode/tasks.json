@@ -10,6 +10,7 @@
         "--headless",
         "--listen=:2345",
         "--api-version=2",
+        "--build-flags=-tags=sqlite_fts5",
         "${workspaceFolder}/app/main.go"
       ],
       "isBackground": true,

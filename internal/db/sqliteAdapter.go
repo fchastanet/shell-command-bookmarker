@@ -6,8 +6,13 @@ import (
 	"path/filepath"
 
 	// Import for side effects
-	// Build with: go build -tags "fts5"
+	// Build with: go build -tags "sqlite_fts5"
 	_ "github.com/mattn/go-sqlite3"
+)
+
+const (
+	DirectoryPerm = 0o755
+	FilePerm      = 0o644
 )
 
 // SQLiteAdapter represents a connection to a SQLite database
@@ -41,10 +46,10 @@ func NewSQLiteAdapter(dbPath, schema string) Adapter {
 }
 
 // Open opens the database connection and initializes the schema if needed
-func (a SQLiteAdapter) Open() error {
+func (a *SQLiteAdapter) Open() error {
 	// Create the directory if it doesn't exist
 	dbDir := filepath.Dir(a.path)
-	if err := os.MkdirAll(dbDir, os.ModeDir); err != nil {
+	if err := os.MkdirAll(dbDir, DirectoryPerm); err != nil {
 		return &DatabaseDirectoryCreationError{
 			Directory:  dbDir,
 			InnerError: err,
@@ -55,7 +60,7 @@ func (a SQLiteAdapter) Open() error {
 	isNew := !fileExists(a.path)
 
 	// Open the database connection with foreign keys and FTS5 enabled
-	db, err := sql.Open("sqlite3", a.path+"?_foreign_keys=on&_fts5=1")
+	db, err := sql.Open("sqlite3", a.path+"?_foreign_keys=on&_sqlite_fts5=1")
 	if err != nil {
 		return &DatabaseNotFoundError{
 			DBFilePath: a.path,
@@ -86,7 +91,7 @@ func (a SQLiteAdapter) Open() error {
 }
 
 // Close closes the database connection
-func (a SQLiteAdapter) Close() error {
+func (a *SQLiteAdapter) Close() error {
 	if a.db != nil {
 		return a.db.Close()
 	}
@@ -94,17 +99,17 @@ func (a SQLiteAdapter) Close() error {
 }
 
 // GetDB returns the database connection
-func (a SQLiteAdapter) GetDB() Driver {
+func (a *SQLiteAdapter) GetDB() Driver {
 	return a.db
 }
 
 // BeginTx starts a new transaction
-func (a SQLiteAdapter) BeginTx() (*sql.Tx, error) {
+func (a *SQLiteAdapter) BeginTx() (*sql.Tx, error) {
 	return a.db.Begin()
 }
 
 // initSchema initializes the database schema
-func (a SQLiteAdapter) initSchema() error {
+func (a *SQLiteAdapter) initSchema() error {
 	// Execute the schema SQL
 	_, err := a.db.Exec(a.schema)
 	if err != nil {
