@@ -70,10 +70,13 @@ func mainImpl() error {
 		slog.Error("Error opening database", "error", err)
 		return err
 	}
-	if err := historyService.IngestHistory(); err != nil {
-		slog.Error("Error ingesting history", "error", err)
-		return err
-	}
+	go func() {
+		if err := historyService.IngestHistory(); err != nil {
+			slog.Error("Error ingesting history", "error", err)
+			// Depending on requirements, you might want to signal this error back
+			// to the main thread or handle it differently. For now, just logging.
+		}
+	}()
 
 	focusManager := focus.NewFocusManager()
 	m := models.NewAppModel(
