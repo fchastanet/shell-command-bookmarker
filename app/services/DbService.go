@@ -1,6 +1,8 @@
 package services
 
 import (
+	"database/sql"
+	"errors"
 	"log/slog"
 	"time"
 
@@ -103,6 +105,11 @@ func (s *DBService) GetCommandByScript(script string) (*Command, error) {
 		&command.Status,
 	)
 	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			slog.Debug("No command found in database", "script", script)
+			return nil, nil
+		}
+		// Handle other scan errors
 		slog.Error("Error scanning command from database", "error", err)
 		return nil, err
 	}
@@ -127,7 +134,7 @@ func (s *DBService) GetMaxCommandTimestamp() (time.Time, error) {
 	var maxTimestamp time.Time
 
 	// Query for the maximum creation_datetime
-	row := s.dbAdapter.GetDB().QueryRow("SELECT MAX(creation_datetime) FROM command")
+	row := s.dbAdapter.GetDB().QueryRow("SELECT IFNULL(MAX(creation_datetime), '1970-01-01 00:00:00') FROM command")
 	err := row.Scan(&maxTimestampStr)
 	if err != nil {
 		// Handle case where table might be empty or other scan errors
