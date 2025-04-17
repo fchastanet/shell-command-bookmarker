@@ -10,6 +10,11 @@ import (
 	"github.com/fchastanet/shell-command-bookmarker/app/processors"
 )
 
+const (
+	// MinCommandLength is the minimum length of a command to be ingested
+	MinCommandLength = 6
+)
+
 type HistoryIngestor interface {
 	// IngestHistoryWithCallback reads the bash history file and ingests it into the database using a callback
 	ParseBashHistory(historyFilePath string, fromTimestamp time.Time, callback func(processors.HistoryCommand) error) error
@@ -102,6 +107,10 @@ func (s *HistoryService) IngestHistory() error {
 	slog.Debug("Max command timestamp", "timestamp", maxCommandTimestamp)
 
 	if err := s.ingestor.ParseBashHistory(historyFilePath, maxCommandTimestamp, func(cmd processors.HistoryCommand) error {
+		if len(cmd.Command) < MinCommandLength {
+			slog.Info("Command too short, skipping", "command", cmd)
+			return nil
+		}
 		_, err := s.dbService.GetCommandByScript(cmd.Command)
 		if err == nil {
 			slog.Debug("Command already exists in database", "command", cmd)
