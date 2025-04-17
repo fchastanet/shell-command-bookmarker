@@ -5,13 +5,14 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/fchastanet/shell-command-bookmarker/app/processors"
 )
 
 type HistoryIngestor interface {
 	// IngestHistoryWithCallback reads the bash history file and ingests it into the database using a callback
-	ParseBashHistory(historyFilePath string, callback func(processors.HistoryCommand) error) error
+	ParseBashHistory(historyFilePath string, fromTimestamp time.Time, callback func(processors.HistoryCommand) error) error
 }
 
 type HistoryService struct {
@@ -93,7 +94,14 @@ func (s *HistoryService) IngestHistory() error {
 		return nil
 	}
 
-	if err := s.ingestor.ParseBashHistory(historyFilePath, func(cmd processors.HistoryCommand) error {
+	maxCommandTimestamp, err := s.dbService.GetMaxCommandTimestamp()
+	if err != nil {
+		slog.Debug("Error getting max command timestamp, fallback to 0", "error", err)
+		maxCommandTimestamp = time.Time{}
+	}
+	slog.Debug("Max command timestamp", "timestamp", maxCommandTimestamp)
+
+	if err := s.ingestor.ParseBashHistory(historyFilePath, maxCommandTimestamp, func(cmd processors.HistoryCommand) error {
 		if err := s.dbService.SaveCommand(cmd); err != nil {
 			slog.Error("Error saving command to database", "command", cmd, "error", err)
 			return err

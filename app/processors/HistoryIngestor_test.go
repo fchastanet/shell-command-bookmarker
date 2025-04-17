@@ -227,7 +227,7 @@ func TestParseBashHistory(t *testing.T) {
 			var commands []string
 
 			historyIngestor := &HistoryIngestor{}
-			err := historyIngestor.ParseBashHistory(tt.historyFile, func(cmd HistoryCommand) error {
+			err := historyIngestor.ParseBashHistory(tt.historyFile, time.Time{}, func(cmd HistoryCommand) error {
 				commands = append(commands, cmd.Command)
 				return nil
 			})
@@ -270,7 +270,7 @@ func TestParseBashHistoryWithCallbackError(t *testing.T) {
 	callCount := 0
 
 	historyIngestor := &HistoryIngestor{}
-	err := historyIngestor.ParseBashHistory(testFile, func(_ HistoryCommand) error {
+	err := historyIngestor.ParseBashHistory(testFile, time.Time{}, func(_ HistoryCommand) error {
 		callCount++
 		if callCount == 2 {
 			return expectedErr
@@ -298,7 +298,7 @@ func TestParseBashHistoryDefaultPath(t *testing.T) {
 	// Just test that the function doesn't error with empty path
 	// We're not actually validating the contents since we don't want to modify the real ~/.bash_history
 	historyIngestor := &HistoryIngestor{}
-	err = historyIngestor.ParseBashHistory("", func(_ HistoryCommand) error {
+	err = historyIngestor.ParseBashHistory("", time.Time{}, func(_ HistoryCommand) error {
 		// Don't process commands from actual history file
 		return nil
 	})
@@ -355,8 +355,8 @@ line3`},
 			historyContent: `: 1678886400:5;git status
 : 1678886410:2;docker ps`,
 			expectedCmds: []HistoryCommand{
-				{Command: `git status`, Timestamp: time.Unix(1678886400, 0), Elapsed: 5},
-				{Command: `docker ps`, Timestamp: time.Unix(1678886410, 0), Elapsed: 2},
+				{Command: `git status`, Timestamp: time.Unix(1678886400, 0).UTC(), Elapsed: 5},
+				{Command: `docker ps`, Timestamp: time.Unix(1678886410, 0).UTC(), Elapsed: 2},
 			},
 		},
 		{
@@ -368,8 +368,8 @@ message"
 			expectedCmds: []HistoryCommand{
 				{Command: `git commit -m "multi \
 line \
-message"`, Timestamp: time.Unix(1678886400, 0), Elapsed: 5},
-				{Command: `docker ps`, Timestamp: time.Unix(1678886410, 0), Elapsed: 2},
+message"`, Timestamp: time.Unix(1678886400, 0).UTC(), Elapsed: 5},
+				{Command: `docker ps`, Timestamp: time.Unix(1678886410, 0).UTC(), Elapsed: 2},
 			},
 		},
 		{
@@ -382,13 +382,16 @@ another simple \
 multi-line
 : 1678886410:2;docker ps`,
 			expectedCmds: []HistoryCommand{
-				{Command: `simple command`},
-				{Command: `git commit -m "multi \
+				{ParseFinished: true, Command: `simple command`},
+				{ParseFinished: true, Command: `git commit -m "multi \
 line \
-message"`, Timestamp: time.Unix(1678886400, 0), Elapsed: 5},
-				{Command: `another simple \
+message"`, Timestamp: time.Unix(1678886400, 0).UTC(), Elapsed: 5},
+				{ParseFinished: true, Command: `another simple \
 multi-line`},
-				{Command: `docker ps`, Timestamp: time.Unix(1678886410, 0), Elapsed: 2},
+				{
+					ParseFinished: true, Command: `docker ps`,
+					Timestamp: time.Unix(1678886410, 0).UTC(), Elapsed: 2,
+				},
 			},
 		},
 		{
@@ -396,7 +399,7 @@ multi-line`},
 			historyContent: `echo "part1" \
 part2 \`,
 			expectedCmds: []HistoryCommand{
-				{Command: `echo "part1" \
+				{ParseFinished: true, Command: `echo "part1" \
 part2 \
 `}, // Note the trailing space might occur depending on interpretation
 			},
@@ -406,9 +409,9 @@ part2 \
 			historyContent: `: 1678886400:5;git commit \
 -m "incomplete" \`,
 			expectedCmds: []HistoryCommand{
-				{Command: `git commit \
+				{ParseFinished: true, Command: `git commit \
 -m "incomplete" \
-`, Timestamp: time.Unix(1678886400, 0), Elapsed: 5},
+`, Timestamp: time.Unix(1678886400, 0).UTC(), Elapsed: 5},
 			},
 		},
 		{
@@ -427,14 +430,14 @@ part2 \
 			name:           "Invalid extended format (no semicolon)",
 			historyContent: `: 1678886400:5 git status`, // Missing semicolon
 			expectedCmds: []HistoryCommand{
-				{Command: `: 1678886400:5 git status`}, // Treated as simple command
+				{ParseFinished: true, Command: `: 1678886400:5 git status`}, // Treated as simple command
 			},
 		},
 		{
 			name:           "Invalid extended format (bad timestamp)",
 			historyContent: `: not_a_time:5;git status`,
 			expectedCmds: []HistoryCommand{
-				{Command: `: not_a_time:5;git status`}, // Treated as simple command
+				{ParseFinished: true, Command: `: not_a_time:5;git status`}, // Treated as simple command
 			},
 		},
 	}
@@ -458,7 +461,7 @@ part2 \
 				return nil
 			}
 
-			err := ingestor.ParseBashHistory(historyFilePath, callback)
+			err := ingestor.ParseBashHistory(historyFilePath, time.Time{}, callback)
 
 			require.NoError(t, err)
 			// Adjust expected commands' timestamps if they are zero (simple format)
@@ -472,6 +475,7 @@ part2 \
 							actualCmds[i].Timestamp = time.Time{}
 						}
 					}
+					adjustedExpectedCmds[i].ParseFinished = true
 				}
 				assert.Equal(t, adjustedExpectedCmds, actualCmds)
 			} else {
@@ -485,6 +489,7 @@ func TestParseBashHistory_FileNotFound(t *testing.T) {
 	ingestor := NewHistoryIngestor()
 	err := ingestor.ParseBashHistory(
 		"/non/existent/path/to/.bash_history",
+		time.Time{},
 		func(_ HistoryCommand) error {
 			t.Fatal("Callback should not be called")
 			return nil

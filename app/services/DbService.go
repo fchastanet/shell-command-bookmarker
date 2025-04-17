@@ -58,3 +58,28 @@ func (s *DBService) SaveCommand(command processors.HistoryCommand) error {
 	}
 	return nil
 }
+
+func (s *DBService) GetMaxCommandTimestamp() (time.Time, error) {
+	var maxTimestampStr string
+	var maxTimestamp time.Time
+
+	// Query for the maximum creation_datetime
+	row := s.dbAdapter.GetDB().QueryRow("SELECT MAX(creation_datetime) FROM command")
+	err := row.Scan(&maxTimestampStr)
+	if err != nil {
+		// Handle case where table might be empty or other scan errors
+		// If the table is empty, Scan might return sql.ErrNoRows, depending on the driver and MAX behavior with NULLs.
+		// We might want to return time.Zero or a specific error in that case.
+		// For simplicity, returning zero time and the error for now.
+		return time.Time{}, err
+	}
+
+	// Parse the timestamp string into time.Time
+	// Assuming the format stored is time.DateTime ("2006-01-02 15:04:05")
+	maxTimestamp, err = time.Parse(time.DateTime, maxTimestampStr)
+	if err != nil {
+		return time.Time{}, err
+	}
+
+	return maxTimestamp, nil
+}
