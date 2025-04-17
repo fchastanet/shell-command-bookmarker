@@ -13,6 +13,11 @@
         "--build-flags=-tags=sqlite_fts5",
         "${workspaceFolder}/app/main.go"
       ],
+      "options": {
+        "env": {
+          "DEBUG": "1"
+        }
+      },
       "isBackground": true,
       "problemMatcher": {
         "owner": "go",

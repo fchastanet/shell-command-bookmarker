@@ -23,10 +23,10 @@ import (
 var sqliteSchema string
 
 func initLogger(level slog.Level, logFileHandler io.Writer) {
-	slogLevel := slog.SetLogLoggerLevel(level)
+	slog.SetLogLoggerLevel(level)
 	opts := &slog.HandlerOptions{
-		AddSource:   slogLevel == slog.LevelDebug,
-		Level:       slogLevel,
+		AddSource:   level == slog.LevelDebug,
+		Level:       level,
 		ReplaceAttr: nil,
 	}
 	handler := slog.NewTextHandler(logFileHandler, opts)
@@ -50,7 +50,8 @@ func mainImpl() error {
 	}
 	defer f.Close()
 	level := slog.LevelError
-	if os.Getenv("DEBUG") != "" {
+	debug := os.Getenv("DEBUG")
+	if debug != "" {
 		level = slog.LevelDebug
 	}
 	initLogger(level, f)
