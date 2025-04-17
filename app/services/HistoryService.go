@@ -102,6 +102,11 @@ func (s *HistoryService) IngestHistory() error {
 	slog.Debug("Max command timestamp", "timestamp", maxCommandTimestamp)
 
 	if err := s.ingestor.ParseBashHistory(historyFilePath, maxCommandTimestamp, func(cmd processors.HistoryCommand) error {
+		_, err := s.dbService.GetCommandByScript(cmd.Command)
+		if err == nil {
+			slog.Debug("Command already exists in database", "command", cmd)
+			return nil
+		}
 		if err := s.dbService.SaveCommand(cmd); err != nil {
 			slog.Error("Error saving command to database", "command", cmd, "error", err)
 			return err

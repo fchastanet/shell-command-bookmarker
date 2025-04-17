@@ -1,6 +1,7 @@
 package services
 
 import (
+	"log/slog"
 	"time"
 
 	"github.com/fchastanet/shell-command-bookmarker/app/processors"
@@ -18,6 +19,22 @@ type DBService struct {
 	dbAdapter  db.Adapter
 	dbPath     string
 	schemaPath string
+}
+
+type Command struct {
+	ID                   int
+	Title                string
+	Description          string
+	Script               string
+	Elapsed              int
+	CreationDatetime     time.Time
+	ModificationDatetime time.Time
+	Status               CommandStatus
+}
+
+type CommandStatusEnum struct {
+	Imported   CommandStatus
+	Bookmarked CommandStatus
 }
 
 func NewDBService(
@@ -57,6 +74,52 @@ func (s *DBService) SaveCommand(command processors.HistoryCommand) error {
 		return err
 	}
 	return nil
+}
+
+func (s *DBService) GetCommandByScript(script string) (*Command, error) {
+	var command Command
+	var creationDateStr string
+	var modificationDateStr string
+
+	slog.Debug("Retrieving command from database", "script", script)
+	// Use QueryRow for single row retrieval
+	row := s.dbAdapter.GetDB().QueryRow(
+		"SELECT id, title, description, script, elapsed, creation_datetime, modification_datetime, status "+
+			"FROM command WHERE script = ? LIMIT 1",
+		script,
+	)
+	if row == nil {
+		slog.Debug("No command found in database", "script", script)
+		return nil, nil
+	}
+	err := row.Scan(
+		&command.ID,
+		&command.Title,
+		&command.Description,
+		&command.Script,
+		&command.Elapsed,
+		&creationDateStr,
+		&modificationDateStr,
+		&command.Status,
+	)
+	if err != nil {
+		slog.Error("Error scanning command from database", "error", err)
+		return nil, err
+	}
+	slog.Debug("Command retrieved from database", "command", command)
+
+	command.CreationDatetime, err = time.Parse(time.DateTime, creationDateStr)
+	if err != nil {
+		slog.Error("Error parsing creation date", "error", err)
+		return nil, err
+	}
+
+	command.ModificationDatetime, err = time.Parse(time.DateTime, modificationDateStr)
+	if err != nil {
+		slog.Error("Error parsing modification date", "error", err)
+		return nil, err
+	}
+	return &command, nil
 }
 
 func (s *DBService) GetMaxCommandTimestamp() (time.Time, error) {

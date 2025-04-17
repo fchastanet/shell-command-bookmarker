@@ -36,6 +36,7 @@ CREATE TABLE command_has_tag (
 CREATE INDEX idx_folder_parent_id ON folder(parent_id);
 CREATE INDEX idx_command_folder ON command(folder_id);
 CREATE INDEX idx_command_status ON command(status);
+CREATE INDEX idx_command_script ON command(script);
 CREATE INDEX idx_command_creation ON command(creation_datetime);
 CREATE INDEX idx_command_modification ON command(modification_datetime);
 
