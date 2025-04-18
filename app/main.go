@@ -95,6 +95,7 @@ func mainImpl() error {
 	focusManager := focus.NewFocusManager()
 	m := models.NewAppModel(
 		focusManager,
+		historyService,
 	)
 	focusManager.SetRootComponents([]focus.Focusable{&m})
 

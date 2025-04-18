@@ -6,8 +6,10 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"time"
 
+	"github.com/charmbracelet/bubbles/table"
 	"github.com/fchastanet/shell-command-bookmarker/app/processors"
 )
 
@@ -44,6 +46,24 @@ func NewHistoryService(
 		scriptRegexp:      nil,
 		ignoreLinesRegexp: nil,
 	}
+}
+
+func (s *HistoryService) GetHistoryRows() ([]table.Row, error) {
+	cmds, err := s.dbService.GetAllCommands()
+	if err != nil {
+		slog.Error("Error getting history rows", "error", err)
+		return []table.Row{}, err
+	}
+	historyRows := make([]table.Row, len(cmds))
+	for row := range cmds {
+		historyRows[row] = table.Row{
+			strconv.Itoa(cmds[row].ID),
+			cmds[row].Title,
+			cmds[row].Script,
+			string(cmds[row].Status),
+		}
+	}
+	return historyRows, nil
 }
 
 func (s *HistoryService) getScriptRegexp() *regexp.Regexp {

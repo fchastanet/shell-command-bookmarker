@@ -127,6 +127,7 @@ func (t Tabs) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				t.activeTab = max(t.activeTab-1, 0)
 			}
 		}
+		t.Tabs[t.activeTab].Model.Update(msg)
 	}
 
 	return t, nil

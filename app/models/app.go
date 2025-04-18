@@ -5,6 +5,7 @@ import (
 
 	"github.com/charmbracelet/bubbles/key"
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/fchastanet/shell-command-bookmarker/app/services"
 	"github.com/fchastanet/shell-command-bookmarker/internal/components/help"
 	"github.com/fchastanet/shell-command-bookmarker/internal/components/tabs"
 	"github.com/fchastanet/shell-command-bookmarker/internal/framework/focus"
@@ -23,6 +24,7 @@ type AppModel struct {
 
 func NewAppModel(
 	focusManager *focus.Manager,
+	historyService *services.HistoryService,
 ) AppModel {
 	styleManager := style.NewManager()
 
@@ -33,7 +35,7 @@ func NewAppModel(
 		},
 		{
 			Title: "History",
-			Model: NewBookmarksTableModel(styleManager),
+			Model: NewHistoryTableModel(styleManager, historyService),
 		},
 		{
 			Title: "Bookmarks",

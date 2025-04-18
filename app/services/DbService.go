@@ -160,3 +160,63 @@ func (s *DBService) GetMaxCommandTimestamp() (time.Time, error) {
 
 	return maxTimestamp, nil
 }
+
+func (s *DBService) GetAllCommands() ([]*Command, error) {
+	var commands []*Command
+	var creationDateStr string
+	var modificationDateStr string
+
+	rows, err := s.dbAdapter.GetDB().Query(
+		`SELECT id, title, description, script, status,
+			lint_issues, lint_status, elapsed,
+			creation_datetime, modification_datetime
+			FROM command`,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		command := Command{
+			ID:                   0,
+			Title:                "",
+			Description:          "",
+			Script:               "",
+			Status:               "",
+			LintIssues:           "",
+			LintStatus:           "",
+			Elapsed:              0,
+			CreationDatetime:     time.Time{},
+			ModificationDatetime: time.Time{},
+		}
+		err := rows.Scan(
+			&command.ID,
+			&command.Title,
+			&command.Description,
+			&command.Script,
+			&command.Status,
+			&command.LintIssues,
+			&command.LintStatus,
+			&command.Elapsed,
+			&creationDateStr,
+			&modificationDateStr,
+		)
+		if err != nil {
+			return nil, err
+		}
+
+		command.CreationDatetime, err = time.Parse(time.DateTime, creationDateStr)
+		if err != nil {
+			return nil, err
+		}
+
+		command.ModificationDatetime, err = time.Parse(time.DateTime, modificationDateStr)
+		if err != nil {
+			return nil, err
+		}
+		slog.Debug("Command retrieved from database", "command", command)
+		commands = append(commands, &command)
+	}
+	return commands, nil
+}
