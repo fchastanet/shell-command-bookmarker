@@ -18,8 +18,10 @@ CREATE TABLE command (
     title TEXT NOT NULL CHECK(length(title) <= 50),
     description TEXT,
     script TEXT NOT NULL,
+    lint_issues TEXT,
+    lint_status TEXT NOT NULL CHECK(lint_status IN ('NOT_AVAILABLE', 'OK', 'WARNING', 'ERROR', 'SHELLCHECK_FAILED')),
     elapsed INTEGER,
-    status TEXT NOT NULL CHECK(status IN ('IMPORTED', 'ARCHIVED')),
+    status TEXT NOT NULL CHECK(status IN ('IMPORTED', 'ARCHIVED', 'LINT_ISSUES')),
     folder_id INTEGER,
     FOREIGN KEY (folder_id) REFERENCES folder(id) ON DELETE CASCADE
 );
@@ -37,6 +39,7 @@ CREATE INDEX idx_folder_parent_id ON folder(parent_id);
 CREATE INDEX idx_command_folder ON command(folder_id);
 CREATE INDEX idx_command_status ON command(status);
 CREATE INDEX idx_command_script ON command(script);
+CREATE INDEX idx_command_lint_status ON command(lint_status);
 CREATE INDEX idx_command_creation ON command(creation_datetime);
 CREATE INDEX idx_command_modification ON command(modification_datetime);
 

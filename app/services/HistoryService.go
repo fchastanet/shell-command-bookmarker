@@ -24,6 +24,7 @@ type HistoryIngestor interface {
 type HistoryService struct {
 	ingestor          HistoryIngestor
 	dbService         *DBService
+	lintService       *LintService
 	scriptRegexp      *regexp.Regexp
 	ignoreLinesRegexp []*regexp.Regexp
 }
@@ -31,10 +32,12 @@ type HistoryService struct {
 func NewHistoryService(
 	ingestor HistoryIngestor,
 	dbService *DBService,
+	lintService *LintService,
 ) *HistoryService {
 	return &HistoryService{
 		ingestor:          ingestor,
 		dbService:         dbService,
+		lintService:       lintService,
 		scriptRegexp:      nil,
 		ignoreLinesRegexp: nil,
 	}
@@ -159,24 +162,55 @@ func (s *HistoryService) IngestHistory() error {
 	}
 	slog.Debug("Max command timestamp", "timestamp", maxCommandTimestamp)
 
-	if err := s.ingestor.ParseBashHistory(historyFilePath, maxCommandTimestamp, func(cmd processors.HistoryCommand) error {
-		if ok, err := s.checkIfCommandShouldBeSaved(cmd); err != nil {
-			return err
-		} else if !ok {
-			slog.Debug("Command already exists in database", "command", cmd)
-			return nil
-		}
-		if err := s.dbService.SaveCommand(cmd); err != nil {
-			slog.Error("Error saving command to database", "command", cmd, "error", err)
-			return err
-		}
-		slog.Info("Command saved successfully", "command", cmd)
-		return nil
-	}); err != nil {
+	if err := s.ingestor.ParseBashHistory(historyFilePath, maxCommandTimestamp, s.processCmd); err != nil {
 		slog.Error("Error ingesting history", "file", historyFilePath, "error", err)
 		return err
 	}
 
+	return nil
+}
+
+func (s *HistoryService) processCmd(historyCmd processors.HistoryCommand) error {
+	if ok, err := s.checkIfCommandShouldBeSaved(historyCmd); err != nil {
+		return err
+	} else if !ok {
+		slog.Debug("Command already exists in database", "command", historyCmd)
+		return nil
+	}
+	cmd := &Command{
+		ID:                   0,
+		Title:                "",
+		Description:          "",
+		Script:               historyCmd.Command,
+		Elapsed:              historyCmd.Elapsed,
+		LintIssues:           "[]",
+		LintStatus:           LintStatusNotAvailable,
+		Status:               CommandStatusImported,
+		CreationDatetime:     historyCmd.Timestamp,
+		ModificationDatetime: time.Now(),
+	}
+	if s.lintService.IsLintingAvailable() {
+		issues, err := s.lintService.LintScript(historyCmd.Command)
+		if err != nil && len(issues) == 0 {
+			slog.Error("Error linting command", "command", historyCmd, "error", err)
+			cmd.LintStatus = LintStatusShellcheckFailed
+			cmd.LintIssues = "[]"
+		} else {
+			cmd.LintStatus = s.lintService.GetLintResultingStatus(issues)
+			cmd.LintIssues = s.lintService.FormatLintIssuesAsJSON(issues)
+		}
+		if cmd.LintStatus == LintStatusWarning {
+			slog.Warn("Linting issues found", "command", historyCmd, "issues", issues)
+		}
+		if cmd.LintStatus == LintStatusError {
+			slog.Error("Linting errors found", "command", historyCmd, "issues", issues)
+		}
+	}
+	if err := s.dbService.SaveCommand(cmd); err != nil {
+		slog.Error("Error saving command to database", "command", cmd, "error", err)
+		return err
+	}
+	slog.Info("Command saved successfully", "command", cmd)
 	return nil
 }
 

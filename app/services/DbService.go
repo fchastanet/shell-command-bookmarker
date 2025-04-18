@@ -6,7 +6,6 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/fchastanet/shell-command-bookmarker/app/processors"
 	"github.com/fchastanet/shell-command-bookmarker/internal/db"
 )
 
@@ -28,10 +27,12 @@ type Command struct {
 	Title                string
 	Description          string
 	Script               string
+	Status               CommandStatus
+	LintIssues           string
+	LintStatus           LintStatus
 	Elapsed              int
 	CreationDatetime     time.Time
 	ModificationDatetime time.Time
-	Status               CommandStatus
 }
 
 type CommandStatusEnum struct {
@@ -62,15 +63,17 @@ func (s *DBService) GetDBAdapter() db.Adapter {
 	return s.dbAdapter
 }
 
-func (s *DBService) SaveCommand(command processors.HistoryCommand) error {
-	date := command.Timestamp.Format(time.DateTime)
+func (s *DBService) SaveCommand(command *Command) error {
 	// Use Exec instead of Query for INSERT statements
 	_, err := s.dbAdapter.GetDB().Exec(
-		"INSERT INTO command (title, description, script, elapsed, creation_datetime, modification_datetime, status) "+
-			"VALUES (?, ?, ?, ?, ?, ?, ?)",
-		"", "",
-		command.Command, command.Elapsed, date, date,
-		string(CommandStatusImported),
+		`INSERT INTO command (
+			title, description, script, status,
+			lint_issues, lint_status, elapsed,
+			creation_datetime, modification_datetime
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		command.Title, command.Description, command.Script, string(command.Status),
+		command.LintIssues, string(command.LintStatus), command.Elapsed,
+		command.CreationDatetime.Format(time.DateTime), command.ModificationDatetime.Format(time.DateTime),
 	)
 	if err != nil {
 		return err
@@ -86,8 +89,10 @@ func (s *DBService) GetCommandByScript(script string) (*Command, error) {
 	slog.Debug("Retrieving command from database", "script", script)
 	// Use QueryRow for single row retrieval
 	row := s.dbAdapter.GetDB().QueryRow(
-		"SELECT id, title, description, script, elapsed, creation_datetime, modification_datetime, status "+
-			"FROM command WHERE script = ? LIMIT 1",
+		`SELECT id, title, description, script, status,
+			lint_issues, lint_status, elapsed,
+			creation_datetime, modification_datetime
+			FROM command WHERE script = ? LIMIT 1`,
 		script,
 	)
 	if row == nil {
@@ -99,10 +104,12 @@ func (s *DBService) GetCommandByScript(script string) (*Command, error) {
 		&command.Title,
 		&command.Description,
 		&command.Script,
+		&command.Status,
+		&command.LintIssues,
+		&command.LintStatus,
 		&command.Elapsed,
 		&creationDateStr,
 		&modificationDateStr,
-		&command.Status,
 	)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {

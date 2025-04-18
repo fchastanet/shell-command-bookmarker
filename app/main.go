@@ -4,6 +4,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -63,9 +64,21 @@ func mainImpl() error {
 	dbService := services.NewDBService(dbPath, sqliteSchema)
 	defer dbService.Close()
 
+	lintService, err := services.NewLintService()
+	if err != nil {
+		if errors.Is(err, services.ErrShellCheckNotFound) {
+			slog.Warn("shellcheck command not found in PATH. Linting will be disabled.", "error", err)
+		} else {
+			slog.Error("Error creating LintService", "error", err)
+
+			return err
+		}
+	}
+
 	historyService := services.NewHistoryService(
 		processors.NewHistoryIngestor(),
 		dbService,
+		lintService,
 	)
 	if err := dbService.Open(); err != nil {
 		slog.Error("Error opening database", "error", err)
