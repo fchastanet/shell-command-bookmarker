@@ -13,11 +13,35 @@ import (
 
 const ExtendedCommandPrefixLen = 2
 
-type HistoryIngestor struct{}
+type HistoryIngestor struct {
+	// parsedCmdCount is the number of commands parsed from the history file
+	parsedCmdCount int
+	// importedCmdCount is the number of commands successfully imported
+	// into the database
+	importedCmdCount int
+	// skippedCmdCount is the number of commands skipped
+	skippedCmdCount int
+	// errorCmdCount is the number of commands that has lint errors
+	// or other errors
+	errorCmdCount int
+	// alreadyExistsCmdCount is the number of commands that already exist
+	// in the database and were not imported
+	alreadyExistsCmdCount int
+	// filteredOutCmdCount is the number of commands that were filtered out
+	// by the ignore lines regexps
+	filteredOutCmdCount int
+}
 
 // NewHistoryIngestor creates a new HistoryIngestor instance
 func NewHistoryIngestor() *HistoryIngestor {
-	return &HistoryIngestor{}
+	return &HistoryIngestor{
+		parsedCmdCount:        0,
+		importedCmdCount:      0,
+		skippedCmdCount:       0,
+		errorCmdCount:         0,
+		alreadyExistsCmdCount: 0,
+		filteredOutCmdCount:   0,
+	}
 }
 
 // HistoryCommand represents a single command entry from bash history
@@ -55,7 +79,7 @@ func (*HistoryIngestor) OpenHistoryFile(historyFilePath string) (*os.File, error
 func (h *HistoryIngestor) ParseBashHistory(
 	historyFilePath string,
 	fromTimestamp time.Time,
-	callback func(HistoryCommand) error,
+	callback func(HistoryCommand) (CommandImportedStatus, error),
 ) error {
 	file, err := h.OpenHistoryFile(historyFilePath)
 	if err != nil {
@@ -65,6 +89,7 @@ func (h *HistoryIngestor) ParseBashHistory(
 
 	scanner := bufio.NewScanner(file)
 	var commandBuilder strings.Builder
+	var importStatus CommandImportedStatus
 	var currentCommand *HistoryCommand // Pointer to track the command being built
 
 	lineNumber := 0
@@ -79,10 +104,15 @@ func (h *HistoryIngestor) ParseBashHistory(
 
 		h.processHistoryLine(line, &commandBuilder, &currentCommand)
 
-		if err := h.handleCommand(historyFilePath, lineNumber, fromTimestamp, currentCommand, callback); err != nil {
+		if importStatus, err = h.handleCommand(
+			historyFilePath, lineNumber, fromTimestamp, currentCommand, callback,
+		); err != nil {
 			// Stop processing if the callback returns an error
+			h.updateStats(importStatus)
 			return err // Propagate callback error
 		}
+		h.updateStats(importStatus)
+
 		if currentCommand.ParseFinished {
 			// If the command is fully parsed, we can reset the command builder
 			currentCommand = nil
@@ -97,34 +127,82 @@ func (h *HistoryIngestor) ParseBashHistory(
 		currentCommand.ParseFinished = true // Mark as fully parsed
 		currentCommand.Command = commandBuilder.String()
 
-		if err := h.handleCommand(historyFilePath, lineNumber, fromTimestamp, currentCommand, callback); err != nil {
+		if importStatus, err = h.handleCommand(
+			historyFilePath, lineNumber, fromTimestamp, currentCommand, callback,
+		); err != nil {
+			h.updateStats(importStatus)
 			return err // Propagate callback error
 		}
+		h.updateStats(importStatus)
 	}
 
 	if err := scanner.Err(); err != nil {
 		return err // Propagate scanner error
 	}
+	slog.Debug(
+		"History ingestion stats",
+		"historyFilePath", historyFilePath,
+		"fromTimestamp", fromTimestamp,
+		"parsedCmdCount", h.parsedCmdCount,
+		"importedCmdCount", h.importedCmdCount,
+		"skippedCmdCount", h.skippedCmdCount,
+		"errorCmdCount", h.errorCmdCount,
+		"alreadyExistsCmdCount", h.alreadyExistsCmdCount,
+		"filteredOutCmdCount", h.filteredOutCmdCount,
+	)
 
 	return nil
 }
+
+// updateStats updates the statistics based on the import status
+func (h *HistoryIngestor) updateStats(importStatus CommandImportedStatus) {
+	if importStatus != CommandImportedStatusInProgress {
+		h.parsedCmdCount++
+	}
+	// Update counts based on the import status
+	switch {
+	case importStatus == CommandImportedStatusNew:
+		h.importedCmdCount++
+	case importStatus == CommandImportedStatusError:
+		h.errorCmdCount++
+	case importStatus == CommandImportedStatusFilteredOut:
+		h.filteredOutCmdCount++
+	case importStatus == CommandImportedStatusAlreadyExists:
+		h.alreadyExistsCmdCount++
+	case importStatus == CommandImportedStatusSkipped:
+		h.skippedCmdCount++
+	}
+}
+
+type CommandImportedStatus int
+
+const (
+	CommandImportedStatusNew CommandImportedStatus = iota
+	CommandImportedStatusSkipped
+	CommandImportedStatusFilteredOut
+	CommandImportedStatusAlreadyExists
+	CommandImportedStatusError
+	CommandImportedStatusInProgress
+)
 
 func (*HistoryIngestor) handleCommand(
 	historyFilePath string,
 	lineNumber int,
 	fromTimestamp time.Time,
 	cmd *HistoryCommand,
-	callback func(HistoryCommand) error,
-) error {
+	callback func(HistoryCommand) (CommandImportedStatus, error),
+) (CommandImportedStatus, error) {
 	if !cmd.ParseFinished {
-		return nil // Skip if the command is not fully parsed
+		return CommandImportedStatusInProgress, nil // Skip if the command is not fully parsed
 	}
 	if strings.TrimSpace(cmd.Command) == "" {
-		return nil // Skip empty commands
+		return CommandImportedStatusSkipped, nil // Skip empty commands
 	}
+	importedStatus := CommandImportedStatusSkipped
+	var err error
 	if cmd.Timestamp.IsZero() || cmd.Timestamp.After(fromTimestamp) {
-		if err := callback(*cmd); err != nil {
-			return err
+		if importedStatus, err = callback(*cmd); err != nil {
+			return importedStatus, err
 		}
 	} else {
 		slog.Debug(
@@ -135,7 +213,7 @@ func (*HistoryIngestor) handleCommand(
 			"lineNumber", lineNumber,
 		)
 	}
-	return nil
+	return importedStatus, nil
 }
 
 // processHistoryLine handles the logic for a single line from the history file.
@@ -163,7 +241,9 @@ func (h *HistoryIngestor) processHistoryLine(
 	}
 	if strings.HasSuffix(part, "\\") {
 		// Start of a multi-line command
-		commandBuilder.WriteString(part) // Append line without trailing backslash
+		part = strings.TrimSuffix(part, "\\") // Remove the trailing backslash
+		part = strings.TrimRight(part, " \t") // Remove trailing spaces
+		commandBuilder.WriteString(part)
 		commandBuilder.WriteString("\n") // Add newline separator
 		// command Not completed yet
 	} else {

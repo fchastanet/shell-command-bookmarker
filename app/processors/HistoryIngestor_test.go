@@ -226,11 +226,20 @@ func TestParseBashHistory(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			var commands []string
 
-			historyIngestor := &HistoryIngestor{}
-			err := historyIngestor.ParseBashHistory(tt.historyFile, time.Time{}, func(cmd HistoryCommand) error {
-				commands = append(commands, cmd.Command)
-				return nil
-			})
+			historyIngestor := &HistoryIngestor{
+				parsedCmdCount:        0,
+				importedCmdCount:      0,
+				skippedCmdCount:       0,
+				errorCmdCount:         0,
+				alreadyExistsCmdCount: 0,
+				filteredOutCmdCount:   0,
+			}
+			err := historyIngestor.ParseBashHistory(tt.historyFile, time.Time{},
+				func(cmd HistoryCommand) (CommandImportedStatus, error) {
+					commands = append(commands, cmd.Command)
+					return CommandImportedStatusNew, nil
+				},
+			)
 
 			if (err != nil) != tt.wantErr {
 				t.Errorf("ParseBashHistory() error = %v, wantErr %v", err, tt.wantErr)
@@ -269,14 +278,23 @@ func TestParseBashHistoryWithCallbackError(t *testing.T) {
 	expectedErr := &callbackError{}
 	callCount := 0
 
-	historyIngestor := &HistoryIngestor{}
-	err := historyIngestor.ParseBashHistory(testFile, time.Time{}, func(_ HistoryCommand) error {
-		callCount++
-		if callCount == 2 {
-			return expectedErr
-		}
-		return nil
-	})
+	historyIngestor := &HistoryIngestor{
+		parsedCmdCount:        0,
+		importedCmdCount:      0,
+		skippedCmdCount:       0,
+		errorCmdCount:         0,
+		alreadyExistsCmdCount: 0,
+		filteredOutCmdCount:   0,
+	}
+	err := historyIngestor.ParseBashHistory(testFile, time.Time{},
+		func(_ HistoryCommand) (CommandImportedStatus, error) {
+			callCount++
+			if callCount == 2 {
+				return CommandImportedStatusError, expectedErr
+			}
+			return CommandImportedStatusSkipped, nil
+		},
+	)
 
 	if !errors.Is(err, expectedErr) {
 		t.Errorf("ParseBashHistory() error = %v, want %v", err, expectedErr)
@@ -297,10 +315,17 @@ func TestParseBashHistoryDefaultPath(t *testing.T) {
 
 	// Just test that the function doesn't error with empty path
 	// We're not actually validating the contents since we don't want to modify the real ~/.bash_history
-	historyIngestor := &HistoryIngestor{}
-	err = historyIngestor.ParseBashHistory("", time.Time{}, func(_ HistoryCommand) error {
+	historyIngestor := &HistoryIngestor{
+		parsedCmdCount:        0,
+		importedCmdCount:      0,
+		skippedCmdCount:       0,
+		errorCmdCount:         0,
+		alreadyExistsCmdCount: 0,
+		filteredOutCmdCount:   0,
+	}
+	err = historyIngestor.ParseBashHistory("", time.Time{}, func(_ HistoryCommand) (CommandImportedStatus, error) {
 		// Don't process commands from actual history file
-		return nil
+		return CommandImportedStatusSkipped, nil
 	})
 
 	if err != nil && !os.IsNotExist(err) { // It's OK if ~/.bash_history doesn't exist
@@ -344,8 +369,8 @@ line2 \
 line3
 ls -l`,
 			expectedCmds: []HistoryCommand{
-				{Command: `echo "line1" \
-line2 \
+				{Command: `echo "line1"
+line2
 line3`},
 				{Command: `ls -l`},
 			},
@@ -366,8 +391,8 @@ line \
 message"
 : 1678886410:2;docker ps`,
 			expectedCmds: []HistoryCommand{
-				{Command: `git commit -m "multi \
-line \
+				{Command: `git commit -m "multi
+line
 message"`, Timestamp: time.Unix(1678886400, 0).UTC(), Elapsed: 5},
 				{Command: `docker ps`, Timestamp: time.Unix(1678886410, 0).UTC(), Elapsed: 2},
 			},
@@ -383,10 +408,10 @@ multi-line
 : 1678886410:2;docker ps`,
 			expectedCmds: []HistoryCommand{
 				{ParseFinished: true, Command: `simple command`},
-				{ParseFinished: true, Command: `git commit -m "multi \
-line \
+				{ParseFinished: true, Command: `git commit -m "multi
+line
 message"`, Timestamp: time.Unix(1678886400, 0).UTC(), Elapsed: 5},
-				{ParseFinished: true, Command: `another simple \
+				{ParseFinished: true, Command: `another simple
 multi-line`},
 				{
 					ParseFinished: true, Command: `docker ps`,
@@ -399,8 +424,8 @@ multi-line`},
 			historyContent: `echo "part1" \
 part2 \`,
 			expectedCmds: []HistoryCommand{
-				{ParseFinished: true, Command: `echo "part1" \
-part2 \
+				{ParseFinished: true, Command: `echo "part1"
+part2
 `}, // Note the trailing space might occur depending on interpretation
 			},
 		},
@@ -409,8 +434,8 @@ part2 \
 			historyContent: `: 1678886400:5;git commit \
 -m "incomplete" \`,
 			expectedCmds: []HistoryCommand{
-				{ParseFinished: true, Command: `git commit \
--m "incomplete" \
+				{ParseFinished: true, Command: `git commit
+-m "incomplete"
 `, Timestamp: time.Unix(1678886400, 0).UTC(), Elapsed: 5},
 			},
 		},
@@ -448,7 +473,7 @@ part2 \
 			defer os.Remove(historyFilePath) // Clean up
 
 			var actualCmds []HistoryCommand
-			callback := func(cmd HistoryCommand) error {
+			callback := func(cmd HistoryCommand) (CommandImportedStatus, error) {
 				// Ignore timestamp for simple format comparison if not set in expected
 				if cmd.Timestamp.IsZero() && len(tc.expectedCmds) > len(actualCmds) && tc.expectedCmds[len(actualCmds)].Timestamp.IsZero() {
 					// Use a fixed time for comparison or skip timestamp check for simple format
@@ -458,7 +483,7 @@ part2 \
 				if cmd != (HistoryCommand{}) {
 					actualCmds = append(actualCmds, cmd)
 				}
-				return nil
+				return CommandImportedStatusNew, nil
 			}
 
 			err := ingestor.ParseBashHistory(historyFilePath, time.Time{}, callback)
@@ -490,9 +515,9 @@ func TestParseBashHistory_FileNotFound(t *testing.T) {
 	err := ingestor.ParseBashHistory(
 		"/non/existent/path/to/.bash_history",
 		time.Time{},
-		func(_ HistoryCommand) error {
+		func(_ HistoryCommand) (CommandImportedStatus, error) {
 			t.Fatal("Callback should not be called")
-			return nil
+			return CommandImportedStatusError, nil
 		},
 	)
 	require.Error(t, err)

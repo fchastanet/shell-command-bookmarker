@@ -18,7 +18,10 @@ const (
 
 type HistoryIngestor interface {
 	// IngestHistoryWithCallback reads the bash history file and ingests it into the database using a callback
-	ParseBashHistory(historyFilePath string, fromTimestamp time.Time, callback func(processors.HistoryCommand) error) error
+	ParseBashHistory(
+		historyFilePath string, fromTimestamp time.Time,
+		callback func(processors.HistoryCommand) (processors.CommandImportedStatus, error),
+	) error
 }
 
 type HistoryService struct {
@@ -120,27 +123,27 @@ func getHistoryFilePath() (string, error) {
 	return historyFile, nil
 }
 
-func (s *HistoryService) checkIfCommandShouldBeSaved(cmd processors.HistoryCommand) (bool, error) {
+func (s *HistoryService) checkIfCommandShouldBeSaved(cmd processors.HistoryCommand) (processors.CommandImportedStatus, error) {
 	if len(cmd.Command) < MinCommandLength {
 		slog.Info("Command too short, skipping", "command", cmd)
-		return false, nil
+		return processors.CommandImportedStatusSkipped, nil
 	}
 	if !s.getScriptRegexp().MatchString(cmd.Command) &&
 		matchOneOfRegexp(cmd.Command, s.getIgnoreLinesRegexp()) {
 		slog.Info("Command does not match any script or is ignored", "command", cmd)
-		return false, nil
+		return processors.CommandImportedStatusFilteredOut, nil
 	}
 
 	existingCmd, err := s.dbService.GetCommandByScript(cmd.Command)
 	if err != nil {
 		slog.Error("Error getting command from database", "command", cmd, "error", err)
-		return false, err
+		return processors.CommandImportedStatusError, err
 	}
 	if existingCmd != nil {
 		slog.Debug("Command already exists in database", "command", cmd)
-		return false, nil
+		return processors.CommandImportedStatusAlreadyExists, nil
 	}
-	return true, nil
+	return processors.CommandImportedStatusNew, nil
 }
 
 func (s *HistoryService) IngestHistory() error {
@@ -170,12 +173,12 @@ func (s *HistoryService) IngestHistory() error {
 	return nil
 }
 
-func (s *HistoryService) processCmd(historyCmd processors.HistoryCommand) error {
-	if ok, err := s.checkIfCommandShouldBeSaved(historyCmd); err != nil {
-		return err
-	} else if !ok {
-		slog.Debug("Command already exists in database", "command", historyCmd)
-		return nil
+func (s *HistoryService) processCmd(historyCmd processors.HistoryCommand) (processors.CommandImportedStatus, error) {
+	if importStatus, err := s.checkIfCommandShouldBeSaved(historyCmd); err != nil {
+		return processors.CommandImportedStatusError, err
+	} else if importStatus != processors.CommandImportedStatusNew {
+		slog.Debug("Command already exists in database or is ignored", "command", historyCmd, "status", importStatus)
+		return importStatus, nil
 	}
 	cmd := &Command{
 		ID:                   0,
@@ -208,10 +211,10 @@ func (s *HistoryService) processCmd(historyCmd processors.HistoryCommand) error 
 	}
 	if err := s.dbService.SaveCommand(cmd); err != nil {
 		slog.Error("Error saving command to database", "command", cmd, "error", err)
-		return err
+		return processors.CommandImportedStatusError, err
 	}
 	slog.Info("Command saved successfully", "command", cmd)
-	return nil
+	return processors.CommandImportedStatusNew, nil
 }
 
 func matchOneOfRegexp(line string, regexps []*regexp.Regexp) bool {

@@ -16,7 +16,7 @@
       "options": {
         "env": {
           "DEBUG": "1",
-          "HISTFILE": "/home/wsl/.bash_history2"
+          "HISTFILE": "/home/wsl/.bash_history"
         }
       },
       "isBackground": true,
