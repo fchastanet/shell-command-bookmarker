@@ -36,6 +36,7 @@ Ingestor
 ingestor
 isatty
 jsonv
+killall
 ldflags
 lipgloss
 localereader
@@ -66,10 +67,12 @@ termenv
 terminfo
 txtpbfmt
 Typef
+unalias
 unconvert
 uniseg
 Unmarshalling
 unparam
+updatedb
 uuid
 wazero
 wordwrap

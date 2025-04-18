@@ -5,6 +5,7 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"regexp"
 	"time"
 
 	"github.com/fchastanet/shell-command-bookmarker/app/processors"
@@ -21,8 +22,10 @@ type HistoryIngestor interface {
 }
 
 type HistoryService struct {
-	ingestor  HistoryIngestor
-	dbService *DBService
+	ingestor          HistoryIngestor
+	dbService         *DBService
+	scriptRegexp      *regexp.Regexp
+	ignoreLinesRegexp []*regexp.Regexp
 }
 
 func NewHistoryService(
@@ -30,9 +33,36 @@ func NewHistoryService(
 	dbService *DBService,
 ) *HistoryService {
 	return &HistoryService{
-		ingestor:  ingestor,
-		dbService: dbService,
+		ingestor:          ingestor,
+		dbService:         dbService,
+		scriptRegexp:      nil,
+		ignoreLinesRegexp: nil,
 	}
+}
+
+func (s *HistoryService) getScriptRegexp() *regexp.Regexp {
+	if s.scriptRegexp != nil {
+		return s.scriptRegexp
+	}
+	s.scriptRegexp = regexp.MustCompile("[|&;><()\\[\\]{}$*?!+=,`]")
+	return s.scriptRegexp
+}
+
+func (s *HistoryService) getIgnoreLinesRegexp() []*regexp.Regexp {
+	if s.ignoreLinesRegexp != nil {
+		return s.ignoreLinesRegexp
+	}
+
+	s.ignoreLinesRegexp = []*regexp.Regexp{
+		regexp.MustCompile("^#"),
+		regexp.MustCompile("( --version| --help)"),
+		regexp.MustCompile("^(shutdown|export|kill|ln|man|mc|ls|ll|ps|source|which|command -v|cd|pwd|echo|cat|rm|mv|cp|touch|mkdir|rmdir|chmod|chown|top|killall|grep|find|locate|updatedb|z) "),
+		regexp.MustCompile("^(code|vi|vim|nano|exit|logout|clear|history|alias|unalias|export|unset|set|env|source|bash|sh|zsh) "),
+		regexp.MustCompile(`^(\./[^ ]+|exit|ls|alias|cd)$`),
+		regexp.MustCompile(`^[A-Za-z0-9_]+=[^ ]+$`),
+		regexp.MustCompile(`^\s*$`),
+	}
+	return s.ignoreLinesRegexp
 }
 
 func getHomeDir() (string, error) {
@@ -87,6 +117,29 @@ func getHistoryFilePath() (string, error) {
 	return historyFile, nil
 }
 
+func (s *HistoryService) checkIfCommandShouldBeSaved(cmd processors.HistoryCommand) (bool, error) {
+	if len(cmd.Command) < MinCommandLength {
+		slog.Info("Command too short, skipping", "command", cmd)
+		return false, nil
+	}
+	if !s.getScriptRegexp().MatchString(cmd.Command) &&
+		matchOneOfRegexp(cmd.Command, s.getIgnoreLinesRegexp()) {
+		slog.Info("Command does not match any script or is ignored", "command", cmd)
+		return false, nil
+	}
+
+	existingCmd, err := s.dbService.GetCommandByScript(cmd.Command)
+	if err != nil {
+		slog.Error("Error getting command from database", "command", cmd, "error", err)
+		return false, err
+	}
+	if existingCmd != nil {
+		slog.Debug("Command already exists in database", "command", cmd)
+		return false, nil
+	}
+	return true, nil
+}
+
 func (s *HistoryService) IngestHistory() error {
 	historyFilePath, err := getHistoryFilePath()
 	if err != nil {
@@ -107,12 +160,9 @@ func (s *HistoryService) IngestHistory() error {
 	slog.Debug("Max command timestamp", "timestamp", maxCommandTimestamp)
 
 	if err := s.ingestor.ParseBashHistory(historyFilePath, maxCommandTimestamp, func(cmd processors.HistoryCommand) error {
-		if len(cmd.Command) < MinCommandLength {
-			slog.Info("Command too short, skipping", "command", cmd)
-			return nil
-		}
-		_, err := s.dbService.GetCommandByScript(cmd.Command)
-		if err == nil {
+		if ok, err := s.checkIfCommandShouldBeSaved(cmd); err != nil {
+			return err
+		} else if !ok {
 			slog.Debug("Command already exists in database", "command", cmd)
 			return nil
 		}
@@ -128,4 +178,13 @@ func (s *HistoryService) IngestHistory() error {
 	}
 
 	return nil
+}
+
+func matchOneOfRegexp(line string, regexps []*regexp.Regexp) bool {
+	for _, regexp := range regexps {
+		if regexp.MatchString(line) {
+			return true
+		}
+	}
+	return false
 }
