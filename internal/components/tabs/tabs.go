@@ -4,7 +4,6 @@ import (
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/fchastanet/shell-command-bookmarker/internal/framework/focus"
 	"github.com/fchastanet/shell-command-bookmarker/internal/framework/style"
 
 	"github.com/charmbracelet/bubbles/key"
@@ -22,13 +21,13 @@ type tabsSettings struct {
 }
 
 type Tabs struct {
-	Tabs         []Tab
-	focusManager *focus.Manager
-	styleManager *style.Manager
-	settings     *tabsSettings
-	width        int
-	height       int
-	activeTab    int
+	Tabs            []Tab
+	styleManager    *style.Manager
+	settings        *tabsSettings
+	width           int
+	height          int
+	activeTab       int
+	terminalFocused bool
 }
 
 const OuterTabContentHeight = 8
@@ -48,19 +47,18 @@ func defaultKeyMap() keyMap {
 
 func NewTabs(
 	tabs []Tab,
-	focusManager *focus.Manager,
 	styleManager *style.Manager,
 ) *Tabs {
 	tabsModel := &Tabs{
-		width:        0,
-		height:       0,
-		Tabs:         tabs,
-		focusManager: focusManager,
+		width:  0,
+		height: 0,
+		Tabs:   tabs,
 		settings: &tabsSettings{
 			Keys: defaultKeyMap(),
 		},
-		styleManager: styleManager,
-		activeTab:    0,
+		styleManager:    styleManager,
+		activeTab:       0,
+		terminalFocused: true,
 	}
 
 	// set tabs parent
@@ -81,18 +79,6 @@ func (t Tabs) GetKeyBindings() []key.Binding {
 	return []key.Binding{
 		t.settings.Keys.Left, t.settings.Keys.Right,
 	}
-}
-
-func (t Tabs) IsFocusable() bool {
-	return true
-}
-
-func (t Tabs) GetInnerFocusableComponents() []focus.Focusable {
-	return nil
-}
-
-func (t Tabs) GetFocusableUniqueID() string {
-	return "tabs"
 }
 
 func (t Tabs) Init() tea.Cmd {
@@ -121,8 +107,13 @@ func (t Tabs) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		t.width = msg.Width
 		t.height = msg.Height
+	case tea.FocusMsg:
+		t.terminalFocused = true
+	case tea.BlurMsg:
+		t.terminalFocused = false
+
 	case tea.KeyMsg:
-		if !t.focusManager.IsTerminalFocused() {
+		if !t.terminalFocused {
 			return t, tea.Batch(cmds...)
 		}
 		t.updateActiveTab(msg)

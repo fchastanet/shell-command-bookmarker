@@ -6,7 +6,6 @@ import (
 	"github.com/charmbracelet/bubbles/help"
 	"github.com/charmbracelet/bubbles/key"
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/fchastanet/shell-command-bookmarker/internal/framework/focus"
 	"github.com/fchastanet/shell-command-bookmarker/internal/framework/style"
 )
 
@@ -16,7 +15,6 @@ type Model struct {
 	help             *help.Model
 	shortHelpHandler func() []key.Binding
 	fullHelpHandler  func() [][]key.Binding
-	focusManager     *focus.Manager
 	styleManager     *style.Manager
 	settings         *settings
 }
@@ -58,7 +56,6 @@ func (m Model) GetKeyBindings() []key.Binding {
 }
 
 func NewAppHelpModel(
-	focusManager *focus.Manager,
 	styleManager *style.Manager,
 ) Model {
 	helpModel := help.New()
@@ -66,7 +63,6 @@ func NewAppHelpModel(
 		width:        0,
 		height:       0,
 		help:         &helpModel,
-		focusManager: focusManager,
 		styleManager: styleManager,
 		shortHelpHandler: func() []key.Binding {
 			return []key.Binding{}

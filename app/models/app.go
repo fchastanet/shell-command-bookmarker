@@ -8,7 +8,6 @@ import (
 	"github.com/fchastanet/shell-command-bookmarker/app/services"
 	"github.com/fchastanet/shell-command-bookmarker/internal/components/help"
 	"github.com/fchastanet/shell-command-bookmarker/internal/components/tabs"
-	"github.com/fchastanet/shell-command-bookmarker/internal/framework/focus"
 	"github.com/fchastanet/shell-command-bookmarker/internal/framework/style"
 )
 
@@ -18,12 +17,10 @@ type AppModel struct {
 	// sub components
 	appHelpModel  *help.Model
 	TabsComponent *tabs.Tabs
-	FocusManager  *focus.Manager
 	styleManager  *style.Manager
 }
 
 func NewAppModel(
-	focusManager *focus.Manager,
 	historyService *services.HistoryService,
 ) AppModel {
 	styleManager := style.NewManager()
@@ -45,11 +42,9 @@ func NewAppModel(
 
 	tabsModel := tabs.NewTabs(
 		myTabs,
-		focusManager,
 		styleManager,
 	)
 	appHelpModel := help.NewAppHelpModel(
-		focusManager,
 		styleManager,
 	)
 
@@ -58,7 +53,6 @@ func NewAppModel(
 		height:        0,
 		appHelpModel:  &appHelpModel,
 		TabsComponent: tabsModel,
-		FocusManager:  focusManager,
 		styleManager:  styleManager,
 	}
 
@@ -70,7 +64,6 @@ func NewAppModel(
 		helpKeyMap := m.appHelpModel.GetKeyBindings()
 		return [][]key.Binding{
 			helpKeyMap,
-			m.FocusManager.GetKeyBindings(),
 			m.TabsComponent.GetKeyBindings(),
 		}
 	}
@@ -81,25 +74,10 @@ func NewAppModel(
 	return m
 }
 
-func (m AppModel) IsFocusable() bool {
-	return true
-}
-
-func (m AppModel) GetInnerFocusableComponents() []focus.Focusable {
-	return []focus.Focusable{
-		m.TabsComponent,
-	}
-}
-
-func (m AppModel) GetFocusableUniqueID() string {
-	return "main"
-}
-
 func (m AppModel) Init() tea.Cmd {
 	// Initialize sub-models
 	return tea.Batch(
 		m.appHelpModel.Init(),
-		m.FocusManager.Init(),
 		m.TabsComponent.Init(),
 	)
 }
@@ -110,12 +88,6 @@ func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		msg.Width -= m.styleManager.WindowStyle.GetHorizontalFrameSize()
 		msg.Height -= m.styleManager.WindowStyle.GetVerticalFrameSize()
 	}
-
-	// Update focus manager model
-	focusManagerModel, cmd := m.FocusManager.Update(msg)
-	focusModel := focusManagerModel.(focus.Manager)
-	m.FocusManager = &focusModel
-	cmds = append(cmds, cmd)
 
 	// Update tabs model
 	tabsTeaModel, cmd := m.TabsComponent.Update(msg)
