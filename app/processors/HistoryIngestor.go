@@ -6,12 +6,16 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
 )
 
 const ExtendedCommandPrefixLen = 2
+
+// controlCharsRegexp is a regex to match control characters
+var controlCharsRegexp = regexp.MustCompile(`[^\x00-\x7F]`)
 
 type HistoryIngestor struct {
 	// parsedCmdCount is the number of commands parsed from the history file
@@ -239,6 +243,7 @@ func (h *HistoryIngestor) processHistoryLine(
 		}
 		*cmd = currentCommand // Update the caller's pointer
 	}
+	part = removeControlCharacters(part)
 	if strings.HasSuffix(part, "\\") {
 		// Start of a multi-line command
 		part = strings.TrimSuffix(part, "\\") // Remove the trailing backslash
@@ -251,6 +256,11 @@ func (h *HistoryIngestor) processHistoryLine(
 		currentCommand.Command = commandBuilder.String()
 		currentCommand.ParseFinished = true // Mark command as fully parsed
 	}
+}
+
+// removeControlCharacters removes control characters from the command string
+func removeControlCharacters(command string) string {
+	return controlCharsRegexp.ReplaceAllString(command, "")
 }
 
 // parseFirstHistoryLine parses the first line of a command entry.
