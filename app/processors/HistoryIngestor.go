@@ -243,7 +243,7 @@ func (h *HistoryIngestor) processHistoryLine(
 		}
 		*cmd = currentCommand // Update the caller's pointer
 	}
-	part = removeControlCharacters(part)
+
 	if strings.HasSuffix(part, "\\") {
 		// Start of a multi-line command
 		part = strings.TrimSuffix(part, "\\") // Remove the trailing backslash
@@ -253,9 +253,20 @@ func (h *HistoryIngestor) processHistoryLine(
 		// command Not completed yet
 	} else {
 		commandBuilder.WriteString(part) // Append the final line
-		currentCommand.Command = commandBuilder.String()
+		currentCommand.Command = cleanCommand(commandBuilder.String())
 		currentCommand.ParseFinished = true // Mark command as fully parsed
 	}
+}
+
+func cleanCommand(command string) string {
+	// Remove control characters
+	command = removeControlCharacters(command)
+	// Remove empty lines at begin/end
+	command = strings.TrimLeft(command, "\n")
+	command = strings.TrimRight(command, "\n")
+	// Remove leading and trailing whitespace
+	command = strings.TrimSpace(command)
+	return command
 }
 
 // removeControlCharacters removes control characters from the command string
