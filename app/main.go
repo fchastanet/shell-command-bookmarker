@@ -14,7 +14,6 @@ import (
 	"github.com/fchastanet/shell-command-bookmarker/app/models"
 	"github.com/fchastanet/shell-command-bookmarker/app/processors"
 	"github.com/fchastanet/shell-command-bookmarker/app/services"
-	"github.com/fchastanet/shell-command-bookmarker/internal/framework/focus"
 
 	// Import for side effects
 	_ "embed"
@@ -92,12 +91,9 @@ func mainImpl() error {
 		}
 	}()
 
-	focusManager := focus.NewFocusManager()
 	m := models.NewAppModel(
-		focusManager,
 		historyService,
 	)
-	focusManager.SetRootComponents([]focus.Focusable{&m})
 
 	if _, err := tea.NewProgram(
 		m,

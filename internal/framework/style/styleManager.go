@@ -95,7 +95,7 @@ func (m *Manager) GetTabBorderStyle(
 	borderStyle := style.Border(border)
 	borderStyle = borderStyle.Width(
 		width/tabsCount -
-			(borderStyle.GetBorderLeftSize() + borderStyle.GetBorderRightSize() + width%2),
+			(borderStyle.GetBorderLeftSize() + borderStyle.GetBorderRightSize() + width%tabsCount),
 	)
 
 	return borderStyle
