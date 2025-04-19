@@ -31,6 +31,8 @@ type Tabs struct {
 	activeTab    int
 }
 
+const OuterTabContentHeight = 8
+
 func defaultKeyMap() keyMap {
 	return keyMap{
 		Left: key.NewBinding(
@@ -105,32 +107,57 @@ func (t Tabs) Init() tea.Cmd {
 }
 
 func (t Tabs) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	var cmds []tea.Cmd
+
+	if t.activeTab != -1 {
+		newM, cmd := t.Tabs[t.activeTab].Model.Update(msg)
+		t.Tabs[t.activeTab].Model = newM
+		if cmd != nil {
+			cmds = append(cmds, cmd)
+		}
+	}
+
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		t.width = msg.Width
 		t.height = msg.Height
 	case tea.KeyMsg:
 		if !t.focusManager.IsTerminalFocused() {
-			return t, nil
+			return t, tea.Batch(cmds...)
 		}
-		switch {
-		case key.Matches(msg, t.settings.Keys.Right):
-			if t.activeTab == len(t.Tabs)-1 {
-				t.activeTab = 0
-			} else {
-				t.activeTab = min(t.activeTab+1, len(t.Tabs)-1)
-			}
-		case key.Matches(msg, t.settings.Keys.Left):
-			if t.activeTab == 0 {
-				t.activeTab = len(t.Tabs) - 1
-			} else {
-				t.activeTab = max(t.activeTab-1, 0)
-			}
-		}
-		t.Tabs[t.activeTab].Model.Update(msg)
+		t.updateActiveTab(msg)
 	}
+	return t, tea.Batch(cmds...)
+}
 
-	return t, nil
+func (t *Tabs) updateActiveTab(msg tea.KeyMsg) {
+	oldActiveTab := t.activeTab
+	switch {
+	case key.Matches(msg, t.settings.Keys.Right):
+		if t.activeTab == len(t.Tabs)-1 {
+			t.activeTab = 0
+		} else {
+			t.activeTab = min(t.activeTab+1, len(t.Tabs)-1)
+		}
+	case key.Matches(msg, t.settings.Keys.Left):
+		if t.activeTab == 0 {
+			t.activeTab = len(t.Tabs) - 1
+		} else {
+			t.activeTab = max(t.activeTab-1, 0)
+		}
+	}
+	if oldActiveTab != t.activeTab {
+		activeTab := t.Tabs[t.activeTab].Model
+		tabFrameWidth := t.styleManager.TabStyle.ActiveTab.GetHorizontalFrameSize()
+		tabFrameHeight := t.styleManager.TabStyle.ActiveTab.GetVerticalFrameSize()
+		activeTab.Update(tea.FocusMsg{})
+		activeTab.Update(tea.WindowSizeMsg{
+			Width:  t.width - tabFrameWidth,
+			Height: t.height - tabFrameHeight - OuterTabContentHeight,
+		})
+		t.Tabs[oldActiveTab].Model.Update(tea.BlurMsg{})
+		// TODO t.focusManager.SetCurrentFocus(t.Tabs[t.activeTab].Model)
+	}
 }
 
 func (tab Tab) View(

@@ -15,6 +15,8 @@ type Model struct {
 	table        *table.Model
 	settings     *settings
 	styleManager *style.Manager
+	Width        int
+	Height       int
 }
 
 // keyMap defines a set of keybindings. To work for help it must satisfy
@@ -49,8 +51,38 @@ func NewModel(
 				),
 			},
 		},
+		Width:  0,
+		Height: 0,
 	}
 	return model
+}
+
+func (model Model) IsFocused() bool {
+	return model.table.Focused()
+}
+
+func (model Model) Focus() {
+	model.table.Focus()
+}
+
+func (model Model) Blur() {
+	model.table.Blur()
+}
+
+func (model Model) SetRows(rows []table.Row) {
+	model.table.SetRows(rows)
+}
+
+func (model Model) SetColumns(columns []table.Column) {
+	model.table.SetColumns(columns)
+}
+
+func (model Model) SetWidth(width int) {
+	model.table.SetWidth(width)
+}
+
+func (model Model) SetHeight(height int) {
+	model.table.SetHeight(height)
 }
 
 func (model Model) Init() tea.Cmd {
@@ -59,7 +91,12 @@ func (model Model) Init() tea.Cmd {
 
 func (model Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
-	if msg, ok := msg.(tea.KeyMsg); ok {
+	switch msg := msg.(type) {
+	case tea.BlurMsg:
+		model.table.Blur()
+	case tea.FocusMsg:
+		model.table.Focus()
+	case tea.KeyMsg:
 		switch msg.String() {
 		case "esc":
 			if model.table.Focused() {
@@ -68,9 +105,11 @@ func (model Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				model.table.Focus()
 			}
 		case "enter":
-			return model, tea.Batch(
-				tea.Printf("Let's go to %s!", model.table.SelectedRow()[1]),
-			)
+			if model.table.Focused() {
+				return model, tea.Batch(
+					tea.Printf("Let's go to %s!", model.table.SelectedRow()),
+				)
+			}
 		}
 	}
 	tableModel, cmd := model.table.Update(msg)
@@ -79,5 +118,5 @@ func (model Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (model Model) View() string {
-	return model.styleManager.TableStyle.Render(model.table.View()) + "\n"
+	return model.styleManager.TableStyle.Render(model.table.View())
 }

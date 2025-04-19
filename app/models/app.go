@@ -19,7 +19,7 @@ type AppModel struct {
 	appHelpModel  *help.Model
 	TabsComponent *tabs.Tabs
 	FocusManager  *focus.Manager
-	StyleManager  *style.Manager
+	styleManager  *style.Manager
 }
 
 func NewAppModel(
@@ -59,7 +59,7 @@ func NewAppModel(
 		appHelpModel:  &appHelpModel,
 		TabsComponent: tabsModel,
 		FocusManager:  focusManager,
-		StyleManager:  styleManager,
+		styleManager:  styleManager,
 	}
 
 	shortHelp := func() []key.Binding {
@@ -106,6 +106,11 @@ func (m AppModel) Init() tea.Cmd {
 
 func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmds []tea.Cmd
+	if msg, ok := msg.(tea.WindowSizeMsg); ok {
+		msg.Width -= m.styleManager.WindowStyle.GetHorizontalFrameSize()
+		msg.Height -= m.styleManager.WindowStyle.GetVerticalFrameSize()
+	}
+
 	// Update focus manager model
 	focusManagerModel, cmd := m.FocusManager.Update(msg)
 	focusModel := focusManagerModel.(focus.Manager)
@@ -137,5 +142,5 @@ func (m AppModel) View() string {
 	renderedTabs := m.TabsComponent.View()
 	doc.WriteString(renderedTabs)
 	doc.WriteString(m.appHelpModel.View())
-	return m.StyleManager.DocStyle.Render(doc.String())
+	return m.styleManager.DocStyle.Render(doc.String())
 }

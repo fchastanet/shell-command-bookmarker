@@ -34,7 +34,7 @@ func NewManager() *Manager {
 		DocStyle:       lipgloss.NewStyle().Padding(1, 2, 1, 2),
 		WindowStyle: lipgloss.NewStyle().
 			BorderForeground(highlightColor).
-			Padding(2, 0).
+			Padding(0, 0).
 			Align(lipgloss.Center).
 			Border(lipgloss.NormalBorder()).
 			UnsetBorderTop(),

@@ -132,13 +132,7 @@ func (m Model) View() string {
 	doc := strings.Builder{}
 
 	helpView := m.help.View(&m)
-	height := 0
-	if m.help.ShowAll {
-		height = strings.Count(helpView, "\n")
-	} else {
-		height = 2
-	}
 
-	doc.WriteString(strings.Repeat("\n", height) + helpView)
+	doc.WriteString(helpView)
 	return m.styleManager.DocStyle.Render(doc.String())
 }
