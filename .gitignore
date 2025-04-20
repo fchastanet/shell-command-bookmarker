@@ -4,9 +4,7 @@
 
 # app output
 /bin/
-/logs/
 /db/
-/debug.log
 
 ##########
 # Golang #

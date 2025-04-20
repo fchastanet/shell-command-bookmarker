@@ -11,6 +11,7 @@ envsubst
 errorlint
 exhaustruct
 exportloopref
+Fdump
 Focusable
 focusable
 funlen

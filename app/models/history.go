@@ -75,21 +75,18 @@ func (m *HistoryTableModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	cmds := []tea.Cmd{}
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
-		windowFrameWidth := m.styleManager.WindowStyle.GetHorizontalFrameSize()
 		tableFrameWidth := m.styleManager.TableStyle.GetHorizontalFrameSize()
-
-		m.width = msg.Width - windowFrameWidth - tableFrameWidth
+		m.width = msg.Width - tableFrameWidth
 		m.tableModel.SetColumns(m.getColumns(m.width))
 		m.tableModel.SetWidth(m.width)
 
-		windowFrameHeight := m.styleManager.WindowStyle.GetVerticalFrameSize()
 		tableFrameHeight := m.styleManager.TableStyle.GetVerticalFrameSize()
-
-		m.height = msg.Height - windowFrameHeight - tableFrameHeight
+		m.height = msg.Height - tableFrameHeight
 		m.tableModel.SetHeight(m.height)
 
 	case tea.BlurMsg:
 		m.tableModel.Blur()
+
 	case tea.FocusMsg:
 		rows, err := m.historyService.GetHistoryRows()
 		if err != nil {
@@ -99,12 +96,8 @@ func (m *HistoryTableModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.tableModel.SetRows(rows)
 		m.tableModel.Focus()
 	}
-	tableModel, cmd := m.tableModel.Update(msg)
+	_, cmd := m.tableModel.Update(msg)
 	cmds = append(cmds, cmd)
-	customTableModel, ok := tableModel.(customTable.Model)
-	if ok {
-		m.tableModel = customTableModel
-	}
 
 	return m, tea.Batch(cmds...)
 }
