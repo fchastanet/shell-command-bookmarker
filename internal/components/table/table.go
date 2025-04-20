@@ -26,7 +26,7 @@ type keyMap struct {
 	Enter key.Binding
 }
 
-func (model Model) GetKeyBindings() []key.Binding {
+func (model *Model) GetKeyBindings() []key.Binding {
 	return []key.Binding{
 		model.settings.keys.Esc, model.settings.keys.Enter,
 	}
@@ -57,39 +57,39 @@ func NewModel(
 	return model
 }
 
-func (model Model) IsFocused() bool {
+func (model *Model) IsFocused() bool {
 	return model.table.Focused()
 }
 
-func (model Model) Focus() {
+func (model *Model) Focus() {
 	model.table.Focus()
 }
 
-func (model Model) Blur() {
+func (model *Model) Blur() {
 	model.table.Blur()
 }
 
-func (model Model) SetRows(rows []table.Row) {
+func (model *Model) SetRows(rows []table.Row) {
 	model.table.SetRows(rows)
 }
 
-func (model Model) SetColumns(columns []table.Column) {
+func (model *Model) SetColumns(columns []table.Column) {
 	model.table.SetColumns(columns)
 }
 
-func (model Model) SetWidth(width int) {
+func (model *Model) SetWidth(width int) {
 	model.table.SetWidth(width)
 }
 
-func (model Model) SetHeight(height int) {
+func (model *Model) SetHeight(height int) {
 	model.table.SetHeight(height)
 }
 
-func (model Model) Init() tea.Cmd {
+func (model *Model) Init() tea.Cmd {
 	return nil
 }
 
-func (model Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+func (model *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
 	switch msg := msg.(type) {
 	case tea.BlurMsg:
@@ -112,11 +112,10 @@ func (model Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		}
 	}
-	tableModel, cmd := model.table.Update(msg)
-	model.table = &tableModel
+	_, cmd = model.table.Update(msg)
 	return model, cmd
 }
 
-func (model Model) View() string {
+func (model *Model) View() string {
 	return model.styleManager.TableStyle.Render(model.table.View())
 }

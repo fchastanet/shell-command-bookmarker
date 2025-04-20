@@ -57,7 +57,7 @@ func (m Model) GetKeyBindings() []key.Binding {
 
 func NewAppHelpModel(
 	styleManager *style.Manager,
-) Model {
+) *Model {
 	helpModel := help.New()
 	m := Model{
 		width:        0,
@@ -74,7 +74,7 @@ func NewAppHelpModel(
 			keys: defaultKeyMap(),
 		},
 	}
-	return m
+	return &m
 }
 
 func (m *Model) SetShortHelpHandler(
@@ -89,12 +89,12 @@ func (m *Model) SetFullHelpHandler(
 	m.fullHelpHandler = fullHelpHandler
 }
 
-func (m Model) Init() tea.Cmd {
+func (m *Model) Init() tea.Cmd {
 	// Initialize sub-models
 	return nil
 }
 
-func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmds []tea.Cmd
 
 	switch msg := msg.(type) {
@@ -124,10 +124,10 @@ func (m *Model) FullHelp() [][]key.Binding {
 	return m.fullHelpHandler()
 }
 
-func (m Model) View() string {
+func (m *Model) View() string {
 	doc := strings.Builder{}
 
-	helpView := m.help.View(&m)
+	helpView := m.help.View(m)
 
 	doc.WriteString(helpView)
 	return m.styleManager.DocStyle.Render(doc.String())

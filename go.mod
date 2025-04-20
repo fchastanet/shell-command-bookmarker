@@ -2,12 +2,14 @@ module github.com/fchastanet/shell-command-bookmarker
 
 go 1.23.1
 
-require github.com/charmbracelet/bubbletea v1.3.4
+require (
+	github.com/charmbracelet/bubbletea v1.3.4
+	github.com/davecgh/go-spew v1.1.1
+)
 
 require (
 	github.com/charmbracelet/colorprofile v0.2.3-0.20250311203215-f60798e515dc // indirect
 	github.com/charmbracelet/x/cellbuf v0.0.13-0.20250311204145-2c3ea96c31dd // indirect
-	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/xo/terminfo v0.0.0-20220910002029-abceb7e1c41e // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect

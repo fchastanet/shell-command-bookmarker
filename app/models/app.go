@@ -1,59 +1,44 @@
 package models
 
 import (
+	"io"
 	"strings"
 
 	"github.com/charmbracelet/bubbles/key"
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/davecgh/go-spew/spew"
 	"github.com/fchastanet/shell-command-bookmarker/app/services"
 	"github.com/fchastanet/shell-command-bookmarker/internal/components/help"
-	"github.com/fchastanet/shell-command-bookmarker/internal/components/tabs"
 	"github.com/fchastanet/shell-command-bookmarker/internal/framework/style"
 )
 
 type AppModel struct {
 	width  int
 	height int
+	// debug
+	dump io.Writer
 	// sub components
-	appHelpModel  *help.Model
-	TabsComponent *tabs.Tabs
-	styleManager  *style.Manager
+	appHelpModel *help.Model
+	historyModel *HistoryTableModel
+	styleManager *style.Manager
 }
 
 func NewAppModel(
 	historyService *services.HistoryService,
-) AppModel {
+	dump io.Writer,
+) *AppModel {
 	styleManager := style.NewManager()
-
-	myTabs := []tabs.Tab{
-		{
-			Title: "Search",
-			Model: NewSearchTableModel(styleManager),
-		},
-		{
-			Title: "History",
-			Model: NewHistoryTableModel(styleManager, historyService),
-		},
-		{
-			Title: "Bookmarks",
-			Model: NewBookmarksTableModel(styleManager),
-		},
-	}
-
-	tabsModel := tabs.NewTabs(
-		myTabs,
-		styleManager,
-	)
 	appHelpModel := help.NewAppHelpModel(
 		styleManager,
 	)
-
+	historyModel := NewHistoryTableModel(styleManager, historyService)
 	m := AppModel{
-		width:         0,
-		height:        0,
-		appHelpModel:  &appHelpModel,
-		TabsComponent: tabsModel,
-		styleManager:  styleManager,
+		width:        0,
+		height:       0,
+		dump:         dump,
+		appHelpModel: appHelpModel,
+		historyModel: historyModel,
+		styleManager: styleManager,
 	}
 
 	shortHelp := func() []key.Binding {
@@ -64,55 +49,51 @@ func NewAppModel(
 		helpKeyMap := m.appHelpModel.GetKeyBindings()
 		return [][]key.Binding{
 			helpKeyMap,
-			m.TabsComponent.GetKeyBindings(),
 		}
 	}
 
 	m.appHelpModel.SetShortHelpHandler(shortHelp)
 	m.appHelpModel.SetFullHelpHandler(fullHelp)
 
-	return m
+	return &m
 }
 
-func (m AppModel) Init() tea.Cmd {
+func (m *AppModel) Init() tea.Cmd {
 	// Initialize sub-models
 	return tea.Batch(
 		m.appHelpModel.Init(),
-		m.TabsComponent.Init(),
+		m.historyModel.Init(),
 	)
 }
 
-func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
-	var cmds []tea.Cmd
-	if msg, ok := msg.(tea.WindowSizeMsg); ok {
-		msg.Width -= m.styleManager.WindowStyle.GetHorizontalFrameSize()
-		msg.Height -= m.styleManager.WindowStyle.GetVerticalFrameSize()
+func (m *AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	if m.dump != nil {
+		spew.Fdump(m.dump, msg)
 	}
-
-	// Update tabs model
-	tabsTeaModel, cmd := m.TabsComponent.Update(msg)
-	tabsModel := tabsTeaModel.(tabs.Tabs)
-	m.TabsComponent = &tabsModel
-	cmds = append(cmds, cmd)
+	var cmds []tea.Cmd
 
 	// Update help model
-	helpModel, cmd := m.appHelpModel.Update(msg)
-	helpModelInstance := helpModel.(help.Model)
-	m.appHelpModel = &helpModelInstance
+	_, cmd := m.appHelpModel.Update(msg)
+	cmds = append(cmds, cmd)
+
+	_, cmd = m.historyModel.Update(msg)
 	cmds = append(cmds, cmd)
 
 	if msg, ok := msg.(tea.WindowSizeMsg); ok {
 		m.width = msg.Width
 		m.height = msg.Height
+
+		m.historyModel.height = m.height
+		m.historyModel.width = m.width
 	}
+
 	return m, tea.Batch(cmds...)
 }
 
-func (m AppModel) View() string {
+func (m *AppModel) View() string {
 	doc := strings.Builder{}
 
-	renderedTabs := m.TabsComponent.View()
-	doc.WriteString(renderedTabs)
+	doc.WriteString(m.historyModel.View())
 	doc.WriteString(m.appHelpModel.View())
 	return m.styleManager.DocStyle.Render(doc.String())
 }

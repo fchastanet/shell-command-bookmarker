@@ -19,6 +19,8 @@ import (
 	_ "embed"
 )
 
+const WriteFileMode = 0o644
+
 //go:embed resources/sqlite.schema.sql
 var sqliteSchema string
 
@@ -44,15 +46,23 @@ func main() {
 }
 
 func mainImpl() error {
-	f, err := tea.LogToFile("debug.log", "debug")
+	f, err := tea.LogToFile("logs/error.log", "debug")
 	if err != nil {
 		return err
 	}
 	defer f.Close()
 	level := slog.LevelError
 	debug := os.Getenv("DEBUG")
+	var dump *os.File
 	if debug != "" {
 		level = slog.LevelDebug
+		var err error
+		dump, err = os.OpenFile("logs/debug.log", os.O_CREATE|os.O_TRUNC|os.O_WRONLY, WriteFileMode)
+		if err != nil {
+			slog.Error("Error opening debug log file", "error", err)
+			os.Exit(1)
+		}
+		defer dump.Close()
 	}
 	initLogger(level, f)
 
@@ -93,6 +103,7 @@ func mainImpl() error {
 
 	m := models.NewAppModel(
 		historyService,
+		dump,
 	)
 
 	if _, err := tea.NewProgram(
