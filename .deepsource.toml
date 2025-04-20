@@ -17,7 +17,7 @@ enabled = true
   [analyzers.meta]
   import_root = "github.com/fchastanet/bash-tools-command-bookmarker"
   import_paths = [
-    "github.com/fchastanet/bash-tools-command-bookmarker/internal"
+    "github.com/fchastanet/bash-tools-command-bookmarker/lib"
   ]
 
 [[analyzers]]

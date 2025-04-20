@@ -13,5 +13,8 @@
       },
       "connectionType": "socket"
     }
-  ]
+  ],
+  "gopls": {
+    "buildFlags": ["-tags=sqlite_fts5,fts5"],
+  }
 }

@@ -31,6 +31,7 @@
 - [2. Documentation](#2-documentation)
   - [2.1. Go Libraries used](#21-go-libraries-used)
 - [3. Development](#3-development)
+  - [Necessary tools](#necessary-tools)
   - [3.1. Pre-commit hook](#31-pre-commit-hook)
   - [3.2. Build/run/clean](#32-buildrunclean)
     - [3.2.1. Build](#321-build)
@@ -75,8 +76,16 @@ enhance shell workflows and command management.
   - [slog tutorial](https://betterstack.com/community/guides/logging/logging-in-go/#customizing-the-default-logger)
 - [Bubbletea](https://github.com/charmbracelet/bubbletea) A powerful little TUI
   framework.
+- Not a library, but a lot of snippets, ui logic and design have been taken
+  from [PUG -  A terminal user interface for terraform power users](https://github.com/leg100/pug).
 
 ## 3. Development
+
+### Necessary tools
+
+```bash
+go install golang.org/x/tools/cmd/goimports@latest
+```
 
 ### 3.1. Pre-commit hook
 
