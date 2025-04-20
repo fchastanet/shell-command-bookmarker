@@ -34,7 +34,7 @@ ignorePaths:
   - ".mega-linter*.yml"
   - ".env"
   - "go.sum"
-  - internal/utils/encoding/testsData/content.txt
+  - pkg/utils/encoding/testsData/content.txt
 
 dictionaryDefinitions:
   - name: myBash

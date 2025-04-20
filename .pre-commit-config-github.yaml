@@ -105,7 +105,7 @@ repos:
         exclude: >
           (?x)(
               ^.cspell/codespellrc-.*.txt$|
-              ^internal/utils/encoding/testsData/content.txt$
+              ^pkg/utils/encoding/testsData/content.txt$
           )
 
   - repo: https://github.com/ComPWA/prettier-pre-commit
