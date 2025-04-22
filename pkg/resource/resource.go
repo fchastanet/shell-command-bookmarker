@@ -1,10 +1,11 @@
 package resource
 
-// Resource is a unique pug entity
+// Resource is a unique Shell Command Bookmarker entity
 type Resource interface {
-	// GetID retrieves the unique identifier for the resource.
-	GetID() MonotonicID
+	GetID() ID
+	// GetMonotonicID retrieves the unique identifier for the resource.
+	GetMonotonicID() MonotonicID
 	// String is a human-readable identifier for the resource. Not necessarily
-	// unique across pug.
+	// unique across Shell Command Bookmarker.
 	String() string
 }

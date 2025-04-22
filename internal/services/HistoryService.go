@@ -44,6 +44,7 @@ func NewHistoryService(
 		ingestor:          ingestor,
 		dbService:         dbService,
 		lintService:       lintService,
+		homeDir:           "",
 		scriptRegexp:      nil,
 		ignoreLinesRegexp: nil,
 	}

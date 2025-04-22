@@ -76,8 +76,10 @@ enhance shell workflows and command management.
   - [slog tutorial](https://betterstack.com/community/guides/logging/logging-in-go/#customizing-the-default-logger)
 - [Bubbletea](https://github.com/charmbracelet/bubbletea) A powerful little TUI
   framework.
-- Not a library, but a lot of snippets, ui logic and design have been taken
-  from [PUG -  A terminal user interface for terraform power users](https://github.com/leg100/pug).
+- Not a library, but a lot of snippets, ui logic and design have been taken from
+  [PUG - A terminal user interface for terraform power users](https://github.com/leg100/pug).
+- snippets from
+  [Brandon Fulljames](https://github.com/Evertras/bubble-table/blob/main/table/dimensions.go)
 
 ## 3. Development
 

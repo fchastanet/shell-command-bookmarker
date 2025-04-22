@@ -1,10 +1,6 @@
 package top
 
 import (
-	"errors"
-	"fmt"
-	"io"
-	"os"
 	"strings"
 
 	"github.com/charmbracelet/bubbles/cursor"
@@ -14,17 +10,14 @@ import (
 	"github.com/charmbracelet/lipgloss"
 	"github.com/fchastanet/shell-command-bookmarker/internal/models"
 	"github.com/fchastanet/shell-command-bookmarker/internal/models/keys"
+	"github.com/fchastanet/shell-command-bookmarker/internal/models/structure"
+	"github.com/fchastanet/shell-command-bookmarker/internal/models/styles"
 	"github.com/fchastanet/shell-command-bookmarker/internal/services"
+	"github.com/fchastanet/shell-command-bookmarker/internal/version"
 	"github.com/fchastanet/shell-command-bookmarker/pkg/tui"
-	"github.com/leg100/pug/internal/app"
-	"github.com/leg100/pug/internal/module"
-	"github.com/leg100/pug/internal/resource"
-	"github.com/leg100/pug/internal/task"
-	tuitask "github.com/leg100/pug/internal/tui/task"
-	"github.com/leg100/pug/internal/version"
 )
 
-// pug is in one of several modes, which alter how all messages are handled.
+// alter how all messages are handled.
 type mode int
 
 const (
@@ -33,55 +26,71 @@ const (
 	filterMode             // filter is visible and taking input
 )
 
-type model struct {
+type Model struct {
 	*models.PaneManager
-	appService *services.AppService
+	appService   *services.AppService
+	styles       *styles.Styles
+	filterKeyMap *keys.FilterKeyMap
+	globalKeyMap *keys.GlobalKeyMap
+	paneKeyMap   *keys.PaneNavigationKeyMap
 
-	makers     map[models.Kind]models.Maker
-	modules    *module.Service
-	width      int
-	height     int
-	mode       mode
-	showHelp   bool
-	prompt     *tui.Prompt
-	dump       *os.File
-	workdir    string
-	tasks      *task.Service
-	spinner    *spinner.Model
-	spinning   bool
-	lastTaskID *resource.MonotonicID
-	err        error
-	info       string
-	taskConfig *tuitask.Config
+	width         int
+	height        int
+	mode          mode
+	showHelp      bool
+	prompt        *models.Prompt
+	spinner       *spinner.Model
+	spinning      bool
+	err           error
+	info          string
+	versionWidget string
+	helpWidget    string
 }
 
-func newModel(appService *services.AppService) (model, error) {
-
+func NewModel(
+	appService *services.AppService,
+	myStyles *styles.Styles,
+) Model {
 	// Work-around for
 	// https://github.com/charmbracelet/bubbletea/issues/1036#issuecomment-2158563056
 	_ = lipgloss.HasDarkBackground()
 
-	spinner := spinner.New(spinner.WithSpinner(spinner.Line))
-	taskConfig := &tuitask.Config{}
-	makers := makeMakers(appService, &spinner)
+	spinnerObj := spinner.New(spinner.WithSpinner(spinner.Line))
+	makers := makeMakers(appService, myStyles, &spinnerObj)
 
-	m := model{
-		PaneManager: models.NewPaneManager(makers),
-		spinner:     &spinner,
-		tasks:       app.Tasks,
-		appService:  appService,
-		taskConfig:  taskConfig,
+	helpWidget := myStyles.HelpStyle.Main.Render("? help")
+	versionWidget := myStyles.FooterStyle.Version.Render(version.Get())
+
+	m := Model{
+		PaneManager:   models.NewPaneManager(makers, myStyles),
+		filterKeyMap:  keys.GetFilterKeyMap(),
+		globalKeyMap:  keys.GetGlobalKeyMap(),
+		paneKeyMap:    keys.GetPaneNavigationKeyMap(),
+		spinner:       &spinnerObj,
+		appService:    appService,
+		styles:        myStyles,
+		helpWidget:    helpWidget,
+		versionWidget: versionWidget,
+		width:         0,
+		height:        0,
+		mode:          normalMode,
+		showHelp:      false,
+		spinning:      false,
+		err:           nil,
+		info:          "",
+		prompt:        nil,
 	}
-	return m, nil
+	return m
 }
 
-func (m model) Init() tea.Cmd {
+func (m *Model) Init() tea.Cmd {
 	return tea.Batch(
 		m.PaneManager.Init(),
 	)
 }
 
-func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+//nolint:cyclop // don't see how to simplify right now
+func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	m.appService.LoggerService.LogTeaMsg(msg)
 	var (
 		cmd  tea.Cmd
@@ -90,80 +99,18 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	// Keep shared spinner spinning as long as there are tasks running.
 	switch msg := msg.(type) {
-	case resource.Event[*task.Task]:
-		if m.tasks.Counter() > 0 {
-			if !m.spinning {
-				// There are tasks running and the spinner isn't spinning, so start
-				// the spinner.
-				m.spinning = true
-				cmds = append(cmds, m.spinner.Tick)
-			}
-		} else {
-			// No tasks are running so stop spinner
-			m.spinning = false
-		}
 	case spinner.TickMsg:
 		var cmd tea.Cmd
 		*m.spinner, cmd = m.spinner.Update(msg)
-		//_ = m.updateCurrent(msg)
 		if m.spinning {
 			// Continue spinning spinner.
 			return m, cmd
 		}
-	}
-
-	// Watch tasks as they finish and announce success/failure in the
-	// footer. This is only done for short tasks because these tasks do
-	// not redirect the user to the task output therefore the user needs to be
-	// notified of its success/failure.
-	switch msg := msg.(type) {
-	case resource.Event[*task.Task]:
-		if msg.Type == resource.UpdatedEvent {
-			t := msg.Payload
-			if t.TaskGroupID != nil {
-				break
-			}
-			if !t.Short {
-				break
-			}
-			if t.State != task.Exited && t.State != task.Errored {
-				break
-			}
-			b, err := io.ReadAll(t.NewReader(true))
-			if err != nil {
-				err = fmt.Errorf("unable to report task completion: %w", err)
-				cmds = append(cmds, tui.ReportError(err))
-				break
-			}
-			m.lastTaskID = &msg.Payload.ID
-			report := fmt.Sprintf("%s: ", t.String())
-			errored := t.State == task.Errored
-			if errored {
-				report += task.StripError(string(b))
-			} else {
-				report += "finished successfully"
-			}
-			// Ensure that the suggestion fits within visible width of message.
-			suggestion := "…(Press 'o' for full output)"
-			if len(report)+len(suggestion) > m.availableFooterMsgWidth() {
-				report = report[:m.availableFooterMsgWidth()-len(suggestion)]
-			}
-			report += suggestion
-			if errored {
-				err = errors.New(report)
-				cmds = append(cmds, tui.ReportError(err))
-			} else {
-				cmds = append(cmds, tui.ReportInfo(report))
-			}
-		}
-	}
-
-	switch msg := msg.(type) {
-	case tui.PromptMsg:
+	case models.PromptMsg:
 		// Enable prompt widget
 		m.mode = promptMode
 		var blink tea.Cmd
-		m.prompt, blink = tui.NewPrompt(msg)
+		m.prompt, blink = models.NewPrompt(&msg, m.styles.PromptStyle)
 		// Send out message to panes to resize themselves to make room for the prompt above it.
 		_ = m.PaneManager.Update(tea.WindowSizeMsg{
 			Height: m.viewHeight(),
@@ -174,96 +121,12 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// Pressing any key makes any info/error message in the footer disappear
 		m.info = ""
 		m.err = nil
-
-		switch m.mode {
-		case promptMode:
-			closePrompt, cmd := m.prompt.HandleKey(msg)
-			if closePrompt {
-				// Send message to panes to resize themselves to expand back
-				// into space occupied by prompt.
-				m.mode = normalMode
-				_ = m.PaneManager.Update(tea.WindowSizeMsg{
-					Height: m.viewHeight(),
-					Width:  m.viewWidth(),
-				})
-			}
-			return m, cmd
-		case filterMode:
-			switch {
-			case key.Matches(msg, keys.Global.Quit):
-				// Allow user to quit app whilst in filter mode. In this case,
-				// switch back to normal mode, blur the filter widget, and let
-				// the key handler below handle the quit action.
-				m.mode = normalMode
-				cmd = m.FocusedModel().Update(tui.FilterBlurMsg{})
-				return m, cmd
-			case key.Matches(msg, keys.Filter.Blur):
-				// Switch back to normal mode, and send message to current model
-				// to blur the filter widget
-				m.mode = normalMode
-				cmd = m.FocusedModel().Update(tui.FilterBlurMsg{})
-				return m, cmd
-			case key.Matches(msg, keys.Filter.Close):
-				// Switch back to normal mode, and send message to current model
-				// to close the filter widget
-				m.mode = normalMode
-				cmd = m.FocusedModel().Update(tui.FilterCloseMsg{})
-				return m, cmd
-			default:
-				// Wrap key message in a filter key message and send to current
-				// model.
-				cmd = m.FocusedModel().Update(tui.FilterKeyMsg(msg))
-				return m, cmd
-			}
+		_, teaCmd := m.manageKeyInMode(msg)
+		if teaCmd != nil {
+			cmds = append(cmds, teaCmd)
+			return m, tea.Batch(cmds...)
 		}
-
-		switch {
-		case key.Matches(msg, keys.Global.Quit):
-			// ctrl-c quits the app, but not before prompting the user for
-			// confirmation.
-			return m, tui.YesNoPrompt("Quit pug?", tea.Quit)
-		case key.Matches(msg, keys.Global.Suspend):
-			// ctrl-z suspends the app
-			return m, tea.Suspend
-		case key.Matches(msg, keys.Global.Help):
-			// '?' toggles help widget
-			m.showHelp = !m.showHelp
-			// Help widget takes up space so update panes' dimensions
-			m.PaneManager.Update(tea.WindowSizeMsg{
-				Height: m.viewHeight(),
-				Width:  m.viewWidth(),
-			})
-		case key.Matches(msg, keys.Global.Filter):
-			// '/' enables filter mode if the current model indicates it
-			// supports it, which it does so by sending back a non-nil command.
-			if cmd = m.FocusedModel().Update(tui.FilterFocusReqMsg{}); cmd != nil {
-				m.mode = filterMode
-			}
-			return m, cmd
-		case key.Matches(msg, keys.Global.Explorer):
-			return m, tui.NavigateTo(tui.ExplorerKind, tui.WithPosition(tui.LeftPane))
-		case key.Matches(msg, keys.Global.TaskGroups):
-			// list all taskgroups
-			return m, tui.NavigateTo(tui.TaskGroupListKind)
-		case key.Matches(msg, keys.Global.Logs):
-			return m, tui.NavigateTo(tui.LogListKind)
-		case key.Matches(msg, keys.Global.Tasks):
-			return m, tui.NavigateTo(tui.TaskListKind)
-		case key.Matches(msg, keys.Common.LastTask):
-			if m.lastTaskID != nil {
-				return m, tui.NavigateTo(tui.TaskKind, tui.WithParent(*m.lastTaskID))
-			}
-		default:
-			// Send all others to global task config updater
-			if cmd := m.taskConfig.Update(msg); cmd != nil {
-				return m, cmd
-			}
-			// Send all other keys to panes.
-			if cmd := m.PaneManager.Update(msg); cmd != nil {
-				return m, cmd
-			}
-			return m, nil
-		}
+		return m.manageKey(msg)
 	case tui.ErrorMsg:
 		m.err = error(msg)
 	case tui.InfoMsg:
@@ -291,7 +154,91 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, tea.Batch(cmds...)
 }
 
-func (m model) View() string {
+func (m *Model) manageKeyInMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	var cmd tea.Cmd
+
+	switch m.mode {
+	case promptMode:
+		closePrompt, cmd := m.prompt.HandleKey(msg)
+		if closePrompt {
+			// Send message to panes to resize themselves to expand back
+			// into space occupied by prompt.
+			m.mode = normalMode
+			_ = m.PaneManager.Update(tea.WindowSizeMsg{
+				Height: m.viewHeight(),
+				Width:  m.viewWidth(),
+			})
+		}
+		return m, cmd
+	case filterMode:
+		switch {
+		case key.Matches(msg, m.globalKeyMap.Quit):
+			// Allow user to quit app whilst in filter mode. In this case,
+			// switch back to normal mode, blur the filter widget, and let
+			// the key handler below handle the quit action.
+			m.mode = normalMode
+			cmd = m.FocusedModel().Update(tui.FilterBlurMsg{})
+			return m, cmd
+		case key.Matches(msg, m.filterKeyMap.Blur):
+			// Switch back to normal mode, and send message to current model
+			// to blur the filter widget
+			m.mode = normalMode
+			cmd = m.FocusedModel().Update(tui.FilterBlurMsg{})
+			return m, cmd
+		case key.Matches(msg, m.filterKeyMap.Close):
+			// Switch back to normal mode, and send message to current model
+			// to close the filter widget
+			m.mode = normalMode
+			cmd = m.FocusedModel().Update(tui.FilterCloseMsg{})
+			return m, cmd
+		default:
+			// Wrap key message in a filter key message and send to current
+			// model.
+			cmd = m.FocusedModel().Update(tui.FilterKeyMsg(msg))
+			return m, cmd
+		}
+	case normalMode:
+		// In normal mode, we let manageKey handle the key message.
+	}
+
+	return m, nil
+}
+
+func (m *Model) manageKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	var cmd tea.Cmd
+
+	switch {
+	case key.Matches(msg, m.globalKeyMap.Quit):
+		// ctrl-c quits the app, but not before prompting the user for
+		// confirmation.
+		return m, models.YesNoPrompt("Quit Shell Command Bookmarker?", tea.Quit)
+	case key.Matches(msg, m.globalKeyMap.Help):
+		// '?' toggles help widget
+		m.showHelp = !m.showHelp
+		// Help widget takes up space so update panes' dimensions
+		m.PaneManager.Update(tea.WindowSizeMsg{
+			Height: m.viewHeight(),
+			Width:  m.viewWidth(),
+		})
+	case key.Matches(msg, m.globalKeyMap.Filter):
+		// '/' enables filter mode if the current model indicates it
+		// supports it, which it does so by sending back a non-nil command.
+		if cmd = m.FocusedModel().Update(tui.FilterFocusReqMsg{}); cmd != nil {
+			m.mode = filterMode
+		}
+		return m, cmd
+	case key.Matches(msg, m.globalKeyMap.Search):
+		return m, models.NavigateTo(structure.SearchKind, structure.WithPosition(structure.LeftPane))
+	default:
+	}
+	// Send all other keys to panes.
+	if cmd := m.PaneManager.Update(msg); cmd != nil {
+		return m, cmd
+	}
+	return m, nil
+}
+
+func (m *Model) View() string {
 	// Start composing vertical stack of components that fill entire terminal.
 	var components []string
 
@@ -310,30 +257,24 @@ func (m model) View() string {
 		components = append(components, m.help())
 	}
 	// Compose footer
-	footer := helpWidget
-	if m.err != nil {
-		footer += tui.Regular.Padding(0, 1).
-			Background(tui.Red).
-			Foreground(tui.White).
+	footer := m.helpWidget
+	switch {
+	case m.err != nil:
+		footer += m.styles.FooterStyle.ErrorStyle.
 			Width(m.availableFooterMsgWidth()).
 			Render(m.err.Error())
-	} else if m.info != "" {
-		footer += tui.Padded.
-			Foreground(tui.Black).
-			Background(tui.LightGreen).
+	case m.info != "":
+		footer += m.styles.FooterStyle.InfoStyle.
 			Width(m.availableFooterMsgWidth()).
 			Render(m.info)
-	} else {
-		footer += tui.Padded.
-			Foreground(tui.Black).
-			Background(tui.EvenLighterGrey).
+	default:
+		footer += m.styles.FooterStyle.DefaultStyle.
 			Width(m.availableFooterMsgWidth()).
 			Render(m.info)
 	}
-	footer += versionWidget
+	footer += m.versionWidget
 	// Add footer
-	components = append(components, tui.Regular.
-		Inline(true).
+	components = append(components, m.styles.FooterStyle.Main.
 		MaxWidth(m.width).
 		Width(m.width).
 		Render(footer),
@@ -341,14 +282,9 @@ func (m model) View() string {
 	return strings.Join(components, "\n")
 }
 
-var (
-	helpWidget    = tui.Padded.Background(tui.Grey).Foreground(tui.White).Render("? help")
-	versionWidget = tui.Padded.Background(tui.DarkGrey).Foreground(tui.White).Render(version.Version)
-)
-
-func (m model) availableFooterMsgWidth() int {
+func (m *Model) availableFooterMsgWidth() int {
 	// -2 to accommodate padding
-	return max(0, m.width-lipgloss.Width(helpWidget)-lipgloss.Width(versionWidget))
+	return max(0, m.width-lipgloss.Width(m.helpWidget)-lipgloss.Width(m.versionWidget))
 }
 
 // type taskCompletionMsg struct {
@@ -357,43 +293,43 @@ func (m model) availableFooterMsgWidth() int {
 // viewHeight returns the height available to the panes
 //
 // TODO: rename contentHeight
-func (m model) viewHeight() int {
-	vh := m.height - tui.FooterHeight
+func (m *Model) viewHeight() int {
+	vh := m.height - m.styles.FooterStyle.Height
 	if m.mode == promptMode {
-		vh -= tui.PromptHeight
+		vh -= m.styles.PromptStyle.Height
 	}
 	if m.showHelp {
-		vh -= tui.HelpWidgetHeight
+		vh -= m.styles.HelpStyle.Height
 	}
-	return max(tui.MinContentHeight, vh)
+	return max(m.styles.PaneStyle.MinContentHeight, vh)
 }
 
 // viewWidth retrieves the width available within the main view
 //
 // TODO: rename contentWidth
-func (m model) viewWidth() int {
-	return max(tui.MinContentWidth, m.width)
+func (m *Model) viewWidth() int {
+	return max(m.styles.PaneStyle.MinContentWidth, m.width)
 }
 
-var (
-	helpKeyStyle  = tui.Bold.Foreground(tui.HelpKey).Margin(0, 1, 0, 0)
-	helpDescStyle = tui.Regular.Foreground(tui.HelpDesc)
-)
-
 // help renders key bindings
-func (m model) help() string {
+func (m *Model) help() string {
 	// Compile list of bindings to render
-	bindings := []key.Binding{keys.Global.Help, keys.Global.Quit}
+	bindings := []key.Binding{m.globalKeyMap.Help, m.globalKeyMap.Quit}
+	addDefaultBindings := true
 	switch m.mode {
 	case promptMode:
 		bindings = append(bindings, m.prompt.HelpBindings()...)
+		addDefaultBindings = false
 	case filterMode:
-		bindings = append(bindings, keys.KeyMapToSlice(keys.Filter)...)
-	default:
+		bindings = append(bindings, keys.KeyMapToSlice(*m.filterKeyMap)...)
+	case normalMode:
+		addDefaultBindings = true
 		bindings = append(bindings, m.PaneManager.HelpBindings()...)
 	}
-	bindings = append(bindings, keys.KeyMapToSlice(keys.Global)...)
-	bindings = append(bindings, keys.KeyMapToSlice(keys.Navigation)...)
+	if addDefaultBindings {
+		bindings = append(bindings, keys.KeyMapToSlice(*m.globalKeyMap)...)
+		bindings = append(bindings, keys.KeyMapToSlice(*m.paneKeyMap)...)
+	}
 	bindings = removeDuplicateBindings(bindings)
 
 	// Enumerate through each group of bindings, populating a series of
@@ -402,16 +338,16 @@ func (m model) help() string {
 		pairs []string
 		width int
 		// Subtract 2 to accommodate borders
-		rows = tui.HelpWidgetHeight - 2
+		rows = m.styles.HelpStyle.Height - 2
 	)
 	for i := 0; i < len(bindings); i += rows {
 		var (
-			keys  []string
-			descs []string
+			helpKeys     []string
+			descriptions []string
 		)
 		for j := i; j < min(i+rows, len(bindings)); j++ {
-			keys = append(keys, helpKeyStyle.Render(bindings[j].Help().Key))
-			descs = append(descs, helpDescStyle.Render(bindings[j].Help().Desc))
+			helpKeys = append(helpKeys, m.styles.HelpStyle.KeyStyle.Render(bindings[j].Help().Key))
+			descriptions = append(descriptions, m.styles.HelpStyle.DescStyle.Render(bindings[j].Help().Desc))
 		}
 		// Render pair of columns; beyond the first pair, render a three space
 		// left margin, in order to visually separate the pairs.
@@ -420,8 +356,8 @@ func (m model) help() string {
 			cols = []string{"   "}
 		}
 		cols = append(cols,
-			strings.Join(keys, "\n"),
-			strings.Join(descs, "\n"),
+			strings.Join(helpKeys, "\n"),
+			strings.Join(descriptions, "\n"),
 		)
 
 		pair := lipgloss.JoinHorizontal(lipgloss.Top, cols...)
@@ -435,7 +371,10 @@ func (m model) help() string {
 	}
 	// Join pairs of columns and enclose in a border
 	content := lipgloss.JoinHorizontal(lipgloss.Top, pairs...)
-	return tui.Border.Height(rows).Width(m.width - 2).Render(content)
+	return m.styles.PaneStyle.TopBorder.
+		Height(rows).
+		Width(m.width - m.styles.PaneStyle.BordersWidth).
+		Render(content)
 }
 
 // removeDuplicateBindings removes duplicate bindings from a list of bindings. A
@@ -444,12 +383,12 @@ func removeDuplicateBindings(bindings []key.Binding) []key.Binding {
 	seen := make(map[string]struct{})
 	var i int
 	for _, b := range bindings {
-		key := strings.Join(b.Keys(), " ")
-		if _, ok := seen[key]; ok {
+		bKey := strings.Join(b.Keys(), " ")
+		if _, ok := seen[bKey]; ok {
 			// duplicate, skip
 			continue
 		}
-		seen[key] = struct{}{}
+		seen[bKey] = struct{}{}
 		bindings[i] = b
 		i++
 	}

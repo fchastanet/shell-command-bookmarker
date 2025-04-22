@@ -86,13 +86,13 @@ type keyMap struct {
 	Right key.Binding
 }
 
-func (t Tabs) GetKeyBindings() []key.Binding {
+func (t *Tabs) GetKeyBindings() []key.Binding {
 	return []key.Binding{
 		t.settings.Keys.Left, t.settings.Keys.Right,
 	}
 }
 
-func (t Tabs) Init() tea.Cmd {
+func (t *Tabs) Init() tea.Cmd {
 	batches := make([]tea.Cmd, len(t.Tabs))
 	for _, tab := range t.Tabs {
 		if tab.Model == nil {
@@ -103,7 +103,7 @@ func (t Tabs) Init() tea.Cmd {
 	return tea.Batch(batches...)
 }
 
-func (t Tabs) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+func (t *Tabs) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmds []tea.Cmd
 
 	if t.activeTab != -1 {
@@ -162,7 +162,7 @@ func (t *Tabs) updateActiveTab(msg tea.KeyMsg) {
 	}
 }
 
-func (tab Tab) View(
+func (tab *Tab) View(
 	tabsCount int, width int,
 	isFirst bool, isLast bool, isActive bool,
 ) string {
@@ -176,7 +176,7 @@ func (tab Tab) View(
 	return borderStyle.Render(tab.Title)
 }
 
-func (t Tabs) View() string {
+func (t *Tabs) View() string {
 	doc := strings.Builder{}
 
 	renderedTabs := make([]string, len(t.Tabs))

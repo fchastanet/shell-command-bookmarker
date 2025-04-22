@@ -21,8 +21,29 @@ func (s Status) IsFinal() bool {
 	switch s {
 	case Errored, Exited, Canceled:
 		return true
+	case Pending, Queued, Running:
+		return false
 	default:
 		return false
+	}
+}
+
+func (s Status) String() string {
+	switch s {
+	case Pending:
+		return "pending"
+	case Queued:
+		return "queued"
+	case Running:
+		return "running"
+	case Exited:
+		return "exited"
+	case Errored:
+		return "errored"
+	case Canceled:
+		return "canceled"
+	default:
+		return "unknown"
 	}
 }
 

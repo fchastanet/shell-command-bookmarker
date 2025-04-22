@@ -9,7 +9,9 @@ import (
 	"os"
 
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/fchastanet/shell-command-bookmarker/internal/models"
+	"github.com/fchastanet/shell-command-bookmarker/internal/args"
+	"github.com/fchastanet/shell-command-bookmarker/internal/models/styles"
+	"github.com/fchastanet/shell-command-bookmarker/internal/models/top"
 	"github.com/fchastanet/shell-command-bookmarker/internal/services"
 
 	// Import for side effects
@@ -28,8 +30,8 @@ func main() {
 }
 
 func mainImpl() error {
-	var cli cli
-	err := parseArgs(&cli)
+	var cli args.Cli
+	err := args.ParseArgs(&cli)
 	if err != nil {
 		return err
 	}
@@ -54,13 +56,16 @@ func mainImpl() error {
 		}
 	}()
 
-	m := models.NewAppModel(
-		appService.HistoryService,
-		appService.LoggerService,
+	styles := styles.NewStyles()
+	styles.Init()
+
+	m := top.NewModel(
+		appService,
+		styles,
 	)
 
 	if _, err := tea.NewProgram(
-		m,
+		&m,
 		tea.WithReportFocus(),
 	).Run(); err != nil {
 		slog.Error("Error running program", "error", err)

@@ -5,7 +5,7 @@ import (
 
 	"github.com/charmbracelet/bubbles/table"
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
+	"github.com/fchastanet/shell-command-bookmarker/internal/models/styles"
 	"github.com/fchastanet/shell-command-bookmarker/internal/services"
 	customTable "github.com/fchastanet/shell-command-bookmarker/pkg/components/table"
 )
@@ -16,15 +16,15 @@ import (
 
 type HistoryTableModel struct {
 	tableModel     customTable.Model
-	styles         TableStyles
+	styles         *styles.TableStyle
 	historyService *services.HistoryService
 	width          int
 	height         int
 }
 
-type TableStyles interface {
-	GetTableStyle() lipgloss.Style
-	GetTableContentStyle() table.Styles
+type Styles interface {
+	GetTableStyle() *styles.TableStyle
+	GetTableContentStyle() *table.Styles
 }
 
 const (
@@ -39,7 +39,7 @@ const (
 )
 
 func NewHistoryTableModel(
-	styles TableStyles,
+	myStyles *styles.TableStyle,
 	historyService *services.HistoryService,
 ) *HistoryTableModel {
 	t := table.New(
@@ -50,8 +50,8 @@ func NewHistoryTableModel(
 	)
 	t.Focus()
 	return &HistoryTableModel{
-		tableModel:     *customTable.NewModel(&t, styles),
-		styles:         styles,
+		tableModel:     *customTable.NewModel(&t, myStyles),
+		styles:         myStyles,
 		historyService: historyService,
 		width:          0,
 		height:         0,
@@ -62,7 +62,7 @@ func (m *HistoryTableModel) getColumns(width int) []table.Column {
 	slog.Debug("getColumns", "width", width)
 	const columnsCount = 4
 	w := width -
-		columnsCount*m.styles.GetTableContentStyle().Cell.GetHorizontalPadding()*sidesCount
+		columnsCount*m.styles.Content.Cell.GetHorizontalPadding()*sidesCount
 	return []table.Column{
 		{Title: "Id", Width: idColumnPercentWidth * w / percent},
 		{Title: "Title", Width: titleColumnPercentWidth * w / percent},
@@ -80,12 +80,12 @@ func (m *HistoryTableModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	cmds := []tea.Cmd{}
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
-		tableFrameWidth := m.styles.GetTableStyle().GetHorizontalFrameSize()
+		tableFrameWidth := m.styles.Border.GetHorizontalFrameSize()
 		m.width = msg.Width - tableFrameWidth
 		m.tableModel.SetColumns(m.getColumns(m.width))
 		m.tableModel.SetWidth(m.width)
 
-		tableFrameHeight := m.styles.GetTableStyle().GetVerticalFrameSize()
+		tableFrameHeight := m.styles.Border.GetVerticalFrameSize()
 		m.height = msg.Height - tableFrameHeight
 		m.tableModel.SetHeight(m.height)
 
