@@ -40,22 +40,30 @@ const (
 	BottomRightBorder
 )
 
-func Borderize(content string, active bool, embeddedText map[BorderPosition]string) string {
+func NewBorderStyle(focus bool) lipgloss.Border {
+	return map[bool]lipgloss.Border{
+		true:  lipgloss.ThickBorder(),
+		false: lipgloss.NormalBorder(),
+	}[focus]
+}
+
+func Borderize(
+	content string,
+	active bool,
+	embeddedText map[BorderPosition]string,
+	colorTheme *ColorTheme,
+) string {
 	if embeddedText == nil {
 		embeddedText = make(map[BorderPosition]string)
 	}
 	var (
-		thickness = map[bool]lipgloss.Border{
-			true:  lipgloss.Border(lipgloss.ThickBorder()),
-			false: lipgloss.Border(lipgloss.NormalBorder()),
+		border = NewBorderStyle(active)
+		color  = map[bool]lipgloss.TerminalColor{
+			true:  colorTheme.ActivePreviewBorder,
+			false: colorTheme.InactivePreviewBorder,
 		}
-		color = map[bool]lipgloss.TerminalColor{
-			true:  Blue,
-			false: InactivePreviewBorder,
-		}
-		border = thickness[active]
-		style  = lipgloss.NewStyle().Foreground(color[active])
-		width  = lipgloss.Width(content)
+		style = lipgloss.NewStyle().Foreground(color[active])
+		width = lipgloss.Width(content)
 	)
 
 	encloseInSquareBrackets := func(text string) string {
@@ -68,19 +76,19 @@ func Borderize(content string, active bool, embeddedText map[BorderPosition]stri
 		}
 		return text
 	}
-	buildHorizontalBorder := func(leftText, middleText, rightText, leftCorner, inbetween, rightCorner string) string {
+	buildHorizontalBorder := func(leftText, middleText, rightText, leftCorner, between, rightCorner string) string {
 		leftText = encloseInSquareBrackets(leftText)
 		middleText = encloseInSquareBrackets(middleText)
 		rightText = encloseInSquareBrackets(rightText)
 		// Calculate length of border between embedded texts
 		remaining := max(0, width-lipgloss.Width(leftText)-lipgloss.Width(middleText)-lipgloss.Width(rightText))
-		leftBorderLen := max(0, (width/2)-lipgloss.Width(leftText)-(lipgloss.Width(middleText)/2))
+		leftBorderLen := max(0, (width/HalfDivider)-lipgloss.Width(leftText)-(lipgloss.Width(middleText)/HalfDivider))
 		rightBorderLen := max(0, remaining-leftBorderLen)
 		// Then construct border string
 		s := leftText +
-			style.Render(strings.Repeat(inbetween, leftBorderLen)) +
+			style.Render(strings.Repeat(between, leftBorderLen)) +
 			middleText +
-			style.Render(strings.Repeat(inbetween, rightBorderLen)) +
+			style.Render(strings.Repeat(between, rightBorderLen)) +
 			rightText
 		// Make it fit in the space available between the two corners.
 		s = lipgloss.NewStyle().

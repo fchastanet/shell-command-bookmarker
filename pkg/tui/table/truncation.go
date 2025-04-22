@@ -5,7 +5,9 @@ import (
 	"github.com/charmbracelet/x/ansi"
 )
 
-var defaultTruncationFunc = TruncateRight
+func GetDefaultTruncationFunc() TruncationFunc {
+	return TruncateRight
+}
 
 type TruncationFunc func(s string, w int, tailOrPrefix string) string
 

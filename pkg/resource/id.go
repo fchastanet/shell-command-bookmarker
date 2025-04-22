@@ -1,9 +1,9 @@
 package resource
 
-// ID uniquely identifies a Pug resource.
-type ID any
+// ID uniquely identifies a Shell Command Bookmarker resource.
+type ID uint
 
-// Identifiable is a Pug resource with an identity.
+// Identifiable is a Shell Command Bookmarker resource with an identity.
 type Identifiable interface {
 	GetID() ID
 }

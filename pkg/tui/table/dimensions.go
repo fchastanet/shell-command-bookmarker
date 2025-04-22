@@ -1,12 +1,4 @@
-// Lifted much code from:
-//
-// https://github.com/Evertras/bubble-table/blob/main/table/dimensions.go
-//
-// Copyright (c) 2022 Brandon Fulljames
-
 package table
-
-import "github.com/leg100/pug/internal/tui"
 
 // Update column widths in-place.
 //
@@ -15,7 +7,7 @@ func (m *Model[V]) setColumnWidths() {
 	var (
 		// total available flex width initialized to total table width minus the
 		// padding on each col (2) and the scrollbar to the right
-		totalFlexWidth  = m.width - tui.ScrollbarWidth - 2*len(m.cols)
+		totalFlexWidth  = m.width - m.styles.GetScrollbarWidth() - 2*len(m.cols)
 		totalFlexFactor int
 		flexGCD         int
 	)
@@ -35,7 +27,7 @@ func (m *Model[V]) setColumnWidths() {
 	}
 
 	// We use the GCD here because otherwise very large values won't divide
-	// nicely as ints
+	// nicely as integers
 	totalFlexFactor /= flexGCD
 
 	flexUnit := totalFlexWidth / totalFlexFactor

@@ -1,6 +1,7 @@
-package main
+package args
 
 import (
+	"errors"
 	"fmt"
 	"os"
 
@@ -9,7 +10,7 @@ import (
 
 const maxScreenSize = 80
 
-type cli struct {
+type Cli struct {
 	MaxTasks int         `short:"t" name:"max-tasks" default:"1"             help:"Maximum number of tasks to run concurrently"` //nolint:tagalign //avoid reformat annotations
 	DBPath   FilePath    `arg:""    name:"db-path"   optional:"" type:"path" help:"Path to the SQLite database file"`            //nolint:tagalign //avoid reformat annotations
 	Version  VersionFlag `short:"v" name:"version"                           help:"Print version information and quit"`          //nolint:tagalign //avoid reformat annotations
@@ -20,17 +21,23 @@ type FilePath string
 
 func (f *FilePath) Decode(_ *kong.DecodeContext) error {
 	if *f == "" {
-		return fmt.Errorf("missing required argument: db-path")
+		return ErrMissingDBPath
 	}
+
+	// Check if file exists
+	if _, err := os.Stat(string(*f)); errors.Is(err, os.ErrNotExist) {
+		return fmt.Errorf("%w: %s", ErrFileDoesNotExist, *f)
+	}
+
+	// Check if permission is granted
+	if _, err := os.Stat(string(*f)); errors.Is(err, os.ErrPermission) {
+		return fmt.Errorf("%w: %s", ErrPermissionDenied, *f)
+	}
+
 	if _, err := os.Stat(string(*f)); err != nil {
-		if os.IsNotExist(err) {
-			return fmt.Errorf("file does not exist: %s", *f)
-		}
-		if os.IsPermission(err) {
-			return fmt.Errorf("permission denied to access file: %s", *f)
-		}
-		return fmt.Errorf("error accessing file: %s", *f)
+		return fmt.Errorf("%w: %s", ErrAccessingFile, *f)
 	}
+
 	return nil
 }
 
@@ -42,13 +49,13 @@ func (VersionFlag) Decode(_ *kong.DecodeContext) error { return nil }
 func (VersionFlag) IsBool() bool                       { return true }
 func (VersionFlag) BeforeApply(
 	app *kong.Kong, vars kong.Vars,
-) error { //nolint:unparam // need to conform to interface
+) error {
 	fmt.Printf("Bash command bookmarker version %s\n", vars["version"])
 	app.Exit(0)
 	return nil
 }
 
-func parseArgs(cli *cli) (err error) {
+func ParseArgs(cli *Cli) (err error) {
 	// just need the yaml file, from which all the dependencies will be deduced
 	kong.Parse(cli,
 		kong.Name("shell-command-bookmarker"),

@@ -81,7 +81,8 @@ func (s *DBService) SaveCommand(command *Command) error {
 	return nil
 }
 
-func (s *DBService) GetCommandById(id int) (*Command, error) {
+// GetCommandByID retrieves a command by its database ID
+func (s *DBService) GetCommandByID(id int) (*Command, error) {
 	slog.Debug("Retrieving command by id from database", "id", id)
 	// Use QueryRow for single row retrieval
 	row := s.dbAdapter.GetDB().QueryRow(
@@ -135,7 +136,6 @@ func (s *DBService) getCommandFromRow(row *sql.Row) (*Command, error) {
 	)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			slog.Debug("No command found in database", "script", script)
 			return nil, nil
 		}
 		// Handle other scan errors

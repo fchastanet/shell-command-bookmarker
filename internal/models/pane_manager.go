@@ -9,57 +9,75 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/fchastanet/shell-command-bookmarker/internal/models/keys"
+	"github.com/fchastanet/shell-command-bookmarker/internal/models/structure"
 	"github.com/fchastanet/shell-command-bookmarker/internal/models/styles"
 	"github.com/fchastanet/shell-command-bookmarker/pkg/resource"
 	"github.com/fchastanet/shell-command-bookmarker/pkg/tui"
 	"golang.org/x/exp/maps"
 )
 
-type Position int
+type ErrNoMaker struct {
+	Kind resource.Kind
+}
 
-const (
-	// TopRightPane occupies the top right area of the terminal. Mutually
-	// exclusive with RightPane.
-	TopRightPane Position = iota
-	// BottomRightPane occupies the bottom right area of the terminal. Mutually
-	// exclusive with RightPane.
-	BottomRightPane
-	// LeftPane occupies the left side of the terminal.
-	LeftPane
+func (e *ErrNoMaker) Error() string {
+	return fmt.Sprintf("no maker for page of kind %s", e.Kind)
+}
+
+type ErrMakePage struct {
+	Msg structure.NavigationMsg
+	Err error
+}
+
+func (e *ErrMakePage) Error() string {
+	return fmt.Sprintf("making page of kind %s with id %v: %v", e.Msg.Page.Kind, e.Msg.Page.ID, e.Err)
+}
+
+type ErrMakePageEmptyModel struct {
+	Msg structure.NavigationMsg
+}
+
+func (e *ErrMakePageEmptyModel) Error() string {
+	return fmt.Sprintf("making page of kind %s with id %v: model is nil", e.Msg.Page.Kind, e.Msg.Page.ID)
+}
+
+var (
+	ErrAlreadyAtFirstPage  = errors.New("already at first page")
+	ErrCannotCloseLastPane = errors.New("cannot close last pane")
+	ErrNotFound            = errors.New("resource not found")
 )
 
-type Cache interface {
+type CacheInterface interface {
 	// Get retrieves a model from the cache.
-	Get(page tui.Page) tui.ChildModel
+	Get(page structure.Page) structure.ChildModel
 	// Put stores a model in the cache.
-	Put(page tui.Page, model tui.ChildModel)
+	Put(page structure.Page, model structure.ChildModel)
 	// UpdateAll updates all models in the cache with the given message.
 	UpdateAll(msg tea.Msg) []tea.Cmd
 	// Update updates a specific model in the cache with the given message.
-	Update(key tui.Page, msg tea.Msg) tea.Cmd
-}
-
-type ChildModel interface {
-	Init() tea.Cmd
-	Update(tea.Msg) tea.Cmd
-	View() string
+	Update(key structure.Page, msg tea.Msg) tea.Cmd
 }
 
 // Maker makes new models
 type Maker interface {
-	Make(id resource.ID, width, height int) (ChildModel, error)
+	Make(id resource.ID, width, height int) (structure.ChildModel, error)
 }
 
 // PaneManager manages the layout of the three panes that compose the Pug full screen terminal app.
 type PaneManager struct {
+	styles       *styles.Styles
+	commonKeyMap *keys.CommonKeyMap
+	globalKeyMap *keys.GlobalKeyMap
+	paneKeyMap   *keys.PaneNavigationKeyMap
+
 	// makerFactory for making models for panes
-	makerFactory func(kind Kind) Maker
+	makerFactory func(kind resource.Kind) Maker
 	// cache of previously made models
-	cache Cache
+	cache CacheInterface
 	// the position of the currently focused pane
-	focused Position
+	focused structure.Position
 	// panes tracks currently visible panes
-	panes map[Position]pane
+	panes map[structure.Position]pane
 	// total width and height of the terminal space available to panes.
 	width, height int
 	// leftPaneWidth is the width of the left pane when sharing the terminal
@@ -72,79 +90,93 @@ type PaneManager struct {
 }
 
 type pane struct {
-	model tui.ChildModel
-	page  tui.Page
+	model structure.ChildModel
+	page  structure.Page
 }
 
 type tablePane interface {
-	PreviewCurrentRow() (tui.Kind, resource.ID, bool)
+	PreviewCurrentRow() (resource.Kind, resource.ID, bool)
 }
 
 // NewPaneManager constructs the pane manager with at least the explorer, which
 // occupies the left pane.
-func NewPaneManager(makerFactory func(kind Kind) Maker) *PaneManager {
+func NewPaneManager(
+	makerFactory func(kind resource.Kind) Maker,
+	myStyles *styles.Styles,
+) *PaneManager {
 	p := &PaneManager{
 		makerFactory:   makerFactory,
-		cache:          tui.NewCache(),
-		panes:          make(map[Position]pane),
-		leftPaneWidth:  styles.DefaultLeftPaneWidth,
-		topRightHeight: styles.DefaultTopRightPaneHeight,
+		styles:         myStyles,
+		cache:          structure.NewCache(),
+		panes:          make(map[structure.Position]pane),
+		leftPaneWidth:  myStyles.PaneStyle.DefaultLeftPaneWidth,
+		topRightHeight: myStyles.PaneStyle.DefaultTopRightPaneHeight,
+		commonKeyMap:   keys.GetCommonKeyMap(),
+		globalKeyMap:   keys.GetGlobalKeyMap(),
+		paneKeyMap:     keys.GetPaneNavigationKeyMap(),
+		// The left pane is the default focused pane.
+		focused: structure.LeftPane,
+		width:   0,
+		height:  0,
+		history: make([]pane, 0),
 	}
 	return p
 }
 
 func (p *PaneManager) Init() tea.Cmd {
-	return p.setPane(NavigationMsg{
-		Position: LeftPane,
-		Page:     tui.Page{Kind: tui.Kind(CommandKind)},
+	return p.setPane(structure.NavigationMsg{
+		Position:     structure.LeftPane,
+		Page:         structure.Page{Kind: structure.CommandListKind, ID: 0},
+		DisableFocus: false,
 	})
 }
 
+//nolint:funlen,cyclop // I don't know how to simplify right now
 func (p *PaneManager) Update(msg tea.Msg) tea.Cmd {
 	var cmds []tea.Cmd
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
 		switch {
-		case key.Matches(msg, keys.Common.Back):
-			if p.focused != TopRightPane {
+		case key.Matches(msg, p.commonKeyMap.Back):
+			if p.focused != structure.TopRightPane {
 				// History is only maintained for the top right pane.
 				break
 			}
 			if len(p.history) == 1 {
 				// At dawn of history; can't go further back.
-				return tui.ReportError(errors.New("already at first page"))
+				return tui.ReportError(ErrAlreadyAtFirstPage)
 			}
 			// Pop current model from history
 			p.history = p.history[:len(p.history)-1]
 			// Set pane to last model
-			p.panes[TopRightPane] = p.history[len(p.history)-1]
+			p.panes[structure.TopRightPane] = p.history[len(p.history)-1]
 			// A new top right pane replaces any bottom right pane as well.
-			delete(p.panes, BottomRightPane)
+			delete(p.panes, structure.BottomRightPane)
 			p.updateChildSizes()
-		case key.Matches(msg, keys.Global.ShrinkPaneWidth):
+		case key.Matches(msg, p.globalKeyMap.ShrinkPaneWidth):
 			p.updateLeftWidth(-1)
 			p.updateChildSizes()
-		case key.Matches(msg, keys.Global.GrowPaneWidth):
+		case key.Matches(msg, p.globalKeyMap.GrowPaneWidth):
 			p.updateLeftWidth(1)
 			p.updateChildSizes()
-		case key.Matches(msg, keys.Global.ShrinkPaneHeight):
+		case key.Matches(msg, p.globalKeyMap.ShrinkPaneHeight):
 			p.updateTopRightHeight(-1)
 			p.updateChildSizes()
-		case key.Matches(msg, keys.Global.GrowPaneHeight):
+		case key.Matches(msg, p.globalKeyMap.GrowPaneHeight):
 			p.updateTopRightHeight(1)
 			p.updateChildSizes()
-		case key.Matches(msg, keys.Navigation.SwitchPane):
+		case key.Matches(msg, p.paneKeyMap.SwitchPane):
 			p.cycleFocusedPane(false)
-		case key.Matches(msg, keys.Navigation.SwitchPaneBack):
+		case key.Matches(msg, p.paneKeyMap.SwitchPaneBack):
 			p.cycleFocusedPane(true)
-		case key.Matches(msg, keys.Global.ClosePane):
+		case key.Matches(msg, p.globalKeyMap.ClosePane):
 			cmds = append(cmds, p.closeFocusedPane())
-		case key.Matches(msg, keys.Navigation.LeftPane):
-			p.focusPane(LeftPane)
-		case key.Matches(msg, keys.Navigation.TopRightPane):
-			p.focusPane(TopRightPane)
-		case key.Matches(msg, keys.Navigation.BottomRightPane):
-			p.focusPane(BottomRightPane)
+		case key.Matches(msg, p.paneKeyMap.LeftPane):
+			p.focusPane(structure.LeftPane)
+		case key.Matches(msg, p.paneKeyMap.TopRightPane):
+			p.focusPane(structure.TopRightPane)
+		case key.Matches(msg, p.paneKeyMap.BottomRightPane):
+			p.focusPane(structure.BottomRightPane)
 		default:
 			// Send remaining keys to focused pane
 			cmds = append(cmds, p.updateModel(p.focused, msg))
@@ -155,7 +187,7 @@ func (p *PaneManager) Update(msg tea.Msg) tea.Cmd {
 		p.updateLeftWidth(0)
 		p.updateTopRightHeight(0)
 		p.updateChildSizes()
-	case NavigationMsg:
+	case structure.NavigationMsg:
 		cmds = append(cmds, p.setPane(msg))
 	default:
 		// Send remaining message types to cached panes.
@@ -166,12 +198,12 @@ func (p *PaneManager) Update(msg tea.Msg) tea.Cmd {
 	// ensure the bottom left pane corresponds to that current row, e.g. if the
 	// top right pane is a tasks table, then the bottom right pane shows the
 	// output for the current task row.
-	if pane, ok := p.panes[TopRightPane]; ok {
+	if pane, ok := p.panes[structure.TopRightPane]; ok {
 		if table, ok := pane.model.(tablePane); ok {
 			if kind, id, ok := table.PreviewCurrentRow(); ok {
-				cmd := p.setPane(NavigationMsg{
-					Page:         tui.Page{Kind: kind, ID: id},
-					Position:     BottomRightPane,
+				cmd := p.setPane(structure.NavigationMsg{
+					Page:         structure.Page{Kind: kind, ID: id},
+					Position:     structure.BottomRightPane,
 					DisableFocus: true,
 				})
 				cmds = append(cmds, cmd)
@@ -182,7 +214,7 @@ func (p *PaneManager) Update(msg tea.Msg) tea.Cmd {
 }
 
 // FocusedModel retrieves the model of the focused pane.
-func (p *PaneManager) FocusedModel() tui.ChildModel {
+func (p *PaneManager) FocusedModel() structure.ChildModel {
 	return p.panes[p.focused].model
 }
 
@@ -211,7 +243,7 @@ func (p *PaneManager) cycleFocusedPane(last bool) {
 
 func (p *PaneManager) closeFocusedPane() tea.Cmd {
 	if len(p.panes) == 1 {
-		return tui.ReportError(errors.New("cannot close last pane"))
+		return tui.ReportError(ErrCannotCloseLastPane)
 	}
 	delete(p.panes, p.focused)
 	p.updateChildSizes()
@@ -220,138 +252,160 @@ func (p *PaneManager) closeFocusedPane() tea.Cmd {
 }
 
 func (p *PaneManager) updateLeftWidth(delta int) {
-	if _, ok := p.panes[LeftPane]; !ok {
+	if _, ok := p.panes[structure.LeftPane]; !ok {
 		// There is no vertical split to adjust
 		return
 	}
-	p.leftPaneWidth = clamp(p.leftPaneWidth+delta, styles.MinPaneWidth, p.width-styles.MinPaneWidth)
+	paneStyle := p.styles.PaneStyle
+	p.leftPaneWidth = clamp(
+		p.leftPaneWidth+delta,
+		paneStyle.MinPaneWidth,
+		p.width-paneStyle.MinPaneWidth,
+	)
 }
 
 func (p *PaneManager) updateTopRightHeight(delta int) {
-	if _, ok := p.panes[TopRightPane]; !ok {
+	if _, ok := p.panes[structure.TopRightPane]; !ok {
 		// There is no horizontal split to adjust
 		return
-	} else if _, ok := p.panes[BottomRightPane]; !ok {
+	} else if _, ok := p.panes[structure.BottomRightPane]; !ok {
 		// There is no horizontal split to adjust
 		return
 	}
-	switch p.focused {
-	case BottomRightPane:
+	if p.focused == structure.BottomRightPane {
 		delta = -delta
 	}
-	p.topRightHeight = clamp(p.topRightHeight+delta, styles.MinPaneHeight, p.height-styles.MinPaneHeight)
+	paneStyle := p.styles.PaneStyle
+	p.topRightHeight = clamp(
+		p.topRightHeight+delta,
+		paneStyle.MinPaneHeight,
+		p.height-paneStyle.MinPaneWidth,
+	)
 }
 
 func (p *PaneManager) updateChildSizes() {
 	for position := range p.panes {
 		p.updateModel(position, tea.WindowSizeMsg{
-			Width:  p.paneWidth(position) - 2,  // -2 for borders
-			Height: p.paneHeight(position) - 2, // -2 for borders
+			Width:  p.paneWidth(position) - p.styles.PaneStyle.BordersWidth,
+			Height: p.paneHeight(position) - p.styles.PaneStyle.BordersWidth,
 		})
 	}
 }
 
-func (p *PaneManager) updateModel(position Position, msg tea.Msg) tea.Cmd {
+func (p *PaneManager) updateModel(position structure.Position, msg tea.Msg) tea.Cmd {
 	return p.panes[position].model.Update(msg)
 }
 
-func (m *PaneManager) setPane(msg NavigationMsg) (cmd tea.Cmd) {
-	if pane, ok := m.panes[msg.Position]; ok && pane.page == msg.Page {
+func (p *PaneManager) setPane(msg structure.NavigationMsg) (cmd tea.Cmd) {
+	cmds := []tea.Cmd{}
+	if pane, ok := p.panes[msg.Position]; ok && pane.page == msg.Page {
 		// Pane is already showing requested page, so just bring it into focus.
 		if !msg.DisableFocus {
-			m.focusPane(msg.Position)
+			p.focusPane(msg.Position)
 		}
 		return nil
 	}
-	model := m.cache.Get(msg.Page)
+	model := p.cache.Get(msg.Page)
 	if model == nil {
-		maker := m.makerFactory(Kind(msg.Page.Kind))
+		maker := p.makerFactory(msg.Page.Kind)
+		if maker == nil {
+			return tui.ReportError(&ErrNoMaker{Kind: msg.Page.Kind})
+		}
 		var err error
 		model, err = maker.Make(msg.Page.ID, 0, 0)
 		if err != nil {
-			return tui.ReportError(fmt.Errorf("making page of kind %s with id %s: %w", msg.Page.Kind, msg.Page.ID, err))
+			return tui.ReportError(&ErrMakePage{Msg: msg, Err: err})
 		}
-		m.cache.Put(msg.Page, model)
-		cmd = model.Init()
+		if model == nil {
+			return tui.ReportError(&ErrMakePageEmptyModel{Msg: msg})
+		}
+		p.cache.Put(msg.Page, model)
+		cmds = append(cmds, model.Init())
 	}
-	m.panes[msg.Position] = pane{
+	p.panes[msg.Position] = pane{
 		model: model,
 		page:  msg.Page,
 	}
-	if msg.Position == TopRightPane {
+	if msg.Position == structure.TopRightPane {
 		// A new top right pane replaces any bottom right pane as well.
-		delete(m.panes, BottomRightPane)
+		delete(p.panes, structure.BottomRightPane)
 		// Track the models for the top right pane, so that the user can go back
-		// to previous models.
-		m.history = append(m.history, m.panes[TopRightPane])
+		// to previous
+		p.history = append(p.history, p.panes[structure.TopRightPane])
 	}
-	m.updateChildSizes()
+	p.updateChildSizes()
 	if !msg.DisableFocus {
-		m.focusPane(msg.Position)
+		p.focusPane(msg.Position)
 	}
-	return cmd
+	return tea.Batch(cmds...)
 }
 
-func (m *PaneManager) focusPane(position Position) {
-	if _, ok := m.panes[position]; !ok {
+func (p *PaneManager) focusPane(position structure.Position) {
+	if _, ok := p.panes[position]; !ok {
 		// There is no pane to focus at requested position
 		return
 	}
-	m.focused = position
+	p.focused = position
 }
 
-func (m *PaneManager) paneWidth(position Position) int {
+func (p *PaneManager) paneWidth(position structure.Position) int {
 	switch position {
-	case LeftPane:
-		if len(m.panes) > 1 {
-			return m.leftPaneWidth
+	case structure.LeftPane:
+		if len(p.panes) > 1 {
+			return p.leftPaneWidth
 		}
-	default:
-		if _, ok := m.panes[LeftPane]; ok {
-			return max(styles.MinPaneWidth, m.width-m.leftPaneWidth)
+	case structure.TopRightPane, structure.BottomRightPane:
+		paneStyle := p.styles.PaneStyle
+		if _, ok := p.panes[structure.LeftPane]; ok {
+			return max(
+				paneStyle.MinPaneWidth,
+				p.width-p.leftPaneWidth,
+			)
 		}
 	}
-	return m.width
+	return p.width
 }
 
-func (m *PaneManager) paneHeight(position Position) int {
+func (p *PaneManager) paneHeight(position structure.Position) int {
 	switch position {
-	case TopRightPane:
-		if _, ok := m.panes[BottomRightPane]; ok {
-			return m.topRightHeight
+	case structure.TopRightPane:
+		if _, ok := p.panes[structure.BottomRightPane]; ok {
+			return p.topRightHeight
 		}
-	case BottomRightPane:
-		if _, ok := m.panes[TopRightPane]; ok {
-			return m.height - m.topRightHeight
+	case structure.BottomRightPane:
+		if _, ok := p.panes[structure.TopRightPane]; ok {
+			return p.height - p.topRightHeight
 		}
+	case structure.LeftPane:
+		return p.height
 	}
-	return m.height
+	return p.height
 }
 
-func (m *PaneManager) View() string {
+func (p *PaneManager) View() string {
 	return lipgloss.JoinHorizontal(lipgloss.Top,
 		removeEmptyStrings(
-			m.renderPane(LeftPane),
+			p.renderPane(structure.LeftPane),
 			lipgloss.JoinVertical(lipgloss.Top,
 				removeEmptyStrings(
-					m.renderPane(TopRightPane),
-					m.renderPane(BottomRightPane),
+					p.renderPane(structure.TopRightPane),
+					p.renderPane(structure.BottomRightPane),
 				)...,
 			),
 		)...,
 	)
 }
 
-func (m *PaneManager) renderPane(position Position) string {
-	if _, ok := m.panes[position]; !ok {
+func (p *PaneManager) renderPane(position structure.Position) string {
+	if _, ok := p.panes[position]; !ok {
 		return ""
 	}
-	model := m.panes[position].model
-	isFocused := position == m.focused
+	model := p.panes[position].model
+	isFocused := position == p.focused
 	renderedPane := lipgloss.NewStyle().
-		Width(m.paneWidth(position) - 2).    // -2 for border
-		Height(m.paneHeight(position) - 2).  // -2 for border
-		MaxWidth(m.paneWidth(position) - 2). // -2 for border
+		Width(p.paneWidth(position) - p.styles.PaneStyle.BordersWidth).
+		Height(p.paneHeight(position) - p.styles.PaneStyle.BordersWidth).
+		MaxWidth(p.paneWidth(position) - p.styles.PaneStyle.BordersWidth).
 		Render(model.View())
 	// Optionally, the pane model can embed text in its borders.
 	borderTexts := make(map[styles.BorderPosition]string)
@@ -362,37 +416,39 @@ func (m *PaneManager) renderPane(position Position) string {
 	}
 	if !isFocused {
 		switch position {
-		case LeftPane:
-			borderTexts[styles.TopRightBorder] = keys.Navigation.LeftPane.Keys()[0]
-		case TopRightPane:
-			borderTexts[styles.TopRightBorder] = keys.Navigation.TopRightPane.Keys()[0]
-		case BottomRightPane:
-			borderTexts[styles.TopRightBorder] = keys.Navigation.BottomRightPane.Keys()[0]
+		case structure.LeftPane:
+			borderTexts[styles.TopRightBorder] = p.paneKeyMap.LeftPane.Keys()[0]
+		case structure.TopRightPane:
+			borderTexts[styles.TopRightBorder] = p.paneKeyMap.TopRightPane.Keys()[0]
+		case structure.BottomRightPane:
+			borderTexts[styles.TopRightBorder] = p.paneKeyMap.BottomRightPane.Keys()[0]
 		}
 	}
-	return styles.Borderize(renderedPane, isFocused, borderTexts)
+	return styles.Borderize(
+		renderedPane, isFocused, borderTexts, p.styles.ColorTheme,
+	)
 }
 
-func (m *PaneManager) HelpBindings() (bindings []key.Binding) {
-	if m.focused == TopRightPane {
+func (p *PaneManager) HelpBindings() (bindings []key.Binding) {
+	if p.focused == structure.TopRightPane {
 		// Only the top right pane has the ability to "go back"
-		bindings = append(bindings, keys.Common.Back)
+		bindings = append(bindings, p.commonKeyMap.Back)
 	}
-	if model, ok := m.FocusedModel().(tui.ModelHelpBindings); ok {
+	if model, ok := p.FocusedModel().(structure.ModelHelpBindings); ok {
 		bindings = append(bindings, model.HelpBindings()...)
 	}
 	return bindings
 }
 
-func removeEmptyStrings(strs ...string) []string {
+func removeEmptyStrings(strings ...string) []string {
 	n := 0
-	for _, s := range strs {
+	for _, s := range strings {
 		if s != "" {
-			strs[n] = s
+			strings[n] = s
 			n++
 		}
 	}
-	return strs[:n]
+	return strings[:n]
 }
 
 func clamp(v, low, high int) int {

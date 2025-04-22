@@ -18,6 +18,7 @@ type Table[T any] struct {
 func NewTable[T any](pub Publisher[T]) *Table[T] {
 	return &Table[T]{
 		rows: make(map[ID]T),
+		mu:   sync.RWMutex{},
 		pub:  pub,
 	}
 }
@@ -63,7 +64,7 @@ func (t *Table[T]) Get(id ID) (T, error) {
 
 	row, ok := t.rows[id]
 	if !ok {
-		return *new(T), fmt.Errorf("%s: %w", id, ErrNotFound)
+		return *new(T), fmt.Errorf("%d: %w", id, ErrNotFound)
 	}
 	return row, nil
 }

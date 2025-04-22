@@ -10,24 +10,18 @@ import (
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/fchastanet/shell-command-bookmarker/internal/models/styles"
 	"github.com/fchastanet/shell-command-bookmarker/pkg/resource"
 	"github.com/fchastanet/shell-command-bookmarker/pkg/tui"
-	"github.com/fchastanet/shell-command-bookmarker/pkg/tui/keys"
 	"golang.org/x/exp/maps"
 )
 
-const (
-	// Height of the table header
-	headerHeight = 1
-	// Height of filter widget
-	filterHeight = 2
-	// Minimum recommended height for the table widget. Respecting this minimum
-	// ensures the header and the borders and the filter widget are visible.
-	MinHeight = 6
-)
+const HalfPageMultiplier = 2
 
 // Model defines a state for the table widget.
 type Model[V resource.Identifiable] struct {
+	styles      *styles.TableStyle
+	navigation  *Navigation
 	cols        []Column
 	rows        []V
 	rowRenderer RowRenderer[V]
@@ -56,7 +50,7 @@ type Model[V resource.Identifiable] struct {
 	// height of table without borders
 	height int
 
-	previewKind *tui.Kind
+	previewKind resource.Kind
 }
 
 // Column defines the table structure.
@@ -82,11 +76,19 @@ type RenderedRow map[ColumnKey]string
 type SortFunc[V any] func(V, V) int
 
 // New creates a new model for the table widget.
-func New[V resource.Identifiable](cols []Column, fn RowRenderer[V], width, height int, opts ...Option[V]) Model[V] {
+func New[V resource.Identifiable](
+	tableStyles *styles.TableStyle,
+	cols []Column, fn RowRenderer[V],
+	width, height int, opts ...Option[V],
+) Model[V] {
 	filter := textinput.New()
 	filter.Prompt = "Filter: "
 
 	m := Model[V]{
+		styles:          tableStyles,
+		navigation:      nil,
+		cols:            make([]Column, len(cols)),
+		rows:            []V{},
 		rowRenderer:     fn,
 		items:           make(map[resource.ID]V),
 		rendered:        make(map[resource.ID]RenderedRow),
@@ -94,19 +96,28 @@ func New[V resource.Identifiable](cols []Column, fn RowRenderer[V], width, heigh
 		selectable:      true,
 		filter:          filter,
 		border:          lipgloss.NormalBorder(),
+		borderColor:     lipgloss.NoColor{},
 		currentRowIndex: -1,
+		currentRowID:    resource.ID(0),
+		sortFunc:        nil,
+		start:           0,
+		width:           width,
+		height:          height,
+		previewKind:     resource.DefaultKind{},
 	}
 	for _, fn := range opts {
 		fn(&m)
 	}
+	if m.navigation == nil {
+		m.navigation = GetDefaultNavigation()
+	}
 
 	// Copy column structs onto receiver, because the caller may modify columns.
-	m.cols = make([]Column, len(cols))
 	copy(m.cols, cols)
 	// For each column, set default truncation function if unset.
 	for i, col := range m.cols {
 		if col.TruncationFunc == nil {
-			m.cols[i].TruncationFunc = defaultTruncationFunc
+			m.cols[i].TruncationFunc = GetDefaultTruncationFunc()
 		}
 	}
 
@@ -124,6 +135,13 @@ func WithSortFunc[V resource.Identifiable](sortFunc func(V, V) int) Option[V] {
 	}
 }
 
+// WithNavigation configures the table to use the given navigation keys.
+func WithNavigation[V resource.Identifiable](nav *Navigation) Option[V] {
+	return func(m *Model[V]) {
+		m.navigation = nav
+	}
+}
+
 // WithSelectable sets whether rows are selectable.
 func WithSelectable[V resource.Identifiable](s bool) Option[V] {
 	return func(m *Model[V]) {
@@ -133,9 +151,9 @@ func WithSelectable[V resource.Identifiable](s bool) Option[V] {
 
 // WithPreview configures the table to automatically populate the bottom right
 // pane with a model corresponding to the current row.
-func WithPreview[V resource.Identifiable](maker tui.Kind) Option[V] {
+func WithPreview[V resource.Identifiable](kind resource.Kind) Option[V] {
 	return func(m *Model[V]) {
-		m.previewKind = &maker
+		m.previewKind = kind
 	}
 }
 
@@ -155,16 +173,17 @@ func (m *Model[V]) setDimensions(width, height int) {
 
 // rowAreaHeight returns the height of the terminal allocated to rows.
 func (m Model[V]) rowAreaHeight() int {
-	height := max(0, m.height-headerHeight)
+	height := max(0, m.height-m.styles.HeaderHeight)
 
 	if m.filterVisible() {
 		// Accommodate height of filter widget
-		return max(0, height-filterHeight)
+		return max(0, height-m.styles.FilterHeight)
 	}
 	return height
 }
 
-// visibleRows returns the number of renderable visible rows.
+// visibleRows returns the number of visible rows that can be
+// rendered in the available space.
 func (m Model[V]) visibleRows() int {
 	// The number of visible rows cannot exceed the row area height.
 	return min(m.rowAreaHeight(), len(m.rows)-m.start)
@@ -174,69 +193,18 @@ func (m Model[V]) visibleRows() int {
 func (m Model[V]) Update(msg tea.Msg) (Model[V], tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
-		switch {
-		case key.Matches(msg, keys.Navigation.LineUp):
-			m.MoveUp(1)
-		case key.Matches(msg, keys.Navigation.LineDown):
-			m.MoveDown(1)
-		case key.Matches(msg, keys.Navigation.PageUp):
-			m.MoveUp(m.rowAreaHeight())
-		case key.Matches(msg, keys.Navigation.PageDown):
-			m.MoveDown(m.rowAreaHeight())
-		case key.Matches(msg, keys.Navigation.HalfPageUp):
-			m.MoveUp(m.rowAreaHeight() / 2)
-		case key.Matches(msg, keys.Navigation.HalfPageDown):
-			m.MoveDown(m.rowAreaHeight() / 2)
-		case key.Matches(msg, keys.Navigation.GotoTop):
-			m.GotoTop()
-		case key.Matches(msg, keys.Navigation.GotoBottom):
-			m.GotoBottom()
-		case key.Matches(msg, keys.Global.Select):
-			m.ToggleSelection()
-		case key.Matches(msg, keys.Global.SelectAll):
-			m.SelectAll()
-		case key.Matches(msg, keys.Global.SelectClear):
-			m.DeselectAll()
-		case key.Matches(msg, keys.Global.SelectRange):
-			m.SelectRange()
-		}
+		return m.handleKeyMsg(msg)
 	case BulkInsertMsg[V]:
 		m.AddItems(msg...)
+		return m, nil
 	case resource.Event[V]:
-		switch msg.Type {
-		case resource.CreatedEvent, resource.UpdatedEvent:
-			m.AddItems(msg.Payload)
-		case resource.DeletedEvent:
-			m.removeItem(msg.Payload)
-		}
+		return m.handleResourceEvent(msg)
 	case tea.WindowSizeMsg:
 		m.setDimensions(msg.Width, msg.Height)
-	case tui.FilterFocusReqMsg:
-		// Focus the filter widget
-		blink := m.filter.Focus()
-		// Start blinking the cursor.
-		return m, blink
-	case tui.FilterBlurMsg:
-		// Blur the filter widget
-		m.filter.Blur()
 		return m, nil
-	case tui.FilterCloseMsg:
-		// Close the filter widget
-		m.filter.Blur()
-		m.filter.SetValue("")
-		// Unfilter table items
-		m.setRows(maps.Values(m.items)...)
-		return m, nil
-	case tui.FilterKeyMsg:
-		// unwrap key and send to filter widget
-		kmsg := tea.KeyMsg(msg)
-		var cmd tea.Cmd
-		m.filter, cmd = m.filter.Update(kmsg)
-		// Filter table items
-		m.setRows(maps.Values(m.items)...)
-		return m, cmd
+	case tui.FilterFocusReqMsg, tui.FilterBlurMsg, tui.FilterCloseMsg, tui.FilterKeyMsg:
+		return m.handleFilterMsg(msg)
 	default:
-		// Send any other messages to the filter if it is focused.
 		if m.filter.Focused() {
 			var cmd tea.Cmd
 			m.filter, cmd = m.filter.Update(msg)
@@ -246,15 +214,123 @@ func (m Model[V]) Update(msg tea.Msg) (Model[V], tea.Cmd) {
 	return m, nil
 }
 
-// PreviewCurrentRow
-func (m *Model[V]) PreviewCurrentRow() (tui.Kind, resource.ID, bool) {
-	if _, ok := m.CurrentRow(); !ok {
-		return 0, resource.MonotonicID{}, false
+// handleResourceEvent handles resource events such as create, update, delete
+func (m Model[V]) handleResourceEvent(msg resource.Event[V]) (Model[V], tea.Cmd) {
+	switch msg.Type {
+	case resource.CreatedEvent, resource.UpdatedEvent:
+		m.AddItems(msg.Payload)
+	case resource.DeletedEvent:
+		m.removeItem(msg.Payload)
 	}
-	if m.previewKind == nil {
-		return 0, resource.MonotonicID{}, false
+	return m, nil
+}
+
+// handleFilterMsg handles filter-related messages
+func (m Model[V]) handleFilterMsg(msg tea.Msg) (Model[V], tea.Cmd) {
+	switch msg := msg.(type) {
+	case tui.FilterFocusReqMsg:
+		// Focus the filter widget
+		blink := m.filter.Focus()
+		// Start blinking the cursor
+		return m, blink
+
+	case tui.FilterBlurMsg:
+		// Blur the filter widget
+		m.filter.Blur()
+		return m, nil
+
+	case tui.FilterCloseMsg:
+		// Close the filter widget
+		m.filter.Blur()
+		m.filter.SetValue("")
+		// Un-filter table items
+		m.setRows(maps.Values(m.items)...)
+		return m, nil
+
+	case tui.FilterKeyMsg:
+		// unwrap key and send to filter widget
+		msgKey := tea.KeyMsg(msg)
+		var cmd tea.Cmd
+		m.filter, cmd = m.filter.Update(msgKey)
+		// Filter table items
+		m.setRows(maps.Values(m.items)...)
+		return m, cmd
 	}
-	return *m.previewKind, m.currentRowID, true
+	return m, nil
+}
+
+// handleKeyMsg processes key press messages
+func (m Model[V]) handleKeyMsg(msg tea.KeyMsg) (Model[V], tea.Cmd) {
+	// Group navigation keys
+	if cmd := m.handleNavigationKey(msg); cmd {
+		return m, nil
+	}
+
+	// Group selection keys
+	if cmd := m.handleSelectionKey(msg); cmd {
+		return m, nil
+	}
+
+	return m, nil
+}
+
+// handleNavigationKey handles all navigation key presses
+func (m *Model[V]) handleNavigationKey(msg tea.KeyMsg) bool {
+	nav := m.navigation
+	switch {
+	case key.Matches(msg, nav.LineUp):
+		m.MoveUp(1)
+	case key.Matches(msg, nav.LineDown):
+		m.MoveDown(1)
+	case key.Matches(msg, nav.PageUp):
+		m.MoveUp(m.rowAreaHeight())
+	case key.Matches(msg, nav.PageDown):
+		m.MoveDown(m.rowAreaHeight())
+	case key.Matches(msg, nav.HalfPageUp):
+		m.MoveUp(m.rowAreaHeight() / HalfPageMultiplier)
+	case key.Matches(msg, nav.HalfPageDown):
+		m.MoveDown(m.rowAreaHeight() / HalfPageMultiplier)
+	case key.Matches(msg, nav.GotoTop):
+		m.GotoTop()
+	case key.Matches(msg, nav.GotoBottom):
+		m.GotoBottom()
+	default:
+		return false
+	}
+	return true
+}
+
+// handleSelectionKey handles all selection key presses
+func (m *Model[V]) handleSelectionKey(msg tea.KeyMsg) bool {
+	nav := m.navigation
+	switch {
+	case key.Matches(msg, nav.Select):
+		m.ToggleSelection()
+	case key.Matches(msg, nav.SelectAll):
+		m.SelectAll()
+	case key.Matches(msg, nav.SelectClear):
+		m.DeselectAll()
+	case key.Matches(msg, nav.SelectRange):
+		m.SelectRange()
+	default:
+		return false
+	}
+	return true
+}
+
+// PreviewCurrentRow returns information for previewing the current row
+func (m *Model[V]) PreviewCurrentRow() (
+	resourceKind resource.Kind,
+	resourceID resource.ID,
+	previewAvailable bool,
+) {
+	resourceKind = m.previewKind
+	previewAvailable = false
+	if _, ok := m.CurrentRow(); ok {
+		resourceID = m.currentRowID
+		previewAvailable = true
+	}
+	return resourceKind, resourceID, previewAvailable
 }
 
 // View renders the table.
@@ -267,25 +343,26 @@ func (m Model[V]) View() string {
 	// TODO: this allocation logic is wrong
 	components := make([]string, 0, 1+1+m.visibleRows())
 	if m.filterVisible() {
-		components = append(components, tui.Regular.Margin(0, 1).Render(m.filter.View()))
-		// Add horizontal rule between filter widget and table
-		components = append(components, strings.Repeat("─", m.width))
+		components = append(components,
+			m.styles.FiltersBlock.Render(m.filter.View()),
+			// Add horizontal rule between filter widget and table
+			strings.Repeat("─", m.width))
 	}
 	components = append(components, m.headersView())
 	// Generate scrollbar
-	scrollbar := tui.Scrollbar(m.rowAreaHeight(), len(m.rows), m.visibleRows(), m.start)
+	scrollbar := tui.Scrollbar(
+		m.styles,
+		m.rowAreaHeight(), len(m.rows), m.visibleRows(), m.start)
 	// Get all the visible rows
-	//
-	// TODO: pre-allocate rows
-	var rows []string
+	rows := make([]string, 0, m.visibleRows())
 	for i := range m.visibleRows() {
 		rows = append(rows, m.renderRow(m.start+i))
 	}
-	rowarea := lipgloss.NewStyle().Width(m.width - tui.ScrollbarWidth).Render(
-		strings.Join(rows, "\n"),
-	)
+	rowArea := lipgloss.NewStyle().
+		Width(m.width - m.styles.ScrollbarStyle.Width).
+		Render(strings.Join(rows, "\n"))
 	// Put rows alongside the scrollbar to the right.
-	components = append(components, lipgloss.JoinHorizontal(lipgloss.Top, rowarea, scrollbar))
+	components = append(components, lipgloss.JoinHorizontal(lipgloss.Top, rowArea, scrollbar))
 	// Render table components, ensuring it is at least a min height
 	content := lipgloss.NewStyle().
 		Height(m.height).
@@ -307,11 +384,6 @@ func (m *Model[V]) Metadata() string {
 		metadata = prefix + strconv.Itoa(len(m.rows))
 	}
 	return metadata
-}
-
-func (m *Model[V]) SetBorderStyle(border lipgloss.Border, color lipgloss.TerminalColor) {
-	m.border = border
-	m.borderColor = color
 }
 
 // CurrentRow returns the current row the user has highlighted.  If the table is
@@ -350,8 +422,8 @@ func (m *Model[V]) ToggleSelection() {
 	if !ok {
 		return
 	}
-	if _, isSelected := m.selected[current]; isSelected {
-		delete(m.selected, current)
+	if _, isSelected := m.selected[current.GetID()]; isSelected {
+		delete(m.selected, current.GetID())
 	} else {
 		m.selected[current.GetID()] = current
 	}
@@ -380,7 +452,7 @@ func (m *Model[V]) SelectAll() {
 		return
 	}
 	for _, row := range m.rows {
-		m.selected[row] = row
+		m.selected[row.GetID()] = row
 	}
 }
 
@@ -439,8 +511,8 @@ func (m *Model[V]) SetItems(items ...V) {
 	m.AddItems(items...)
 }
 
-// AddItems idempotently adds items to the table, updating any items that exist
-// on the table already.
+// AddItems idem potently adds items to the table,
+// updating any items that exist on the table already.
 func (m *Model[V]) AddItems(items ...V) {
 	for _, item := range items {
 		// Add/update item
@@ -452,9 +524,9 @@ func (m *Model[V]) AddItems(items ...V) {
 }
 
 func (m *Model[V]) removeItem(item V) {
-	delete(m.rendered, item)
-	delete(m.items, item)
-	delete(m.selected, item)
+	delete(m.rendered, item.GetID())
+	delete(m.items, item.GetID())
+	delete(m.selected, item.GetID())
 	for i, row := range m.rows {
 		if row.GetID() == item.GetID() {
 			// TODO: this might well produce a memory leak. See note:
@@ -474,9 +546,23 @@ func (m *Model[V]) removeItem(item V) {
 	}
 }
 
+// setRows processes and filters items for display
 func (m *Model[V]) setRows(items ...V) {
+	// Process items with filtering
+	m.processFilteredItems(items)
+
+	// Sort rows and locate current row
+	m.sortAndLocateCurrentRow()
+
+	// Set start index
+	m.setStart()
+}
+
+// processFilteredItems handles filtering of items for display
+func (m *Model[V]) processFilteredItems(items []V) {
 	selected := make(map[resource.ID]V)
 	m.rows = make([]V, 0, len(items))
+
 	for _, item := range items {
 		if m.filterVisible() && !m.matchFilter(item) {
 			// Skip item that doesn't match filter
@@ -484,18 +570,23 @@ func (m *Model[V]) setRows(items ...V) {
 		}
 		m.rows = append(m.rows, item)
 		if m.selectable {
-			if _, ok := m.selected[item]; ok {
-				selected[item] = item
+			if _, ok := m.selected[item.GetID()]; ok {
+				selected[item.GetID()] = item
 			}
 		}
 	}
 	m.selected = selected
+}
+
+// sortAndLocateCurrentRow sorts the rows and tracks the current row
+func (m *Model[V]) sortAndLocateCurrentRow() {
 	// Sort rows in-place
 	if m.sortFunc != nil {
 		slices.SortFunc(m.rows, func(i, j V) int {
 			return m.sortFunc(i, j)
 		})
 	}
+
 	// Track current row index
 	m.currentRowIndex = -1
 	for i, row := range m.rows {
@@ -504,23 +595,19 @@ func (m *Model[V]) setRows(items ...V) {
 			break
 		}
 	}
-	// Check if item corresponding to current row doesn't exist, which occurs
-	// the very first time the table is populated. If so, set current row to the
-	// first row.
+
+	// Set default current row if needed
 	if len(m.rows) > 0 && m.currentRowIndex == -1 {
 		m.currentRowIndex = 0
 		m.currentRowID = m.rows[m.currentRowIndex].GetID()
 	}
-	m.setStart()
 }
 
 // matchFilter returns true if the item with the given ID matches the filter
 // value.
 func (m *Model[V]) matchFilter(item V) bool {
 	for _, col := range m.rendered[item.GetID()] {
-		// Remove ANSI escapes code before filtering
-		stripped := internal.StripAnsi(col)
-		if strings.Contains(stripped, m.filter.Value()) {
+		if strings.Contains(col, m.filter.Value()) {
 			return true
 		}
 	}
@@ -578,7 +665,7 @@ func (m Model[V]) headersView() string {
 			style = style.AlignHorizontal(lipgloss.Right)
 		}
 		renderedCell := style.Render(TruncateRight(col.Title, col.Width, "…"))
-		s = append(s, tui.Regular.Padding(0, 1).Render(renderedCell))
+		s = append(s, m.styles.Cell.Render(renderedCell))
 	}
 	return lipgloss.NewStyle().
 		MaxWidth(m.width).
@@ -589,24 +676,22 @@ func (m *Model[V]) renderRow(rowIdx int) string {
 	row := m.rows[rowIdx]
 
 	var (
-		background lipgloss.Color
-		foreground lipgloss.Color
-		current    bool
-		selected   bool
+		current  bool
+		selected bool
 	)
 	if _, ok := m.selected[row.GetID()]; ok {
 		selected = true
 	}
 	current = rowIdx == m.currentRowIndex
-	if current && selected {
-		background = tui.CurrentAndSelectedBackground
-		foreground = tui.CurrentAndSelectedForeground
-	} else if current {
-		background = tui.CurrentBackground
-		foreground = tui.CurrentForeground
-	} else if selected {
-		background = tui.SelectedBackground
-		foreground = tui.SelectedForeground
+	rowStyle := m.styles.Cell
+
+	switch {
+	case current && selected:
+		rowStyle = m.styles.CurrentAndSelectedRow
+	case current:
+		rowStyle = m.styles.CurrentRow
+	case selected:
+		rowStyle = m.styles.SelectedRow
 	}
 
 	cells := m.rendered[row.GetID()]
@@ -636,18 +721,10 @@ func (m *Model[V]) renderRow(rowIdx int) string {
 	renderedRow := lipgloss.JoinHorizontal(lipgloss.Left, styledCells...)
 	// Join cells together to form a row, ensuring it doesn't exceed maximum
 	// table width
-	renderedRow = lipgloss.NewStyle().
+	renderedRow = rowStyle.
 		MaxWidth(m.width).
 		Render(renderedRow)
 
-	// If current row or selected rows, strip colors and apply background color
-	if current || selected {
-		renderedRow = internal.StripAnsi(renderedRow)
-		renderedRow = lipgloss.NewStyle().
-			Foreground(foreground).
-			Background(background).
-			Render(renderedRow)
-	}
 	return renderedRow
 }
 

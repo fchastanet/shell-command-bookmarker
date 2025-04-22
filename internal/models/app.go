@@ -4,6 +4,7 @@ import (
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/fchastanet/shell-command-bookmarker/internal/models/structure"
 	"github.com/fchastanet/shell-command-bookmarker/internal/models/styles"
 	"github.com/fchastanet/shell-command-bookmarker/internal/services"
 )
@@ -22,13 +23,17 @@ func NewAppModel(
 	historyService *services.HistoryService,
 	loggerService *services.LoggerService,
 ) *AppModel {
-	styles := styles.NewStyles()
-	historyModel := NewHistoryTableModel(styles, historyService)
+	myStyles := styles.NewStyles()
+	myStyles.Init()
+	// init kinds
+	structure.RegisterKinds()
+	historyModel := NewHistoryTableModel(myStyles.TableStyle, historyService)
 	m := AppModel{
-		width:        0,
-		height:       0,
-		historyModel: historyModel,
-		styles:       styles,
+		width:         0,
+		height:        0,
+		historyModel:  historyModel,
+		loggerService: loggerService,
+		styles:        myStyles,
 	}
 
 	return &m
@@ -63,5 +68,5 @@ func (m *AppModel) View() string {
 	doc := strings.Builder{}
 
 	doc.WriteString(m.historyModel.View())
-	return m.styles.GetDocStyle().Render(doc.String())
+	return m.styles.WindowStyle.DocStyle.Render(doc.String())
 }

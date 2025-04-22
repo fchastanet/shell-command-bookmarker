@@ -14,7 +14,7 @@ type settings struct {
 type Model struct {
 	table       *table.Model
 	settings    *settings
-	tableStyles TableStyles
+	tableStyles Styles
 	Width       int
 	Height      int
 }
@@ -26,8 +26,8 @@ type keyMap struct {
 	Enter key.Binding
 }
 
-type TableStyles interface {
-	GetTableStyle() lipgloss.Style
+type Styles interface {
+	GetTableBorderStyle() *lipgloss.Style
 }
 
 func (model *Model) GetKeyBindings() []key.Binding {
@@ -38,7 +38,7 @@ func (model *Model) GetKeyBindings() []key.Binding {
 
 func NewModel(
 	tableModel *table.Model,
-	tableStyles TableStyles,
+	tableStyles Styles,
 ) *Model {
 	model := &Model{
 		table:       tableModel,
@@ -121,5 +121,5 @@ func (model *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (model *Model) View() string {
-	return model.tableStyles.GetTableStyle().Render(model.table.View())
+	return model.tableStyles.GetTableBorderStyle().Render(model.table.View())
 }

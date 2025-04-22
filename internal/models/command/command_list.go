@@ -1,83 +1,65 @@
 package command
 
 import (
-	"errors"
 	"fmt"
 
 	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/bubbles/spinner"
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
+	"github.com/fchastanet/shell-command-bookmarker/internal/models/keys"
+	"github.com/fchastanet/shell-command-bookmarker/internal/models/structure"
+	"github.com/fchastanet/shell-command-bookmarker/internal/models/styles"
 	"github.com/fchastanet/shell-command-bookmarker/internal/services"
-	"github.com/fchastanet/shell-command-bookmarker/pkg/table"
-	"github.com/leg100/pug/internal/plan"
-	"github.com/leg100/pug/internal/resource"
-	"github.com/leg100/pug/internal/state"
-	"github.com/leg100/pug/internal/task"
-	"github.com/leg100/pug/internal/tui"
-	"github.com/leg100/pug/internal/tui/keys"
-	"github.com/leg100/pug/internal/workspace"
-	"golang.org/x/exp/maps"
+	"github.com/fchastanet/shell-command-bookmarker/pkg/resource"
+	"github.com/fchastanet/shell-command-bookmarker/pkg/tui"
+	"github.com/fchastanet/shell-command-bookmarker/pkg/tui/table"
 )
 
-var commandColumn = table.Column{
-	Key:        "command",
-	Title:      "COMMAND",
-	FlexFactor: 1,
-}
-
-type CommandListMaker struct {
+type ListMaker struct {
 	App     *services.AppService
+	Styles  *styles.Styles
 	Spinner *spinner.Model
 }
 
-func (mm *CommandListMaker) Make(workspaceID resource.ID, width, height int) (tui.ChildModel, error) {
-	ws, err := mm.Workspaces.Get(workspaceID)
-	if err != nil {
-		return nil, err
+func (mm *ListMaker) Make(_ resource.ID, width, height int) (structure.ChildModel, error) {
+	commandColumn := table.Column{
+		Key:            "command",
+		Title:          "COMMAND",
+		FlexFactor:     1,
+		Width:          0,
+		TruncationFunc: table.GetDefaultTruncationFunc(),
+		RightAlign:     false,
 	}
+
 	columns := []table.Column{commandColumn}
-	renderer := func(resource *state.Resource) table.RenderedRow {
-		addr := string(resource.Address)
-		if resource.Tainted {
-			addr += " (tainted)"
-		}
+	renderer := func(resource resource.Resource) table.RenderedRow {
+		addr := fmt.Sprintf("%d", resource.GetMonotonicID().Serial)
 		return table.RenderedRow{commandColumn.Key: addr}
 	}
 	tbl := table.New(
+		mm.Styles.TableStyle,
 		columns,
 		renderer,
 		width,
 		height,
-		table.WithSortFunc(state.Sort),
-		table.WithPreview[*state.Resource](tui.ResourceKind),
+		table.WithSortFunc(resource.Sort),
+		table.WithPreview[resource.Resource](structure.CommandKind),
 	)
 	m := &resourceList{
-		Model:     tbl,
-		states:    mm.States,
-		plans:     mm.Plans,
-		workspace: ws,
-		spinner:   mm.Spinner,
-		width:     width,
-		height:    height,
-		Helpers:   mm.Helpers,
-	}
-	m.common = &tui.ActionHandler{
-		Helpers:     mm.Helpers,
-		IDRetriever: m,
+		AppService: mm.App,
+		Model:      tbl,
+		reloading:  false,
+		spinner:    mm.Spinner,
+		width:      width,
+		height:     height,
 	}
 	return m, nil
 }
 
 type resourceList struct {
-	table.Model[*state.Resource]
+	table.Model[resource.Resource]
 	*services.AppService
 
-	common    *tui.ActionHandler
-	states    *state.Service
-	plans     *plan.Service
-	state     *state.State
-	workspace *workspace.Workspace
 	reloading bool
 	height    int
 	width     int
@@ -85,108 +67,23 @@ type resourceList struct {
 	spinner *spinner.Model
 }
 
-type initState *state.State
-
 func (m *resourceList) Init() tea.Cmd {
-	return func() tea.Msg {
-		state, err := m.states.Get(m.workspace.ID)
-		if err != nil {
-			return tui.ReportError(fmt.Errorf("initializing state model: %w", err))
-		}
-		return initState(state)
-	}
-}
-
-// reloadedMsg is sent when a state reload has finished.
-type reloadedMsg struct {
-	workspaceID resource.MonotonicID
-	err         error
+	return tea.Batch()
 }
 
 func (m *resourceList) Update(msg tea.Msg) tea.Cmd {
 	var (
-		cmd              tea.Cmd
-		cmds             []tea.Cmd
-		createRunOptions plan.CreateOptions
-		applyPrompt      = "Auto-apply %d resources?"
+		cmd  tea.Cmd
+		cmds []tea.Cmd
 	)
 
 	switch msg := msg.(type) {
-
-	case reloadedMsg:
+	case commandReloadedMsg:
 		m.reloading = false
 		if msg.err != nil {
 			return tui.ReportError(fmt.Errorf("reloading state failed: %w", msg.err))
 		}
 		return tui.ReportInfo("reloading finished")
-
-	case tea.KeyMsg:
-		switch {
-		case key.Matches(msg, resourcesKeys.Enter):
-			if row, ok := m.CurrentRow(); ok {
-				return tui.NavigateTo(tui.ResourceKind, tui.WithParent(row.ID))
-			}
-		case key.Matches(msg, resourcesKeys.Reload):
-			if m.reloading {
-				return tui.ReportError(errors.New("reloading in progress"))
-			}
-			m.reloading = true
-			return func() tea.Msg {
-				msg := reloadedMsg{workspaceID: m.workspace.ID}
-				if spec, err := m.states.Reload(msg.workspaceID); err != nil {
-					msg.err = err
-				} else {
-					task, err := m.Tasks.Create(spec)
-					if err != nil {
-						msg.err = err
-					} else if err := task.Wait(); err != nil {
-						msg.err = err
-					}
-				}
-				return msg
-			}
-		case key.Matches(msg, keys.Common.Delete):
-			addrs := m.selectedOrCurrentAddresses()
-			if len(addrs) == 0 {
-				// no rows; do nothing
-				return nil
-			}
-			fn := func(workspaceID resource.ID) (task.Spec, error) {
-				return m.states.Delete(workspaceID, addrs...)
-			}
-			return tui.YesNoPrompt(
-				fmt.Sprintf("Delete %d resource(s)?", len(addrs)),
-				m.CreateTasks(fn, m.workspace.ID),
-			)
-		case key.Matches(msg, keys.Common.PlanDestroy):
-			// Create a targeted destroy plan.
-			createRunOptions.Destroy = true
-			fallthrough
-		case key.Matches(msg, keys.Common.Plan):
-			// Create a targeted plan.
-			createRunOptions.TargetAddrs = m.selectedOrCurrentAddresses()
-			// NOTE: even if the user hasn't selected any rows, we still proceed
-			// to create a run without targeted resources.
-			fn := func(workspaceID resource.ID) (task.Spec, error) {
-				return m.plans.Plan(workspaceID, createRunOptions)
-			}
-			return m.CreateTasks(fn, m.workspace.ID)
-		case key.Matches(msg, keys.Common.Destroy):
-			createRunOptions.Destroy = true
-			applyPrompt = "Destroy %d resources?"
-		}
-
-	case resource.Event[*state.State]:
-		if msg.Payload.WorkspaceID != m.workspace.ID {
-			return nil
-		}
-		switch msg.Type {
-		case resource.CreatedEvent, resource.UpdatedEvent:
-			// Whenever state is created or updated, re-populate table with
-			// resources.
-			m.SetItems(maps.Values(msg.Payload.Resources)...)
-			m.state = msg.Payload
-		}
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
 		m.height = msg.Height
@@ -199,66 +96,20 @@ func (m *resourceList) Update(msg tea.Msg) tea.Cmd {
 	return tea.Batch(cmds...)
 }
 
-func (m resourceList) View() string {
+func (m *resourceList) View() string {
 	if m.reloading {
-		return fmt.Sprintf("Pulling state %s", m.spinner.View())
-	}
-	if m.state == nil || m.state.Serial < 0 {
-		return "No state found"
+		return "Pulling state " + m.spinner.View()
 	}
 	return m.Model.View()
 }
 
-func (m resourceList) HelpBindings() []key.Binding {
+func (m *resourceList) HelpBindings() []key.Binding {
+	resourcesKeys := GetResourcesKeyMap()
+	commonKeys := keys.GetCommonKeyMap()
 	bindings := []key.Binding{
-		resourcesKeys.Plan,
-		resourcesKeys.PlanDestroy,
-		resourcesKeys.Apply,
-		resourcesKeys.Destroy,
-		keys.Common.Delete,
-		resourcesKeys.Move,
-		resourcesKeys.Taint,
-		resourcesKeys.Untaint,
-		resourcesKeys.Reload,
+		commonKeys.Delete,
+		*resourcesKeys.Move,
+		*resourcesKeys.Reload,
 	}
-	bindings = append(bindings, m.common.HelpBindings()...)
 	return bindings
-}
-
-func (m resourceList) selectedOrCurrentAddresses() []state.ResourceAddress {
-	rows := m.SelectedOrCurrent()
-	addrs := make([]state.ResourceAddress, len(rows))
-	var i int
-	for _, v := range rows {
-		addrs[i] = v.Address
-		i++
-	}
-	return addrs
-}
-
-func (m *resourceList) BorderText() map[tui.BorderPosition]string {
-	var serial int64
-	if m.state != nil {
-		serial = m.state.Serial
-	}
-	return map[tui.BorderPosition]string{
-		tui.TopLeftBorder: fmt.Sprintf(
-			"%s %s %s",
-			tui.Bold.Render("state"),
-			tui.ModulePathWithIcon(m.workspace.ModulePath, true),
-			tui.WorkspaceNameWithIcon(m.workspace.Name, true),
-		),
-		tui.TopMiddleBorder: m.Metadata(),
-		tui.BottomMiddleBorder: lipgloss.NewStyle().
-			Foreground(tui.BurntOrange).
-			Render(fmt.Sprintf("#%d", serial)),
-	}
-}
-
-func (m *resourceList) GetModuleIDs() ([]resource.ID, error) {
-	return []resource.ID{m.workspace.ModuleID}, nil
-}
-
-func (m *resourceList) GetWorkspaceIDs() ([]resource.ID, error) {
-	return []resource.ID{m.workspace.ID}, nil
 }
