@@ -6,11 +6,10 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
-	"strconv"
 	"time"
 
-	"github.com/charmbracelet/bubbles/table"
 	"github.com/fchastanet/shell-command-bookmarker/internal/processors"
+	"github.com/fchastanet/shell-command-bookmarker/internal/services/models"
 )
 
 const (
@@ -50,22 +49,13 @@ func NewHistoryService(
 	}
 }
 
-func (s *HistoryService) GetHistoryRows() ([]table.Row, error) {
+func (s *HistoryService) GetHistoryRows() ([]*models.Command, error) {
 	cmds, err := s.dbService.GetAllCommands()
 	if err != nil {
 		slog.Error("Error getting history rows", "error", err)
-		return []table.Row{}, err
+		return []*models.Command{}, err
 	}
-	historyRows := make([]table.Row, len(cmds))
-	for row := range cmds {
-		historyRows[row] = table.Row{
-			strconv.Itoa(cmds[row].ID),
-			cmds[row].Title,
-			cmds[row].Script,
-			string(cmds[row].Status),
-		}
-	}
-	return historyRows, nil
+	return cmds, nil
 }
 
 func (s *HistoryService) getScriptRegexp() *regexp.Regexp {
@@ -198,15 +188,15 @@ func (s *HistoryService) processCmd(historyCmd processors.HistoryCommand) (proce
 		slog.Debug("Command already exists in database or is ignored", "command", historyCmd, "status", importStatus)
 		return importStatus, nil
 	}
-	cmd := &Command{
+	cmd := &models.Command{
 		ID:                   0,
 		Title:                "",
 		Description:          "",
 		Script:               historyCmd.Command,
 		Elapsed:              historyCmd.Elapsed,
 		LintIssues:           "[]",
-		LintStatus:           LintStatusNotAvailable,
-		Status:               CommandStatusImported,
+		LintStatus:           models.LintStatusNotAvailable,
+		Status:               models.CommandStatusImported,
 		CreationDatetime:     historyCmd.Timestamp,
 		ModificationDatetime: time.Now(),
 	}
@@ -214,16 +204,16 @@ func (s *HistoryService) processCmd(historyCmd processors.HistoryCommand) (proce
 		issues, err := s.lintService.LintScript(historyCmd.Command)
 		if err != nil && len(issues) == 0 {
 			slog.Error("Error linting command", "command", historyCmd, "error", err)
-			cmd.LintStatus = LintStatusShellcheckFailed
+			cmd.LintStatus = models.LintStatusShellcheckFailed
 			cmd.LintIssues = "[]"
 		} else {
 			cmd.LintStatus = s.lintService.GetLintResultingStatus(issues)
 			cmd.LintIssues = s.lintService.FormatLintIssuesAsJSON(issues)
 		}
-		if cmd.LintStatus == LintStatusWarning {
+		if cmd.LintStatus == models.LintStatusWarning {
 			slog.Warn("Linting issues found", "command", historyCmd, "issues", issues)
 		}
-		if cmd.LintStatus == LintStatusError {
+		if cmd.LintStatus == models.LintStatusError {
 			slog.Error("Linting errors found", "command", historyCmd, "issues", issues)
 		}
 	}

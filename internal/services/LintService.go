@@ -7,6 +7,7 @@ import (
 	"os/exec"
 
 	"github.com/fchastanet/shell-command-bookmarker/internal/services/executors"
+	"github.com/fchastanet/shell-command-bookmarker/internal/services/models"
 )
 
 // ErrShellCheckNotFound indicates that the shellcheck command was not found in the system's PATH.
@@ -41,16 +42,6 @@ type LintService struct {
 	commandExecutor CommandExecutorInterface
 	lookupExecutor  LookupExecutorInterface
 }
-
-type LintStatus string
-
-const (
-	LintStatusNotAvailable     LintStatus = "NOT_AVAILABLE"
-	LintStatusOK               LintStatus = "OK"
-	LintStatusWarning          LintStatus = "WARNING"
-	LintStatusError            LintStatus = "ERROR"
-	LintStatusShellcheckFailed LintStatus = "SHELLCHECK_FAILED"
-)
 
 type LintServiceOption func(*LintService)
 
@@ -157,21 +148,21 @@ func (s *LintService) FormatLintIssuesAsJSON(issues []ShellCheckIssue) string {
 	return string(str)
 }
 
-func (s *LintService) GetLintResultingStatus(issues []ShellCheckIssue) LintStatus {
+func (s *LintService) GetLintResultingStatus(issues []ShellCheckIssue) models.LintStatus {
 	if len(issues) == 0 {
-		return LintStatusOK
+		return models.LintStatusOK
 	}
 	allInfo := true
 	for _, issue := range issues {
 		if issue.Level == "error" {
-			return LintStatusError
+			return models.LintStatusError
 		}
 		if issue.Level != "info" {
 			allInfo = false
 		}
 	}
 	if allInfo {
-		return LintStatusOK
+		return models.LintStatusOK
 	}
-	return LintStatusWarning
+	return models.LintStatusWarning
 }

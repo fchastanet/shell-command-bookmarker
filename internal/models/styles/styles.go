@@ -3,12 +3,13 @@ package styles
 import (
 	"log/slog"
 
-	"github.com/charmbracelet/bubbles/table"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/fchastanet/shell-command-bookmarker/pkg/tui/colors"
+	"github.com/fchastanet/shell-command-bookmarker/pkg/tui/table"
 )
 
 type Styles struct {
-	TableStyle  *TableStyle
+	TableStyle  *table.Style
 	PaneStyle   *PaneStyle
 	HelpStyle   *HelpStyle
 	FooterStyle *FooterStyle
@@ -16,12 +17,6 @@ type Styles struct {
 	PromptStyle *PromptStyle
 	// ColorTheme is the color theme used in the application.
 	ColorTheme *ColorTheme
-}
-
-type ScrollbarStyle struct {
-	Thumb string
-	Track string
-	Width int
 }
 
 type FooterStyle struct {
@@ -51,31 +46,6 @@ type PaneStyle struct {
 	MinContentWidth int
 	BordersWidth    int
 	TopBorder       *lipgloss.Style
-}
-
-type TableStyle struct {
-	// Style for the table content
-	Content *table.Styles
-	// Border style for the table
-	Border *lipgloss.Style
-	// Style for the table filters header
-	FiltersBlock *lipgloss.Style
-	// Style for the table cell
-	Cell *lipgloss.Style
-	// Height of the table header
-	HeaderHeight int
-	// Height of filter widget
-	FilterHeight int
-	// Minimum recommended height for the table widget. Respecting this minimum
-	// ensures the header and the borders and the filter widget are visible.
-	MinHeight int
-	// ScrollbarStyle is the style for the scrollbar.
-	ScrollbarStyle *ScrollbarStyle
-
-	Row                   *lipgloss.Style
-	CurrentRow            *lipgloss.Style
-	SelectedRow           *lipgloss.Style
-	CurrentAndSelectedRow *lipgloss.Style
 }
 
 type WindowStyle struct {
@@ -137,8 +107,8 @@ func (s *Styles) initBaseStyles(colorTheme *ColorTheme) {
 
 	thickBorder := regular.
 		Border(lipgloss.ThickBorder()).
-		BorderForeground(Violet).
-		BorderForeground(Red).
+		BorderForeground(colors.Violet).
+		BorderForeground(colors.Red).
 		Padding(0, PaddingSmall)
 
 	footerInline := regular.Inline(true)
@@ -159,8 +129,8 @@ func (s *Styles) initBaseStyles(colorTheme *ColorTheme) {
 		PromptHeight:   HeightPrompt,
 		MinHeight:      HeightMinimum,
 		BorderStyle:    &windowBorder,
-		Background:     EvenLighterGrey,
-		Foreground:     Black,
+		Background:     colors.EvenLighterGrey,
+		Foreground:     colors.Black,
 		DocStyle:       &docStyle,
 		HighlightColor: highlightColor,
 	}
@@ -190,12 +160,12 @@ func (s *Styles) initBaseStyles(colorTheme *ColorTheme) {
 	}
 
 	// Initialize footer style
-	footerDefaultStyle := padded.Foreground(Black).Background(EvenLighterGrey)
+	footerDefaultStyle := padded.Foreground(colors.Black).Background(colors.EvenLighterGrey)
 	footerErrorStyle := regular.Padding(0, PaddingSmall).
 		Background(colorTheme.ErrorLogLevel).
-		Foreground(White)
-	footerInfoStyle := padded.Foreground(Black).Background(LightGreen)
-	versionStyle := padded.Background(DarkGrey).Foreground(White)
+		Foreground(colors.White)
+	footerInfoStyle := padded.Foreground(colors.Black).Background(colors.LightGreen)
+	versionStyle := padded.Background(colors.DarkGrey).Foreground(colors.White)
 	s.FooterStyle = &FooterStyle{
 		Height:       HeightFooter,
 		DefaultStyle: &footerDefaultStyle,
@@ -213,7 +183,7 @@ func (s *Styles) initComponentStyles(colorTheme *ColorTheme) {
 	regular := lipgloss.NewStyle()
 
 	// Create help style
-	helpMainStyle := padded.Background(Grey).Foreground(White)
+	helpMainStyle := padded.Background(colors.Grey).Foreground(colors.White)
 	helpKeyStyle := bold.Foreground(colorTheme.HelpKey).Margin(0, 1, 0, 0)
 	helpDescStyle := regular.Foreground(colorTheme.HelpDesc)
 	s.HelpStyle = &HelpStyle{
@@ -223,44 +193,8 @@ func (s *Styles) initComponentStyles(colorTheme *ColorTheme) {
 		DescStyle: &helpDescStyle,
 	}
 
-	// Create table styles
-	tableFilterBlock := regular.Margin(0, 1)
-	tableCell := regular.Padding(0, PaddingSmall)
-	tableBorderStyle := lipgloss.NewStyle().
-		BorderStyle(lipgloss.NormalBorder()).
-		BorderForeground(lipgloss.Color("240"))
-
-	// Row styles using the color theme
-	row := lipgloss.NewStyle()
-	currentRow := lipgloss.NewStyle().
-		Background(colorTheme.CurrentBackground).
-		Foreground(colorTheme.CurrentForeground)
-	selectedRow := lipgloss.NewStyle().
-		Background(colorTheme.SelectedBackground).
-		Foreground(colorTheme.SelectedForeground)
-	currentAndSelectedRow := lipgloss.NewStyle().
-		Background(colorTheme.CurrentAndSelectedBackground).
-		Foreground(colorTheme.CurrentAndSelectedForeground)
-
 	// Initialize table style
-	s.TableStyle = &TableStyle{
-		Content:               tableContentStyles(),
-		Border:                &tableBorderStyle,
-		FiltersBlock:          &tableFilterBlock,
-		Cell:                  &tableCell,
-		HeaderHeight:          HeightFooter,
-		FilterHeight:          HeightFilter,
-		MinHeight:             HeightMinimum,
-		Row:                   &row,
-		CurrentRow:            &currentRow,
-		SelectedRow:           &selectedRow,
-		CurrentAndSelectedRow: &currentAndSelectedRow,
-		ScrollbarStyle: &ScrollbarStyle{
-			Thumb: "█",
-			Track: "░",
-			Width: 1,
-		},
-	}
+	s.TableStyle = table.GetDefaultStyle()
 }
 
 func (s *Styles) Init() {
@@ -297,40 +231,4 @@ func (s *Styles) checkDimension() {
 	if s.PaneStyle.MinPaneWidth > s.PaneStyle.DefaultLeftPaneWidth {
 		panic("default left pane width must not be lower than the overall minimum width")
 	}
-}
-
-func tableContentStyles() *table.Styles {
-	s := table.DefaultStyles()
-	header := s.Header.
-		BorderStyle(lipgloss.NormalBorder()).
-		BorderForeground(lipgloss.Color("240")).
-		BorderBottom(true).
-		Bold(false)
-	s.Header = &header
-	selected := s.Selected.
-		Foreground(lipgloss.Color("229")).
-		Background(lipgloss.Color("57")).
-		Bold(false)
-	s.Selected = &selected
-	return &s
-}
-
-func (s *TableStyle) GetTableBorderStyle() *lipgloss.Style {
-	return s.Border
-}
-
-func (s *TableStyle) GetTableContentStyle() *table.Styles {
-	return s.Content
-}
-
-func (s *TableStyle) GetScrollbarThumb() string {
-	return s.ScrollbarStyle.Thumb
-}
-
-func (s *TableStyle) GetScrollbarTrack() string {
-	return s.ScrollbarStyle.Track
-}
-
-func (s *TableStyle) GetScrollbarWidth() int {
-	return s.ScrollbarStyle.Width
 }

@@ -6,38 +6,14 @@ import (
 	"log/slog"
 	"time"
 
+	"github.com/fchastanet/shell-command-bookmarker/internal/services/models"
 	"github.com/fchastanet/shell-command-bookmarker/pkg/db"
-)
-
-type CommandStatus string
-
-const (
-	CommandStatusImported   CommandStatus = "IMPORTED"
-	CommandStatusBookmarked CommandStatus = "BOOKMARKED"
 )
 
 type DBService struct {
 	dbAdapter  db.Adapter
 	dbPath     string
 	schemaPath string
-}
-
-type Command struct {
-	ID                   int
-	Title                string
-	Description          string
-	Script               string
-	Status               CommandStatus
-	LintIssues           string
-	LintStatus           LintStatus
-	Elapsed              int
-	CreationDatetime     time.Time
-	ModificationDatetime time.Time
-}
-
-type CommandStatusEnum struct {
-	Imported   CommandStatus
-	Bookmarked CommandStatus
 }
 
 func NewDBService(
@@ -63,7 +39,7 @@ func (s *DBService) GetDBAdapter() db.Adapter {
 	return s.dbAdapter
 }
 
-func (s *DBService) SaveCommand(command *Command) error {
+func (s *DBService) SaveCommand(command *models.Command) error {
 	// Use Exec instead of Query for INSERT statements
 	_, err := s.dbAdapter.GetDB().Exec(
 		`INSERT INTO command (
@@ -82,7 +58,7 @@ func (s *DBService) SaveCommand(command *Command) error {
 }
 
 // GetCommandByID retrieves a command by its database ID
-func (s *DBService) GetCommandByID(id int) (*Command, error) {
+func (s *DBService) GetCommandByID(id int) (*models.Command, error) {
 	slog.Debug("Retrieving command by id from database", "id", id)
 	// Use QueryRow for single row retrieval
 	row := s.dbAdapter.GetDB().QueryRow(
@@ -99,7 +75,7 @@ func (s *DBService) GetCommandByID(id int) (*Command, error) {
 	return s.getCommandFromRow(row)
 }
 
-func (s *DBService) GetCommandByScript(script string) (*Command, error) {
+func (s *DBService) GetCommandByScript(script string) (*models.Command, error) {
 	slog.Debug("Retrieving command by script from database", "script", script)
 	// Use QueryRow for single row retrieval
 	row := s.dbAdapter.GetDB().QueryRow(
@@ -117,8 +93,8 @@ func (s *DBService) GetCommandByScript(script string) (*Command, error) {
 	return s.getCommandFromRow(row)
 }
 
-func (s *DBService) getCommandFromRow(row *sql.Row) (*Command, error) {
-	var command Command
+func (s *DBService) getCommandFromRow(row *sql.Row) (*models.Command, error) {
+	var command models.Command
 	var creationDateStr string
 	var modificationDateStr string
 
@@ -180,8 +156,8 @@ func (s *DBService) GetMaxCommandTimestamp() (time.Time, error) {
 	return maxTimestamp, nil
 }
 
-func (s *DBService) GetAllCommands() ([]*Command, error) {
-	var commands []*Command
+func (s *DBService) GetAllCommands() ([]*models.Command, error) {
+	var commands []*models.Command
 	var creationDateStr string
 	var modificationDateStr string
 
@@ -197,7 +173,7 @@ func (s *DBService) GetAllCommands() ([]*Command, error) {
 	defer rows.Close()
 
 	for rows.Next() {
-		command := Command{
+		command := models.Command{
 			ID:                   0,
 			Title:                "",
 			Description:          "",

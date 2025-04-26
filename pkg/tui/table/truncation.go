@@ -11,12 +11,17 @@ func GetDefaultTruncationFunc() TruncationFunc {
 
 type TruncationFunc func(s string, w int, tailOrPrefix string) string
 
+func NoTruncate(s string, _ int, _ string) string {
+	// No truncation - return the string as-is.
+	return s
+}
+
 func TruncateRight(s string, w int, tail string) string {
 	return ansi.Truncate(s, w, tail)
 }
 
 func TruncateLeft(s string, w int, prefix string) string {
-	// ansi.TruncateLeft is weird and doesn't obey its documented behaviour:
+	// ansi.TruncateLeft is weird and doesn't obey its documented behavior:
 	// instead it removes n chars from the left-side of the string and prefixes
 	// the prefix string. Because it is ANSI aware it is still useful. It is
 	// only called if the string is determined to need truncating.
