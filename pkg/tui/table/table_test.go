@@ -4,7 +4,6 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/fchastanet/shell-command-bookmarker/internal/models/styles"
 	"github.com/fchastanet/shell-command-bookmarker/pkg/resource"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -39,7 +38,7 @@ func (r *testResource) GetID() resource.ID { return r.ID.Serial }
 // testing. The rows are sorted from lowest int to highest int.
 func setupTest() Model[*testResource] {
 	renderer := func(_ *testResource) RenderedRow { return nil }
-	tbl := New(styles.NewStyles().TableStyle, nil, renderer, 0, 0,
+	tbl := New(GetDefaultStyle(), nil, renderer, 0, 0,
 		WithSortFunc(func(i, j *testResource) int {
 			if i.n < j.n {
 				return -1

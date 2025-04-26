@@ -10,7 +10,6 @@ const (
 
 	// Height constants
 	HeightPrompt  = 3
-	HeightFilter  = 2
 	HeightMinimum = 6
 	HeightMinPane = 4
 	HeightHelp    = 12

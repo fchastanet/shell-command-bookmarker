@@ -10,7 +10,6 @@ import (
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
-	"github.com/fchastanet/shell-command-bookmarker/internal/models/styles"
 	"github.com/fchastanet/shell-command-bookmarker/pkg/resource"
 	"github.com/fchastanet/shell-command-bookmarker/pkg/tui"
 	"golang.org/x/exp/maps"
@@ -20,7 +19,7 @@ const HalfPageMultiplier = 2
 
 // Model defines a state for the table widget.
 type Model[V resource.Identifiable] struct {
-	styles      *styles.TableStyle
+	styles      *Style
 	navigation  *Navigation
 	cols        []Column
 	rows        []V
@@ -37,6 +36,7 @@ type Model[V resource.Identifiable] struct {
 	items    map[resource.ID]V
 	sortFunc SortFunc[V]
 
+	focused    bool
 	selected   map[resource.ID]V
 	selectable bool
 
@@ -77,7 +77,7 @@ type SortFunc[V any] func(V, V) int
 
 // New creates a new model for the table widget.
 func New[V resource.Identifiable](
-	tableStyles *styles.TableStyle,
+	tableStyles *Style,
 	cols []Column, fn RowRenderer[V],
 	width, height int, opts ...Option[V],
 ) Model[V] {
@@ -85,6 +85,7 @@ func New[V resource.Identifiable](
 	filter.Prompt = "Filter: "
 
 	m := Model[V]{
+		focused:         false,
 		styles:          tableStyles,
 		navigation:      nil,
 		cols:            make([]Column, len(cols)),
@@ -157,6 +158,36 @@ func WithPreview[V resource.Identifiable](kind resource.Kind) Option[V] {
 	}
 }
 
+func (m *Model[V]) IsFocused() bool {
+	return m.focused
+}
+
+func (m *Model[V]) Focus() {
+	m.focused = true
+	m.filter.Focus()
+}
+
+func (m *Model[V]) Blur() {
+	m.focused = false
+	m.filter.Blur()
+}
+
+func (m *Model[V]) SetRows(rows []V) {
+	m.rows = rows
+}
+
+func (m *Model[V]) SetColumns(columns []Column) {
+	m.cols = columns
+}
+
+func (m *Model[V]) SetWidth(width int) {
+	m.width = width
+}
+
+func (m *Model[V]) SetHeight(height int) {
+	m.height = height
+}
+
 func (m *Model[V]) filterVisible() bool {
 	// Filter is visible if it's either in focus, or it has a non-empty value.
 	return m.filter.Focused() || m.filter.Value() != ""
@@ -172,7 +203,7 @@ func (m *Model[V]) setDimensions(width, height int) {
 }
 
 // rowAreaHeight returns the height of the terminal allocated to rows.
-func (m Model[V]) rowAreaHeight() int {
+func (m *Model[V]) rowAreaHeight() int {
 	height := max(0, m.height-m.styles.HeaderHeight)
 
 	if m.filterVisible() {
@@ -184,13 +215,13 @@ func (m Model[V]) rowAreaHeight() int {
 
 // visibleRows returns the number of visible rows that can be
 // rendered in the available space.
-func (m Model[V]) visibleRows() int {
+func (m *Model[V]) visibleRows() int {
 	// The number of visible rows cannot exceed the row area height.
 	return min(m.rowAreaHeight(), len(m.rows)-m.start)
 }
 
 // Update is the Bubble Tea update loop.
-func (m Model[V]) Update(msg tea.Msg) (Model[V], tea.Cmd) {
+func (m *Model[V]) Update(msg tea.Msg) (*Model[V], tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
 		return m.handleKeyMsg(msg)
@@ -215,7 +246,7 @@ func (m Model[V]) Update(msg tea.Msg) (Model[V], tea.Cmd) {
 }
 
 // handleResourceEvent handles resource events such as create, update, delete
-func (m Model[V]) handleResourceEvent(msg resource.Event[V]) (Model[V], tea.Cmd) {
+func (m *Model[V]) handleResourceEvent(msg resource.Event[V]) (*Model[V], tea.Cmd) {
 	switch msg.Type {
 	case resource.CreatedEvent, resource.UpdatedEvent:
 		m.AddItems(msg.Payload)
@@ -226,7 +257,7 @@ func (m Model[V]) handleResourceEvent(msg resource.Event[V]) (Model[V], tea.Cmd)
 }
 
 // handleFilterMsg handles filter-related messages
-func (m Model[V]) handleFilterMsg(msg tea.Msg) (Model[V], tea.Cmd) {
+func (m *Model[V]) handleFilterMsg(msg tea.Msg) (*Model[V], tea.Cmd) {
 	switch msg := msg.(type) {
 	case tui.FilterFocusReqMsg:
 		// Focus the filter widget
@@ -260,7 +291,7 @@ func (m Model[V]) handleFilterMsg(msg tea.Msg) (Model[V], tea.Cmd) {
 }
 
 // handleKeyMsg processes key press messages
-func (m Model[V]) handleKeyMsg(msg tea.KeyMsg) (Model[V], tea.Cmd) {
+func (m *Model[V]) handleKeyMsg(msg tea.KeyMsg) (*Model[V], tea.Cmd) {
 	// Group navigation keys
 	if cmd := m.handleNavigationKey(msg); cmd {
 		return m, nil
@@ -334,7 +365,7 @@ func (m *Model[V]) PreviewCurrentRow() (
 }
 
 // View renders the table.
-func (m Model[V]) View() string {
+func (m *Model[V]) View() string {
 	// Table is composed of a vertical stack of components:
 	// (a) optional filter widget
 	// (b) header
@@ -388,7 +419,7 @@ func (m *Model[V]) Metadata() string {
 
 // CurrentRow returns the current row the user has highlighted.  If the table is
 // empty then false is returned.
-func (m Model[V]) CurrentRow() (V, bool) {
+func (m *Model[V]) CurrentRow() (V, bool) {
 	if m.currentRowIndex < 0 || m.currentRowIndex >= len(m.rows) {
 		return *new(V), false
 	}
@@ -397,7 +428,7 @@ func (m Model[V]) CurrentRow() (V, bool) {
 
 // SelectedOrCurrent returns either the selected rows, or if there are no
 // selections, the current row
-func (m Model[V]) SelectedOrCurrent() []V {
+func (m *Model[V]) SelectedOrCurrent() []V {
 	if len(m.selected) > 0 {
 		rows := make([]V, len(m.selected))
 		var i int
@@ -656,7 +687,7 @@ func (m *Model[V]) GotoBottom() {
 	m.MoveDown(len(m.rows))
 }
 
-func (m Model[V]) headersView() string {
+func (m *Model[V]) headersView() string {
 	s := make([]string, 0, len(m.cols))
 	// TODO: use index and don't use append below
 	for _, col := range m.cols {
