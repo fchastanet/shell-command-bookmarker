@@ -47,12 +47,12 @@ func GetGlobalKeyMap() *GlobalKeyMap {
 			key.WithHelp("X", "close pane"),
 		),
 		Quit: key.NewBinding(
-			key.WithKeys("ctrl+c"),
-			key.WithHelp("ctrl+c", "exit"),
+			key.WithKeys("q", "ctrl+c"),
+			key.WithHelp("q/ctrl+c", "exit"),
 		),
 		Help: key.NewBinding(
-			key.WithKeys("?"),
-			key.WithHelp("?", "close help"),
+			key.WithKeys("h", "?"),
+			key.WithHelp("h/?", "close help"),
 		),
 	}
 }
