@@ -10,8 +10,8 @@ import (
 func defaultCli() *Cli {
 	return &Cli{
 		MaxTasks: 1,
-		DBPath:   FilePath("db/shell-command-bookmarker.db"),
-		Version:  VersionFlag(""),
+		DBPath:   "db/shell-command-bookmarker.db",
+		Version:  "",
 		Debug:    false,
 	}
 }

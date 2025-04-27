@@ -1,12 +1,8 @@
 package styles
 
-// UI layout constants
 const (
-	// Padding constants
-	PaddingNone   = 0
 	PaddingSmall  = 1
 	PaddingMedium = 2
-	PaddingLarge  = 3
 
 	// Height constants
 	HeightPrompt  = 3

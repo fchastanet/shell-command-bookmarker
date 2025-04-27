@@ -6,8 +6,6 @@ import (
 )
 
 const (
-	// Padding constants
-	PaddingNone  = 0
 	PaddingSmall = 1
 
 	// Height constants

@@ -44,7 +44,6 @@ func (e *ErrMakePageEmptyModel) Error() string {
 var (
 	ErrAlreadyAtFirstPage  = errors.New("already at first page")
 	ErrCannotCloseLastPane = errors.New("cannot close last pane")
-	ErrNotFound            = errors.New("resource not found")
 )
 
 type CacheInterface interface {
@@ -297,7 +296,7 @@ func (p *PaneManager) updateModel(position structure.Position, msg tea.Msg) tea.
 }
 
 func (p *PaneManager) setPane(msg structure.NavigationMsg) (cmd tea.Cmd) {
-	cmds := []tea.Cmd{}
+	var cmds []tea.Cmd
 	if pane, ok := p.panes[msg.Position]; ok && pane.page == msg.Page {
 		// Pane is already showing requested page, so just bring it into focus.
 		if !msg.DisableFocus {

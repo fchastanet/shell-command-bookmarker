@@ -14,12 +14,6 @@ type MockCommandExecutor struct {
 	err    error
 }
 
-func WithCustomCommandExecutor(commandExecutor CommandExecutorInterface) LintServiceOption {
-	return func(p *LintService) {
-		p.commandExecutor = commandExecutor
-	}
-}
-
 func WithLookPathExecutor(lookupExecutor LookupExecutorInterface) LintServiceOption {
 	return func(p *LintService) {
 		p.lookupExecutor = lookupExecutor

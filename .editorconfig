@@ -14,7 +14,7 @@ indent_size = unset
 [{*.go,Makefile,.gitmodules,go.mod,go.sum}]
 indent_style = tab
 
-[{*.sh}]
+[*.sh]
 # we choose the google style guide here: https://google.github.io/styleguide/shellguide.html
 indent_style = space
 indent_size = 2

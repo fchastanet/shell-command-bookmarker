@@ -10,8 +10,6 @@ const (
 	Exited   Status = "exited"
 	Errored  Status = "errored"
 	Canceled Status = "canceled"
-
-	MaxStatusLen = len(Canceled)
 )
 
 // IsFinal returns true if the state is a final state.
