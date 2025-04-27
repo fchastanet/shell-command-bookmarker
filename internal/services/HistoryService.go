@@ -226,8 +226,8 @@ func (s *HistoryService) processCmd(historyCmd processors.HistoryCommand) (proce
 }
 
 func matchOneOfRegexp(line string, regexps []*regexp.Regexp) bool {
-	for _, regexp := range regexps {
-		if regexp.MatchString(line) {
+	for _, r := range regexps {
+		if r.MatchString(line) {
 			return true
 		}
 	}

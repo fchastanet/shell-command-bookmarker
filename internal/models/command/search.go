@@ -75,6 +75,6 @@ func (m *search) View() string {
 }
 
 func (m *search) HelpBindings() []key.Binding {
-	bindings := []key.Binding{}
+	var bindings []key.Binding
 	return bindings
 }

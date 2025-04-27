@@ -1,5 +1,4 @@
 //go:build sqlite_fts5 || fts5
-// +build sqlite_fts5 fts5
 
 package main
 
@@ -56,12 +55,12 @@ func mainImpl() error {
 		}
 	}()
 
-	styles := styles.NewStyles()
-	styles.Init()
+	myStyles := styles.NewStyles()
+	myStyles.Init()
 
 	m := top.NewModel(
 		appService,
-		styles,
+		myStyles,
 	)
 
 	if _, err := tea.NewProgram(

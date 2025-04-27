@@ -13,7 +13,6 @@ import (
 
 const (
 	DirectoryPerm = 0o755
-	FilePerm      = 0o644
 )
 
 // SQLiteAdapter represents a connection to a SQLite database

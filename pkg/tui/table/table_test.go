@@ -10,11 +10,6 @@ import (
 	"golang.org/x/exp/maps"
 )
 
-type ResourceTestKind struct{ key string }
-
-func (r ResourceTestKind) Key() string { return r.key }
-func (r ResourceTestKind) IsKind()     {}
-
 var (
 	resource0 = testResource{n: 0, ID: 1}
 	resource1 = testResource{n: 1, ID: 2}

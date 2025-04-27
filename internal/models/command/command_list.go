@@ -33,10 +33,9 @@ const (
 	titleColumnPercentWidth  = 19
 	scriptColumnPercentWidth = 71
 	statusColumnPercentWidth = 7
-	// rowsDisplayLimit is the number of rows to display in the table
-	rowsDisplayLimit = 20
-	percent          = 100
-	sidesCount       = 2
+
+	percent    = 100
+	sidesCount = 2
 )
 
 func (mm *ListMaker) Make(_ resource.ID, width, height int) (structure.ChildModel, error) {
