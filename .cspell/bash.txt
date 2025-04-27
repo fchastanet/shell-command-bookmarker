@@ -1,6 +1,7 @@
 ABRT
 buildx
 coverprofile
+deadcode
 DEBCONF
 EPOCHREALTIME
 EPOCHSECONDS

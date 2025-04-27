@@ -19,28 +19,28 @@ const HalfPageMultiplier = 2
 
 // Model defines a state for the table widget.
 type Model[V resource.Identifiable] struct {
-	styles      *Style
-	navigation  *Navigation
-	cols        []Column
-	rows        []V
-	rowRenderer RowRenderer[V]
-	rendered    map[resource.ID]RenderedRow
-
-	border      lipgloss.Border
 	borderColor lipgloss.TerminalColor
 
-	currentRowIndex int
-	currentRowID    resource.ID
+	previewKind resource.Kind
+	styles      *Style
+	navigation  *Navigation
+	rowRenderer RowRenderer[V]
+	rendered    map[resource.ID]RenderedRow
 
 	// items are the unfiltered set of items available to the table.
 	items    map[resource.ID]V
 	sortFunc SortFunc[V]
 
-	focused    bool
-	selected   map[resource.ID]V
-	selectable bool
+	selected map[resource.ID]V
+
+	border lipgloss.Border
+	cols   []Column
+	rows   []V
 
 	filter textinput.Model
+
+	currentRowIndex int
+	currentRowID    resource.ID
 
 	// index of first visible row
 	start int
@@ -50,17 +50,18 @@ type Model[V resource.Identifiable] struct {
 	// height of table without borders
 	height int
 
-	previewKind resource.Kind
+	focused    bool
+	selectable bool
 }
 
 // Column defines the table structure.
 type Column struct {
-	Key ColumnKey
-	// TODO: Default to upper case of key
-	Title          string
-	Width          int
-	FlexFactor     int
 	TruncationFunc func(s string, w int, tail string) string
+	Key            ColumnKey
+	// TODO: Default to upper case of key
+	Title      string
+	Width      int
+	FlexFactor int
 	// RightAlign aligns content to the right. If false, content is aligned to
 	// the left.
 	RightAlign bool
@@ -74,6 +75,9 @@ type RowRenderer[V any] func(V) RenderedRow
 type RenderedRow map[ColumnKey]string
 
 type SortFunc[V any] func(V, V) int
+
+// BulkInsertMsg performs a bulk insertion of entities into a table
+type BulkInsertMsg[T any] []T
 
 // New creates a new model for the table widget.
 func New[V resource.Identifiable](
@@ -225,16 +229,16 @@ func (m *Model[V]) Update(msg tea.Msg) (*Model[V], tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
 		return m.handleKeyMsg(msg)
-	case BulkInsertMsg[V]:
-		m.AddItems(msg...)
-		return m, nil
-	case resource.Event[V]:
-		return m.handleResourceEvent(msg)
 	case tea.WindowSizeMsg:
 		m.setDimensions(msg.Width, msg.Height)
 		return m, nil
 	case tui.FilterFocusReqMsg, tui.FilterBlurMsg, tui.FilterCloseMsg, tui.FilterKeyMsg:
 		return m.handleFilterMsg(msg)
+	case resource.Event[V]:
+		return m.handleResourceEvent(msg)
+	case BulkInsertMsg[V]:
+		m.AddItems(msg...)
+		return m, nil
 	default:
 		if m.filter.Focused() {
 			var cmd tea.Cmd

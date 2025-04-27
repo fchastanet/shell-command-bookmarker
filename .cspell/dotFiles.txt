@@ -1,6 +1,7 @@
 Aftertabs
 allowInts
 allowStrs
+betteralign
 cpes
 crashlytics
 distro
@@ -15,12 +16,13 @@ GRYPE
 gtpl
 ignoreFuncs
 logrus
+nosec
 Println
 sarif
 sbom
 Setenv
 shellcheckrc
-structslop
+staticcheck
 tabwidth
 tagname
 unindexed

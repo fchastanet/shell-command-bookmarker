@@ -11,9 +11,9 @@ import (
 const maxScreenSize = 80
 
 type Cli struct {
-	MaxTasks int         `short:"t" name:"max-tasks" default:"1"             help:"Maximum number of tasks to run concurrently"` //nolint:tagalign //avoid reformat annotations
 	DBPath   FilePath    `arg:""    name:"db-path"   optional:"" type:"path" help:"Path to the SQLite database file"`            //nolint:tagalign //avoid reformat annotations
 	Version  VersionFlag `short:"v" name:"version"                           help:"Print version information and quit"`          //nolint:tagalign //avoid reformat annotations
+	MaxTasks int         `short:"t" name:"max-tasks" default:"1"             help:"Maximum number of tasks to run concurrently"` //nolint:tagalign //avoid reformat annotations
 	Debug    bool        `short:"d"                                          help:"Set log in debug level"`                      //nolint:tagalign //avoid reformat annotations
 }
 

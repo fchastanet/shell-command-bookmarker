@@ -2,6 +2,7 @@ package db
 
 import (
 	"database/sql"
+	"log/slog"
 	"os"
 	"path/filepath"
 
@@ -79,7 +80,10 @@ func (a *SQLiteAdapter) Open() error {
 	// Initialize the schema if the database is new
 	if isNew {
 		if err := a.initSchema(); err != nil {
-			a.Close() // Close the DB if initialization fails
+			err := a.Close() // Close the DB if initialization fails
+			if err != nil {
+				slog.Error("Error closing database after schema initialization failure", "error", err)
+			}
 			return &SchemaInitializationError{
 				DBFilePath: a.path,
 				InnerError: err,

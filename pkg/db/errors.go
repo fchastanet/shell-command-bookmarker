@@ -3,8 +3,8 @@ package db
 import "fmt"
 
 type DatabaseDirectoryCreationError struct {
-	Directory  string
 	InnerError error
+	Directory  string
 }
 
 func (e *DatabaseDirectoryCreationError) Error() string {
@@ -26,8 +26,8 @@ func (e *DatabaseNotFoundError) Error() string {
 }
 
 type DatabaseConnectionError struct {
-	DBFilePath string
 	InnerError error
+	DBFilePath string
 }
 
 func (e *DatabaseConnectionError) Error() string {
@@ -38,8 +38,8 @@ func (e *DatabaseConnectionError) Error() string {
 }
 
 type SchemaInitializationError struct {
-	DBFilePath string
 	InnerError error
+	DBFilePath string
 }
 
 func (e *SchemaInitializationError) Error() string {
@@ -50,9 +50,9 @@ func (e *SchemaInitializationError) Error() string {
 }
 
 type QueryExecutionError struct {
+	InnerError error
 	DBFilePath string
 	Query      string
-	InnerError error
 }
 
 func (e *QueryExecutionError) Error() string {

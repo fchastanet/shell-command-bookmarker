@@ -16,31 +16,31 @@ var ErrShellCheckNotFound = errors.New("shellcheck command not found")
 // ShellCheckIssue represents a single issue reported by shellcheck.
 // Fields correspond to the JSON output format of shellcheck.
 type ShellCheckIssue struct {
-	File      string    `json:"file"`
-	Line      int       `json:"line"`
-	EndLine   int       `json:"endLine"`
-	Column    int       `json:"column"`
-	EndColumn int       `json:"endColumn"`
-	Level     string    `json:"level"` // e.g., "error", "warning", "info", "style"
-	Code      int       `json:"code"`  // e.g., SC2086
-	Message   string    `json:"message"`
-	Fix       *struct { // Optional fix information
+	Fix *struct { // Optional fix information
 		Replacements []struct {
+			InsertionPoint string `json:"insertionPoint"` // "beginning", "end", etc.
+			Replacement    string `json:"replacement"`
 			Line           int    `json:"line"`
 			Column         int    `json:"column"`
 			EndLine        int    `json:"endLine"`
 			EndColumn      int    `json:"endColumn"`
-			InsertionPoint string `json:"insertionPoint"` // "beginning", "end", etc.
-			Replacement    string `json:"replacement"`
 		} `json:"replacements"`
 	} `json:"fix"`
+	File      string `json:"file"`
+	Level     string `json:"level"` // e.g., "error", "warning", "info", "style"
+	Message   string `json:"message"`
+	Line      int    `json:"line"`
+	EndLine   int    `json:"endLine"`
+	Column    int    `json:"column"`
+	EndColumn int    `json:"endColumn"`
+	Code      int    `json:"code"` // e.g., SC2086
 }
 
 // LintService provides functionality to lint shell scripts using shellcheck.
 type LintService struct {
-	shellCheckPath  string
 	commandExecutor CommandExecutorInterface
 	lookupExecutor  LookupExecutorInterface
+	shellCheckPath  string
 }
 
 type LintServiceOption func(*LintService)

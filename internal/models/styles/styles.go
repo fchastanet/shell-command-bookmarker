@@ -20,15 +20,16 @@ type Styles struct {
 }
 
 type FooterStyle struct {
-	Height       int
 	ErrorStyle   *lipgloss.Style
 	InfoStyle    *lipgloss.Style
 	DefaultStyle *lipgloss.Style
 	Main         *lipgloss.Style
 	Version      *lipgloss.Style
+	Height       int
 }
 
 type PaneStyle struct {
+	TopBorder    *lipgloss.Style
 	FooterHeight int
 	HeaderHeight int
 	// defaultLeftPaneWidth is the default width of the left pane.
@@ -45,27 +46,26 @@ type PaneStyle struct {
 	// MinContentWidth is the minimum width of the content.
 	MinContentWidth int
 	BordersWidth    int
-	TopBorder       *lipgloss.Style
 }
 
 type WindowStyle struct {
+	BorderStyle    *lipgloss.Style
+	DocStyle       *lipgloss.Style
+	HighlightColor *lipgloss.AdaptiveColor
+	Background     lipgloss.Color
+	Foreground     lipgloss.Color
 	// MinHeight is the minimum height of the TUI.
 	MinHeight int
 	// Height of prompt including borders
-	PromptHeight   int
-	BorderStyle    *lipgloss.Style
-	Background     lipgloss.Color
-	Foreground     lipgloss.Color
-	DocStyle       *lipgloss.Style
-	HighlightColor *lipgloss.AdaptiveColor
+	PromptHeight int
 }
 
 type HelpStyle struct {
-	// Height of help widget, including borders
-	Height    int
 	Main      *lipgloss.Style
 	KeyStyle  *lipgloss.Style
 	DescStyle *lipgloss.Style
+	// Height of help widget, including borders
+	Height int
 }
 
 type PromptStyle struct {

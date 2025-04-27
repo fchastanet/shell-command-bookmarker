@@ -50,8 +50,8 @@ func NewHistoryIngestor() *HistoryIngestor {
 
 // HistoryCommand represents a single command entry from bash history
 type HistoryCommand struct {
-	Command       string
 	Timestamp     time.Time
+	Command       string
 	Elapsed       int // elapsed time in seconds
 	ParseFinished bool
 }
@@ -69,7 +69,7 @@ func (*HistoryIngestor) OpenHistoryFile(historyFilePath string) (*os.File, error
 		historyFilePath = filepath.Join(homeDir, ".bash_history")
 	}
 
-	file, err := os.Open(historyFilePath)
+	file, err := os.Open(historyFilePath) // #nosec G304
 	if err != nil {
 		return nil, err // Propagate file open error
 	}
@@ -164,17 +164,21 @@ func (h *HistoryIngestor) updateStats(importStatus CommandImportedStatus) {
 		h.parsedCmdCount++
 	}
 	// Update counts based on the import status
-	switch {
-	case importStatus == CommandImportedStatusNew:
+	switch importStatus {
+	case CommandImportedStatusNew:
 		h.importedCmdCount++
-	case importStatus == CommandImportedStatusError:
+	case CommandImportedStatusError:
 		h.errorCmdCount++
-	case importStatus == CommandImportedStatusFilteredOut:
+	case CommandImportedStatusFilteredOut:
 		h.filteredOutCmdCount++
-	case importStatus == CommandImportedStatusAlreadyExists:
+	case CommandImportedStatusAlreadyExists:
 		h.alreadyExistsCmdCount++
-	case importStatus == CommandImportedStatusSkipped:
+	case CommandImportedStatusSkipped:
 		h.skippedCmdCount++
+	case CommandImportedStatusInProgress:
+		// Do nothing for in-progress status
+	default:
+		slog.Error("Unknown command import status", "importStatus", importStatus)
 	}
 }
 

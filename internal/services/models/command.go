@@ -14,16 +14,16 @@ const (
 )
 
 type Command struct {
-	ID                   uint
+	CreationDatetime     time.Time
+	ModificationDatetime time.Time
 	Title                string
 	Description          string
 	Script               string
 	Status               CommandStatus
 	LintIssues           string
 	LintStatus           LintStatus
+	ID                   uint
 	Elapsed              int
-	CreationDatetime     time.Time
-	ModificationDatetime time.Time
 }
 
 type CommandStatusEnum struct {

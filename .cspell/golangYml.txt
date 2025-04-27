@@ -50,7 +50,6 @@ runtimes
 sloglint
 staticcheck
 strconv
-structslop
 stylecheck
 tagalign
 testifylint

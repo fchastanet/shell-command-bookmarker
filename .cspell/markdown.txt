@@ -1,5 +1,8 @@
+betteralign
 Brandon
 Chastanet
+deadcode
+depguard
 François
 Fulljames
 goimports

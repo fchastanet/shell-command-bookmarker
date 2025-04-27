@@ -23,6 +23,11 @@ type ListMaker struct {
 	Spinner *spinner.Model
 }
 
+// commandReloadedMsg is sent when a command reload has finished.
+type commandReloadedMsg struct {
+	err error
+}
+
 const (
 	idColumnPercentWidth     = 3
 	titleColumnPercentWidth  = 19
@@ -140,7 +145,7 @@ func (m *resourceList) getColumns(width int) []table.Column {
 func (m *resourceList) Init() tea.Cmd {
 	return func() tea.Msg {
 		m.Model.SetColumns(m.getColumns(m.width))
-		rows, err := m.AppService.HistoryService.GetHistoryRows()
+		rows, err := m.HistoryService.GetHistoryRows()
 		if err != nil {
 			slog.Error("Error getting history rows", "error", err)
 			return nil
@@ -172,7 +177,7 @@ func (m *resourceList) Update(msg tea.Msg) tea.Cmd {
 	case tea.BlurMsg:
 		m.Model.Blur()
 	case tea.FocusMsg:
-		rows, err := m.AppService.HistoryService.GetHistoryRows()
+		rows, err := m.HistoryService.GetHistoryRows()
 		if err != nil {
 			slog.Error("Error getting history rows", "error", err)
 			return nil

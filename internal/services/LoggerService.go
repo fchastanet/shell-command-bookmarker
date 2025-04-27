@@ -12,9 +12,9 @@ import (
 const WriteFileMode = 0o644
 
 type LoggerService struct {
-	debug           bool
 	logFileHandler  io.WriteCloser
 	dumpFileHandler io.WriteCloser
+	debug           bool
 }
 
 func NewLoggerService(debug bool) *LoggerService {
@@ -75,7 +75,7 @@ func (s *LoggerService) Close() error {
 }
 
 func openFileInWriteMode(filePath string) (io.WriteCloser, error) {
-	file, err := os.OpenFile(filePath, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, WriteFileMode)
+	file, err := os.OpenFile(filePath, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, WriteFileMode) // #nosec G304
 	if err != nil {
 		slog.Error("Error opening debug log file", "error", err)
 		return nil, err
