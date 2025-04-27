@@ -12,8 +12,8 @@ type (
 
 	// Event represents an event in the lifecycle of a resource
 	Event[T any] struct {
-		Type    EventType
 		Payload T
+		Type    EventType
 	}
 
 	Publisher[T any] interface {

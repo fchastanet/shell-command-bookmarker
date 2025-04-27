@@ -11,12 +11,14 @@ import (
 
 // PromptMsg enables the prompt widget.
 type PromptMsg struct {
+	// Action to carry out when key is pressed.
+	Action PromptAction
 	// Prompt to display to the user.
 	Prompt string
 	// Set initial value for the user to edit.
 	InitialValue string
-	// Action to carry out when key is pressed.
-	Action PromptAction
+	// Set placeholder text in prompt
+	Placeholder string
 	// Key that when pressed triggers the action and closes the prompt.
 	Key key.Binding
 	// Cancel is a key that when pressed skips the action and closes the prompt.
@@ -25,8 +27,6 @@ type PromptMsg struct {
 	// Key is pressed. If so then the action is skipped and the prompt is
 	// closed. Overrides Cancel key binding.
 	CancelAnyOther bool
-	// Set placeholder text in prompt
-	Placeholder string
 }
 
 type PromptAction func(text string) tea.Cmd
@@ -72,12 +72,12 @@ func NewPrompt(msg *PromptMsg, style *styles.PromptStyle) (*Prompt, tea.Cmd) {
 
 // Prompt is a widget that prompts the user for input and triggers an action.
 type Prompt struct {
-	model          textinput.Model
 	action         PromptAction
+	style          styles.PromptStyle
 	trigger        key.Binding
 	cancel         key.Binding
+	model          textinput.Model
 	cancelAnyOther bool
-	style          styles.PromptStyle
 }
 
 // HandleKey handles the user key press, and returns a command to be run, and

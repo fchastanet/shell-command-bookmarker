@@ -17,10 +17,10 @@ type AppService struct {
 }
 
 type AppServiceConfig struct {
-	MaxTasks     int
-	Debug        bool
 	DBPath       string
 	SqliteSchema string
+	MaxTasks     int
+	Debug        bool
 }
 
 func NewAppService(cfg AppServiceConfig) *AppService {
@@ -39,8 +39,11 @@ func NewAppService(cfg AppServiceConfig) *AppService {
 	cleanup := func() {
 		// Perform cleanup tasks here
 		// e.g., close database connections, release resources, etc.
-		dbService.Close()
-		loggerService.Close()
+		err := dbService.Close()
+		if err != nil {
+			slog.Error("Error closing database", "error", err)
+		}
+		loggerService.Close() // #nosec G104
 	}
 
 	return &AppService{

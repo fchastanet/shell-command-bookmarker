@@ -27,6 +27,7 @@ const (
 )
 
 type Model struct {
+	err error
 	*models.PaneManager
 	appService   *services.AppService
 	styles       *styles.Styles
@@ -34,17 +35,17 @@ type Model struct {
 	globalKeyMap *keys.GlobalKeyMap
 	paneKeyMap   *keys.PaneNavigationKeyMap
 
-	width         int
-	height        int
-	mode          mode
-	showHelp      bool
 	prompt        *models.Prompt
 	spinner       *spinner.Model
-	spinning      bool
-	err           error
 	info          string
 	versionWidget string
 	helpWidget    string
+
+	width    int
+	height   int
+	mode     mode
+	showHelp bool
+	spinning bool
 }
 
 func NewModel(
@@ -324,7 +325,7 @@ func (m *Model) help() string {
 		bindings = append(bindings, keys.KeyMapToSlice(*m.filterKeyMap)...)
 	case normalMode:
 		addDefaultBindings = true
-		bindings = append(bindings, m.PaneManager.HelpBindings()...)
+		bindings = append(bindings, m.HelpBindings()...)
 	}
 	if addDefaultBindings {
 		bindings = append(bindings, keys.KeyMapToSlice(*m.globalKeyMap)...)

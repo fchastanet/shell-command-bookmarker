@@ -54,6 +54,7 @@ nindent
 noctx
 nolint
 nolintlint
+nosec
 pflag
 pgdn
 pgdown

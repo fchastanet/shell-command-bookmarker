@@ -31,14 +31,16 @@
 - [2. Documentation](#2-documentation)
   - [2.1. Go Libraries used](#21-go-libraries-used)
 - [3. Development](#3-development)
-  - [Necessary tools](#necessary-tools)
-  - [3.1. Pre-commit hook](#31-pre-commit-hook)
-  - [3.2. Build/run/clean](#32-buildrunclean)
-    - [3.2.1. Build](#321-build)
-    - [3.2.2. Tests](#322-tests)
-    - [3.2.3. Coverage](#323-coverage)
-    - [3.2.4. run the binary](#324-run-the-binary)
-    - [3.2.5. Clean](#325-clean)
+  - [3.1. Necessary tools](#31-necessary-tools)
+  - [3.2. Pre-commit hook](#32-pre-commit-hook)
+  - [3.3. pre-commit external tools install](#33-pre-commit-external-tools-install)
+  - [3.4. detect dead code](#34-detect-dead-code)
+  - [3.5. Build/run/clean](#35-buildrunclean)
+    - [3.5.1. Build](#351-build)
+    - [3.5.2. Tests](#352-tests)
+    - [3.5.3. Coverage](#353-coverage)
+    - [3.5.4. run the binary](#354-run-the-binary)
+    - [3.5.5. Clean](#355-clean)
 - [4. Commands](#4-commands)
 
 ## 1. Excerpt
@@ -83,13 +85,13 @@ enhance shell workflows and command management.
 
 ## 3. Development
 
-### Necessary tools
+### 3.1. Necessary tools
 
 ```bash
 go install golang.org/x/tools/cmd/goimports@latest
 ```
 
-### 3.1. Pre-commit hook
+### 3.2. Pre-commit hook
 
 This repository uses pre-commit software to ensure every commits respects a set
 of rules specified by the `.pre-commit-config.yaml` file. It supposes pre-commit
@@ -104,11 +106,30 @@ pre-commit install --hook-type pre-commit --hook-type pre-push
 Now each time you commit or push, some linters/compilation tools are launched
 automatically
 
-### 3.2. Build/run/clean
+### 3.3. pre-commit external tools install
+
+```bash
+go install github.com/securego/gosec/v2/cmd/gosec@latest
+go install github.com/OpenPeeDeeP/depguard/cmd/depguard@latest
+go install golang.org/x/tools/cmd/goimports@latest
+go install github.com/go-delve/delve/cmd/dlv@latest
+go install github.com/dkorunic/betteralign/cmd/betteralign@latest
+go install github.com/go-critic/go-critic/cmd/go-critic@latest
+go install -v github.com/go-critic/go-critic/cmd/gocritic@latest
+```
+
+### 3.4. detect dead code
+
+```bash
+go install golang.org/x/tools/cmd/deadcode@latest
+deadcode -filter "github.com/fchastanet/shell-command-bookmarker" ./app/main.go
+```
+
+### 3.5. Build/run/clean
 
 Formatting is managed exclusively by pre-commit hooks.
 
-#### 3.2.1. Build
+#### 3.5.1. Build
 
 ```bash
 .build/build-docker.sh
@@ -118,25 +139,25 @@ Formatting is managed exclusively by pre-commit hooks.
 .build/build-local.sh
 ```
 
-#### 3.2.2. Tests
+#### 3.5.2. Tests
 
 ```bash
 .build/test.sh
 ```
 
-#### 3.2.3. Coverage
+#### 3.5.3. Coverage
 
 ```bash
 .build/coverage.sh
 ```
 
-#### 3.2.4. run the binary
+#### 3.5.4. run the binary
 
 ```bash
 .build/run.sh
 ```
 
-#### 3.2.5. Clean
+#### 3.5.5. Clean
 
 ```bash
 .build/clean.sh

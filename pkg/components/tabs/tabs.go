@@ -10,9 +10,9 @@ import (
 )
 
 type Tab struct {
-	Title     string
 	Model     tea.Model
 	tabsModel *Tabs
+	Title     string
 }
 
 type tabsSettings struct {
@@ -32,9 +32,9 @@ type TabStyles interface {
 }
 
 type Tabs struct {
-	Tabs            []Tab
 	styles          TabStyles
 	settings        *tabsSettings
+	Tabs            []Tab
 	width           int
 	height          int
 	activeTab       int

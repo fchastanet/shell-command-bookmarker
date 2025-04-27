@@ -16,13 +16,12 @@ func (r ResourceTestKind) Key() string { return r.key }
 func (r ResourceTestKind) IsKind()     {}
 
 var (
-	resourceTestKind = &ResourceTestKind{key: "test"}
-	resource0        = testResource{n: 0, ID: 1}
-	resource1        = testResource{n: 1, ID: 2}
-	resource2        = testResource{n: 2, ID: 3}
-	resource3        = testResource{n: 3, ID: 4}
-	resource4        = testResource{n: 4, ID: 5}
-	resource5        = testResource{n: 5, ID: 6}
+	resource0 = testResource{n: 0, ID: 1}
+	resource1 = testResource{n: 1, ID: 2}
+	resource2 = testResource{n: 2, ID: 3}
+	resource3 = testResource{n: 3, ID: 4}
+	resource4 = testResource{n: 4, ID: 5}
+	resource5 = testResource{n: 5, ID: 6}
 )
 
 type testResource struct {

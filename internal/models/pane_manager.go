@@ -25,8 +25,8 @@ func (e *ErrNoMaker) Error() string {
 }
 
 type ErrMakePage struct {
-	Msg structure.NavigationMsg
 	Err error
+	Msg structure.NavigationMsg
 }
 
 func (e *ErrMakePage) Error() string {
@@ -65,6 +65,8 @@ type Maker interface {
 
 // PaneManager manages the layout of the three panes that compose the Pug full screen terminal app.
 type PaneManager struct {
+	// cache of previously made models
+	cache        CacheInterface
 	styles       *styles.Styles
 	commonKeyMap *keys.CommonKeyMap
 	globalKeyMap *keys.GlobalKeyMap
@@ -72,12 +74,12 @@ type PaneManager struct {
 
 	// makerFactory for making models for panes
 	makerFactory func(kind resource.Kind) Maker
-	// cache of previously made models
-	cache CacheInterface
-	// the position of the currently focused pane
-	focused structure.Position
 	// panes tracks currently visible panes
 	panes map[structure.Position]pane
+	// history tracks previously visited models for the top right pane.
+	history []pane
+	// the position of the currently focused pane
+	focused structure.Position
 	// total width and height of the terminal space available to panes.
 	width, height int
 	// leftPaneWidth is the width of the left pane when sharing the terminal
@@ -85,8 +87,6 @@ type PaneManager struct {
 	leftPaneWidth int
 	// topRightPaneHeight is the height of the top right pane.
 	topRightHeight int
-	// history tracks previously visited models for the top right pane.
-	history []pane
 }
 
 type pane struct {

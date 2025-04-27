@@ -32,9 +32,9 @@ type search struct {
 	App     *services.AppService
 	Spinner *spinner.Model
 	Styles  *styles.Styles
+	model   *textinput.Model
 	width   int
 	height  int
-	model   *textinput.Model
 }
 
 func (m *search) Init() tea.Cmd {

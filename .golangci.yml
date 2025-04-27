@@ -1,10 +1,9 @@
----
+version: "2"
 run:
   # Number of operating system threads (`GOMAXPROCS`) that can execute golangci-lint simultaneously.
   # If it is explicitly set to 0 (i.e. not the default) then golangci-lint will automatically set the value to match Linux container CPU quota.
   # Default: the number of logical CPUs in the machine
   concurrency: 4
-  timeout: 10m
   issues-exit-code: 1
   tests: true
 
@@ -13,273 +12,265 @@ linters:
   # https://golangci-lint.run/usage/linters/
   enable:
     - cyclop # Go linter that checks if package imports are in a list of acceptable packages
+    - copyloopvar # detects places where loop variables are copied.
     - depguard # Go linter that checks if package imports are in a list of acceptable packages
     - dogsled # Checks assignments with too many blank identifiers (e.g. x, , , _, := f())
     - dupl # Tool for code clone detection
     - errorlint # errorlint is a linter for that can be used to find code that will cause problems with the error wrapping scheme introduced in Go 1.13.
     - exhaustive # check exhaustiveness of enum switch statements
-    - copyloopvar # detects places where loop variables are copied.
+    - exhaustruct # Checks if all structure fields are initialized.
     - funlen # Tool for detection of long functions
     - gochecknoglobals # A global variable is a variable declared in package scope and that can be read and written to by any function within the package.
     - gocritic # Provides diagnostics that check for bugs, performance and style issues.
-    - goconst # Inspects source code for security problems
+    - goconst # Finds repeated strings that could be replaced by a constant.
     - gocyclo # Computes and checks the cyclomatic complexity of functions
     - err113 # Golang linter to check the errors handling expressions
-    - gofmt # Gofmt checks whether code was gofmt-ed. By default this tool runs with -s option to check for code simplification
-    - goimports # In addition to fixing imports, goimports also formats your code in the same style as gofmt.
-    - mnd # An analyzer to detect magic numbers.
     - goprintffuncname # Checks that printf-like functions are named with f at the end
     - gosec # Inspects source code for security problems
+    - govet
     - misspell # Finds commonly misspelled English words in comments
+    - mnd # An analyzer to detect magic numbers.
     - nakedret # Finds naked returns in functions greater than a specified function length
     - nestif # Reports deeply nested if statements
     - nilerr # Finds the code that returns nil even if it checks that the error is not nil.
     - noctx # noctx finds sending http request without context.Context
     - nolintlint # Reports ill-formed or insufficient nolint directives
+    - perfsprint
     - prealloc # Finds slice declarations that could potentially be pre-allocated
+    - predeclared # Find code that shadows one of Go's predeclared identifiers.
     - promlinter # Check Prometheus metrics naming via promlint
     - revive # Fast, configurable, extensible, flexible, and beautiful linter for Go. Drop-in replacement of golint.
+    - sloglint
+    - staticcheck # Using static analysis, it finds bugs and performance issues, offers simplifications, and enforces style rules.
+    - tagalign
     - unconvert # Remove unnecessary type conversions
     - unparam # Reports unused function parameters
-    - whitespace # Tool for detection of leading and trailing whitespace
-    - sloglint
-    - staticcheck
-    - gofumpt
-    - copyloopvar # Copyloopvar is a linter detects places where loop variables are copied.
-    - exhaustruct # Checks if all structure fields are initialized.
-    - predeclared # Find code that shadows one of Go's predeclared identifiers.
-    - goconst # Finds repeated strings that could be replaced by a constant.
-    - gosimple
-    - gosec
-    - govet
-    - perfsprint
-    - stylecheck
-    - tagalign
     - usestdlibvars
+    - whitespace # Tool for detection of leading and trailing whitespace
   disable:
     - errcheck # Errcheck is a program for checking for unchecked errors in Go code. These unchecked errors can be critical bugs in some cases.
     - nlreturn # missing auto fixer
     - testifylint # use this library ?
     - unused # reports false positives with parameters ignored using _
 
-linters-settings:
-  unused:
-    # Mark all struct fields that have been written to as used.
-    # Default: true
-    field-writes-are-uses: true
-    # Treat IncDec statement (e.g. `i++` or `i--`) as both read and write operation instead of just write.
-    # Default: false
-    post-statements-are-reads: true
-    # Mark all exported fields as used.
-    # default: true
-    exported-fields-are-used: false
-    # Mark all function parameters as used.
-    # default: true
-    parameters-are-used: false
-    # Mark all local variables as used.
-    # default: true
-    local-variables-are-used: false
-    # Mark all identifiers inside generated files as used.
-    # Default: true
-    generated-is-used: false
-  usestdlibvars:
-    # Suggest the use of http.MethodXX.
-    # Default: true
-    http-method: false
-    # Suggest the use of http.StatusXX.
-    # Default: true
-    http-status-code: false
-    # Suggest the use of time.Weekday.String().
-    # Default: true
-    time-weekday: true
-    # Suggest the use of time.Month.String().
-    # Default: false
-    time-month: true
-    # Suggest the use of time.Layout.
-    # Default: false
-    time-layout: true
-    # Suggest the use of crypto.Hash.String().
-    # Default: false
-    crypto-hash: true
-    # Suggest the use of rpc.DefaultXXPath.
-    # Default: false
-    default-rpc-path: true
-    # Suggest the use of sql.LevelXX.String().
-    # Default: false
-    sql-isolation-level: true
-    # Suggest the use of tls.SignatureScheme.String().
-    # Default: false
-    tls-signature-scheme: true
-    # Suggest the use of constant.Kind.String().
-    # Default: false
-    constant-kind: true
-  predeclared:
-    # Comma-separated list of predeclared identifiers to not report on.
-    # Default: ""
-    ignore: ""
-    # Include method names and field names (i.e., qualified names) in checks.
-    # Default: false
-    q: true
-  errcheck:
-    # Report about not checking of errors in type assertions: `a := b.(MyStruct)`.
-    # Such cases aren't reported by default.
-    # Default: false
-    check-type-assertions: true
-    # report about assignment of errors to blank identifier: `num, _ := strconv.Atoi(numStr)`.
-    # Such cases aren't reported by default.
-    # Default: false
-    check-blank: true
-    # To disable the errcheck built-in exclude list.
-    # See `-excludeonly` option in https://github.com/kisielk/errcheck#excluding-functions for details.
-    # Default: false
-    disable-default-exclusions: true
-    # List of functions to exclude from checking, where each entry is a single function to exclude.
-    # See https://github.com/kisielk/errcheck#excluding-functions for details.
-    # exclude-functions:
-  copyloopvar:
-    # Check all assigning the loop variable to another variable.
-    # Default: false
-    check-alias: true
-  funlen:
-    lines: 100
-    statements: 50
-  sloglint:
-    # Enforce not mixing key-value pairs and attributes.
-    # https://github.com/go-simpler/sloglint?tab=readme-ov-file#no-mixed-arguments
-    # Default: true
-    no-mixed-args: true
-    # Enforce using key-value pairs only (overrides no-mixed-args, incompatible with attr-only).
-    # https://github.com/go-simpler/sloglint?tab=readme-ov-file#key-value-pairs-only
-    # Default: false
-    kv-only: true
-    # Enforce using attributes only (overrides no-mixed-args, incompatible with kv-only).
-    # https://github.com/go-simpler/sloglint?tab=readme-ov-file#attributes-only
-    # Default: false
-    attr-only: false
-    # Enforce not using global loggers.
-    # Values:
-    # - "": disabled
-    # - "all": report all global loggers
-    # - "default": report only the default slog logger
-    # https://github.com/go-simpler/sloglint?tab=readme-ov-file#no-global
-    # Default: ""
-    no-global: ""
-    # Enforce using methods that accept a context.
-    # Values:
-    # - "": disabled
-    # - "all": report all contextless calls
-    # - "scope": report only if a context exists in the scope of the outermost function
-    # https://github.com/go-simpler/sloglint?tab=readme-ov-file#context-only
-    # Default: ""
-    context: "scope"
-    # Enforce using static values for log messages.
-    # https://github.com/go-simpler/sloglint?tab=readme-ov-file#static-messages
-    # Default: false
-    static-msg: true
-    # Enforce using constants instead of raw keys.
-    # https://github.com/go-simpler/sloglint?tab=readme-ov-file#no-raw-keys
-    # Default: false
-    no-raw-keys: false
-    # Enforce a single key naming convention.
-    # Values: snake, kebab, camel, pascal
-    # https://github.com/go-simpler/sloglint?tab=readme-ov-file#key-naming-convention
-    # Default: ""
-    key-naming-case: camel
-    # Enforce not using specific keys.
-    # Default: []
-    forbidden-keys:
-      - time
-      - level
-      - msg
-      - source
-      - foo
-    # Enforce putting arguments on separate lines.
-    # https://github.com/go-simpler/sloglint?tab=readme-ov-file#forbidden-keys
-    # Default: false
-    args-on-sep-lines: false
-  gocritic:
-    enable-all: true
-    disabled-checks:
-      - paramTypeCombine
-      - ptrToRefParam # it seems *map is necessary
-  depguard:
-    # Rules to apply.
-    #
-    # Variables:
-    # - File Variables
-    #   you can still use and exclamation mark ! in front of a variable to say not to use it.
-    #   Example !$test will match any file that is not a go test file.
-    #
-    #   `$all` - matches all go files
-    #   `$test` - matches all go test files
-    #
-    # - Package Variables
-    #
-    #  `$gostd` - matches all of go's standard library (Pulled from `GOROOT`)
-    #
-    # Default: Only allow $gostd in all files.
+  settings:
+    copyloopvar:
+      check-alias: true
+    depguard:
+      rules:
+        main:
+          files:
+            - "**/*.go"
+            - "!**/*_test.go"
+          allow:
+            - $gostd
+            - github.com/fchastanet
+            - github.com/charmbracelet
+            - github.com/alecthomas/kong
+            - github.com/mattn/go-sqlite3
+            - github.com/davecgh/go-spew/spew
+            - golang.org/x/exp/maps
+          deny:
+            - pkg: github.com/stretchr/testify
+              desc: no testify on non test files
+            - pkg: github.com/sirupsen/logrus
+              desc: not allowed
+            - pkg: github.com/pkg/errors
+              desc: Should be replaced by standard lib errors package
+            - pkg: io/ioutil
+              desc:
+                "replaced by io and os packages since Go 1.16:
+                https://tip.golang.org/doc/go1.16#ioutil"
+        pkg:
+          files:
+            - "**/pkg/**/*.go"
+            - "!**/pkg/**/*_test.go"
+          allow:
+            - $gostd
+            - github.com/charmbracelet
+            - github.com/fchastanet/shell-command-bookmarker
+            - github.com/alecthomas/kong
+            - github.com/mattn/go-sqlite3
+            - github.com/davecgh/go-spew/spew
+            - golang.org/x/exp/maps
+          deny:
+            - pkg: github.com/fchastanet/shell-command-bookmarker/internal
+              desc: keep pkg not using internal packages
+            - pkg: io/ioutil
+              desc:
+                "replaced by io and os packages since Go 1.16:
+                https://tip.golang.org/doc/go1.16#ioutil"
+        tests:
+          files:
+            - $test
+          allow:
+            - $gostd
+            - github.com/fchastanet
+            - github.com/stretchr/testify
+            - golang.org/x/exp/maps
+    errcheck:
+      # To disable the errcheck built-in exclude list.
+      # See `-excludeonly` option in https://github.com/kisielk/errcheck#excluding-functions for details.
+      # Default: false
+      disable-default-exclusions: true
+      # Report about not checking of errors in type assertions: `a := b.(MyStruct)`.
+      # Such cases aren't reported by default.
+      # Default: false
+      check-type-assertions: true
+      # report about assignment of errors to blank identifier: `num, _ := strconv.Atoi(numStr)`.
+      # Such cases aren't reported by default.
+      # Default: false
+      check-blank: true
+      # List of functions to exclude from checking, where each entry is a single function to exclude.
+      # See https://github.com/kisielk/errcheck#excluding-functions for details.
+      # exclude-functions:
+    funlen:
+      lines: 100
+      statements: 50
+    gocritic:
+      enable-all: true
+      disabled-checks:
+        - paramTypeCombine
+        - ptrToRefParam # it seems *map is necessary
+
+    predeclared:
+      # Include method names and field names (i.e., qualified names) in checks.
+      # Default: false
+      qualified-name: true
+      # Comma-separated list of predeclared identifiers to not report on.
+      # Default: []
+      #ignore:
+    sloglint:
+      # Enforce not mixing key-value pairs and attributes.
+      # https://github.com/go-simpler/sloglint?tab=readme-ov-file#no-mixed-arguments
+      # Default: true
+      no-mixed-args: true
+      # Enforce using key-value pairs only (overrides no-mixed-args, incompatible with attr-only).
+      # https://github.com/go-simpler/sloglint?tab=readme-ov-file#key-value-pairs-only
+      # Default: false
+      kv-only: true
+      # Enforce using attributes only (overrides no-mixed-args, incompatible with kv-only).
+      # https://github.com/go-simpler/sloglint?tab=readme-ov-file#attributes-only
+      # Default: false
+      attr-only: false
+      # Enforce not using global loggers.
+      # Values:
+      # - "": disabled
+      # - "all": report all global loggers
+      # - "default": report only the default slog logger
+      # https://github.com/go-simpler/sloglint?tab=readme-ov-file#no-global
+      # Default: ""
+      no-global: ""
+      # Enforce using methods that accept a context.
+      # Values:
+      # - "": disabled
+      # - "all": report all contextless calls
+      # - "scope": report only if a context exists in the scope of the outermost function
+      # https://github.com/go-simpler/sloglint?tab=readme-ov-file#context-only
+      # Default: ""
+      context: "scope"
+      # Enforce using static values for log messages.
+      # https://github.com/go-simpler/sloglint?tab=readme-ov-file#static-messages
+      # Default: false
+      static-msg: true
+      # Enforce using constants instead of raw keys.
+      # https://github.com/go-simpler/sloglint?tab=readme-ov-file#no-raw-keys
+      # Default: false
+      no-raw-keys: false
+      # Enforce a single key naming convention.
+      # Values: snake, kebab, camel, pascal
+      # https://github.com/go-simpler/sloglint?tab=readme-ov-file#key-naming-convention
+      # Default: ""
+      key-naming-case: camel
+      # Enforce not using specific keys.
+      # Default: []
+      forbidden-keys:
+        - time
+        - level
+        - msg
+        - source
+        - foo
+      # Enforce putting arguments on separate lines.
+      # https://github.com/go-simpler/sloglint?tab=readme-ov-file#forbidden-keys
+      # Default: false
+      args-on-sep-lines: false
+    unused:
+      # Mark all struct fields that have been written to as used.
+      # Default: true
+      field-writes-are-uses: true
+      # Treat IncDec statement (e.g. `i++` or `i--`) as both read and write operation instead of just write.
+      # Default: false
+      post-statements-are-reads: true
+      # Mark all exported fields as used.
+      # default: true
+      exported-fields-are-used: false
+      # Mark all function parameters as used.
+      # default: true
+      parameters-are-used: false
+      # Mark all local variables as used.
+      # default: true
+      local-variables-are-used: false
+      # Mark all identifiers inside generated files as used.
+      # Default: true
+      generated-is-used: false
+    usestdlibvars:
+      # Suggest the use of http.MethodXX.
+      # Default: true
+      http-method: false
+      # Suggest the use of http.StatusXX.
+      # Default: true
+      http-status-code: false
+      # Suggest the use of time.Weekday.String().
+      # Default: true
+      time-weekday: true
+      # Suggest the use of time.Month.String().
+      # Default: false
+      time-month: true
+      # Suggest the use of time.Layout.
+      # Default: false
+      time-layout: true
+      # Suggest the use of crypto.Hash.String().
+      # Default: false
+      crypto-hash: true
+      # Suggest the use of rpc.DefaultXXPath.
+      # Default: false
+      default-rpc-path: true
+      # Suggest the use of sql.LevelXX.String().
+      # Default: false
+      sql-isolation-level: true
+      # Suggest the use of tls.SignatureScheme.String().
+      # Default: false
+      tls-signature-scheme: true
+      # Suggest the use of constant.Kind.String().
+      # Default: false
+      constant-kind: true
+  exclusions:
+    generated: lax
+    presets:
+      - comments
+      - common-false-positives
+      - legacy
+      - std-error-handling
     rules:
-      # Name of a rule.
-      pkg:
-        files:
-          # Remove the leading slash which could be causing path matching issues
-          - "**/pkg/**/*.go"
-          - "!**/pkg/**/*_test.go"
-        allow:
-          - $gostd
-          - github.com/charmbracelet
-          - github.com/fchastanet/shell-command-bookmarker
-          - github.com/alecthomas/kong
-          - github.com/mattn/go-sqlite3
-          - github.com/davecgh/go-spew/spew
-        deny:
-          # Use a more comprehensive pattern to catch all internal imports
-          - pkg: "github.com/fchastanet/shell-command-bookmarker/internal"
-            desc: "keep pkg not using internal packages"
-          - pkg: "io/ioutil"
-            desc:
-              "replaced by io and os packages since Go 1.16:
-              https://tip.golang.org/doc/go1.16#ioutil"
-      main:
-        # List of file globs that will match this list of settings to compare against.
-        # Default: $all
-        files:
-          - "**/*.go"
-          - "!**/*_test.go"
-        # List of allowed packages.
-        allow:
-          - $gostd
-          - github.com/fchastanet
-          - github.com/charmbracelet
-          - github.com/alecthomas/kong
-          - github.com/mattn/go-sqlite3
-          - github.com/davecgh/go-spew/spew
-        # Packages that are not allowed where the value is a suggestion.
-        deny:
-          - pkg: "github.com/stretchr/testify"
-            desc: "no testify on non test files"
-          - pkg: "github.com/sirupsen/logrus"
-            desc: "not allowed"
-          - pkg: "github.com/pkg/errors"
-            desc: "Should be replaced by standard lib errors package"
-          - pkg: "io/ioutil"
-            desc:
-              "replaced by io and os packages since Go 1.16:
-              https://tip.golang.org/doc/go1.16#ioutil"
-      tests:
-        files:
-          - $test
-        allow:
-          - $gostd
-          - "github.com/fchastanet"
-          - "github.com/stretchr/testify"
-issues:
-  # Excluding configuration per-path, per-linter, per-text and per-source
-  exclude-rules:
-    - path: _test\.go
-      linters:
-        - gochecknoglobals
-        - gosec
-        - funlen
-        - noctx
-        - errcheck
+      - linters:
+          - errcheck
+          - funlen
+          - gochecknoglobals
+          - gosec
+          - noctx
+        path: _test\.go
+    paths:
+      - third_party$
+      - builtin$
+      - examples$
+formatters:
+  enable:
+    - gofmt # Gofmt checks whether code was gofmt-ed. By default this tool runs with -s option to check for code simplification
+    - goimports # In addition to fixing imports, goimports also formats your code in the same style as gofmt.
+    - gofumpt
+  exclusions:
+    generated: lax
+    paths:
+      - third_party$
+      - builtin$
+      - examples$

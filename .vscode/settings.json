@@ -15,6 +15,6 @@
     }
   ],
   "gopls": {
-    "buildFlags": ["-tags=sqlite_fts5,fts5"],
+    "buildFlags": ["-tags=sqlite_fts5,fts5"]
   }
 }
