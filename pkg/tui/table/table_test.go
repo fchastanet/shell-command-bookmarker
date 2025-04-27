@@ -16,22 +16,21 @@ func (r ResourceTestKind) Key() string { return r.key }
 func (r ResourceTestKind) IsKind()     {}
 
 var (
-	resourceTestKind   = &ResourceTestKind{key: "test"}
-	monotonicIDService = resource.NewMonotonicIDService()
-	resource0          = testResource{n: 0, ID: monotonicIDService.NewMonotonicID(resourceTestKind)}
-	resource1          = testResource{n: 1, ID: monotonicIDService.NewMonotonicID(resourceTestKind)}
-	resource2          = testResource{n: 2, ID: monotonicIDService.NewMonotonicID(resourceTestKind)}
-	resource3          = testResource{n: 3, ID: monotonicIDService.NewMonotonicID(resourceTestKind)}
-	resource4          = testResource{n: 4, ID: monotonicIDService.NewMonotonicID(resourceTestKind)}
-	resource5          = testResource{n: 5, ID: monotonicIDService.NewMonotonicID(resourceTestKind)}
+	resourceTestKind = &ResourceTestKind{key: "test"}
+	resource0        = testResource{n: 0, ID: 1}
+	resource1        = testResource{n: 1, ID: 2}
+	resource2        = testResource{n: 2, ID: 3}
+	resource3        = testResource{n: 3, ID: 4}
+	resource4        = testResource{n: 4, ID: 5}
+	resource5        = testResource{n: 5, ID: 6}
 )
 
 type testResource struct {
-	ID resource.MonotonicID
+	ID resource.ID
 	n  int
 }
 
-func (r *testResource) GetID() resource.ID { return r.ID.Serial }
+func (r *testResource) GetID() resource.ID { return r.ID }
 
 // setupTest sets up a table test with several rows. Each row is keyed with an
 // int, and the row item is an int corresponding to the key, for ease of
@@ -72,7 +71,7 @@ func TestTable_ToggleSelection(t *testing.T) {
 	tbl.ToggleSelection()
 
 	assert.Len(t, tbl.selected, 1)
-	assert.Equal(t, &resource0, tbl.selected[resource0.ID.Serial])
+	assert.Equal(t, &resource0, tbl.selected[resource0.ID])
 }
 
 func TestTable_SelectRange(t *testing.T) {
@@ -96,33 +95,33 @@ func TestTable_SelectRange(t *testing.T) {
 		},
 		{
 			name:     "select no range when cursor is on the only selected row",
-			selected: []resource.ID{resource0.ID.Serial},
+			selected: []resource.ID{resource0.ID},
 			cursor:   0,
-			want:     []resource.ID{resource0.ID.Serial},
+			want:     []resource.ID{resource0.ID},
 		},
 		{
 			name:     "select all rows between selected top row and cursor on last row",
-			selected: []resource.ID{resource0.ID.Serial}, // first row
-			cursor:   5,                                  // last row
-			want:     []resource.ID{resource0.ID.Serial, resource1.ID.Serial, resource2.ID.Serial, resource3.ID.Serial, resource4.ID.Serial, resource5.ID.Serial},
+			selected: []resource.ID{resource0.ID}, // first row
+			cursor:   5,                           // last row
+			want:     []resource.ID{resource0.ID, resource1.ID, resource2.ID, resource3.ID, resource4.ID, resource5.ID},
 		},
 		{
 			name:     "select rows between selected top row and cursor in third row",
-			selected: []resource.ID{resource0.ID.Serial}, // first row
-			cursor:   2,                                  // third row
-			want:     []resource.ID{resource0.ID.Serial, resource1.ID.Serial, resource2.ID.Serial},
+			selected: []resource.ID{resource0.ID}, // first row
+			cursor:   2,                           // third row
+			want:     []resource.ID{resource0.ID, resource1.ID, resource2.ID},
 		},
 		{
 			name:     "select rows between selected top row and cursor in third row, ignoring selected last row",
-			selected: []resource.ID{resource0.ID.Serial, resource5.ID.Serial}, // first and last row
-			cursor:   2,                                                       // third row
-			want:     []resource.ID{resource0.ID.Serial, resource1.ID.Serial, resource2.ID.Serial, resource5.ID.Serial},
+			selected: []resource.ID{resource0.ID, resource5.ID}, // first and last row
+			cursor:   2,                                         // third row
+			want:     []resource.ID{resource0.ID, resource1.ID, resource2.ID, resource5.ID},
 		},
 		{
 			name:     "select rows between cursor in third row and selected last row",
-			selected: []resource.ID{resource5.ID.Serial}, // last row
-			cursor:   2,                                  // third row
-			want:     []resource.ID{resource2.ID.Serial, resource3.ID.Serial, resource4.ID.Serial, resource5.ID.Serial},
+			selected: []resource.ID{resource5.ID}, // last row
+			cursor:   2,                           // third row
+			want:     []resource.ID{resource2.ID, resource3.ID, resource4.ID, resource5.ID},
 		},
 	}
 	for _, tt := range tests {

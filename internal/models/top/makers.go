@@ -16,13 +16,6 @@ type Maker interface {
 	Make(id resource.ID, width, height int) (structure.ChildModel, error)
 }
 
-// DefaultMaker is the default model maker
-type DefaultMaker struct{}
-
-func (m *DefaultMaker) Make(_ resource.ID, _, _ int) (structure.ChildModel, error) {
-	return nil, nil
-}
-
 // makeMakers makes model makers for making models
 func makeMakers(
 	app *services.AppService,

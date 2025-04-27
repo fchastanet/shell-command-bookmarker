@@ -38,20 +38,8 @@ func NewNavigationMsg(kind resource.Kind, opts ...NavigateOption) NavigationMsg 
 
 type NavigateOption func(msg *NavigationMsg)
 
-func WithParent(parent resource.ID) NavigateOption {
-	return func(msg *NavigationMsg) {
-		msg.Page.ID = parent
-	}
-}
-
 func WithPosition(position Position) NavigateOption {
 	return func(msg *NavigationMsg) {
 		msg.Position = position
-	}
-}
-
-func DisableFocus() NavigateOption {
-	return func(msg *NavigationMsg) {
-		msg.DisableFocus = true
 	}
 }

@@ -45,18 +45,6 @@ type LintService struct {
 
 type LintServiceOption func(*LintService)
 
-func WithCustomCommandExecutor(commandExecutor CommandExecutorInterface) LintServiceOption {
-	return func(p *LintService) {
-		p.commandExecutor = commandExecutor
-	}
-}
-
-func WithLookPathExecutor(lookupExecutor LookupExecutorInterface) LintServiceOption {
-	return func(p *LintService) {
-		p.lookupExecutor = lookupExecutor
-	}
-}
-
 // NewLintService creates a new LintService instance.
 // It checks for the presence of the shellcheck command during initialization.
 func NewLintService(options ...LintServiceOption) *LintService {
