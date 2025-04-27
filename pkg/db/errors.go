@@ -49,18 +49,6 @@ func (e *SchemaInitializationError) Error() string {
 	)
 }
 
-type SchemaReadError struct {
-	DBFilePath string
-	InnerError error
-}
-
-func (e *SchemaReadError) Error() string {
-	return fmt.Sprintf("schema read failure for database file: %s (inner error: %v)",
-		e.DBFilePath,
-		e.InnerError,
-	)
-}
-
 type QueryExecutionError struct {
 	DBFilePath string
 	Query      string
