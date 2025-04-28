@@ -47,8 +47,8 @@ func GetGlobalKeyMap() *GlobalKeyMap {
 			key.WithHelp("X", "close pane"),
 		),
 		Quit: key.NewBinding(
-			key.WithKeys("q", "ctrl+c"),
-			key.WithHelp("q/ctrl+c", "exit"),
+			key.WithKeys("esc", "ctrl+c"),
+			key.WithHelp("esc/ctrl+c", "exit"),
 		),
 		Help: key.NewBinding(
 			key.WithKeys("h", "?"),
