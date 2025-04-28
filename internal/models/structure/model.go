@@ -24,5 +24,5 @@ type Page struct {
 // ModelHelpBindings is implemented by models that surface further help bindings
 // specific to the model.
 type ModelHelpBindings interface {
-	HelpBindings() []key.Binding
+	HelpBindings() []*key.Binding
 }

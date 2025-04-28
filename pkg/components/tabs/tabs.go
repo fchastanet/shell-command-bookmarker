@@ -44,15 +44,17 @@ type Tabs struct {
 const OuterTabContentHeight = 8
 
 func defaultKeyMap() keyMap {
+	left := key.NewBinding(
+		key.WithKeys("left", "p"),
+		key.WithHelp("←/p", "move tab left"),
+	)
+	right := key.NewBinding(
+		key.WithKeys("right", "n"),
+		key.WithHelp("→/n", "move tab right"),
+	)
 	return keyMap{
-		Left: key.NewBinding(
-			key.WithKeys("left", "p"),
-			key.WithHelp("←/p", "move tab left"),
-		),
-		Right: key.NewBinding(
-			key.WithKeys("right", "n"),
-			key.WithHelp("→/n", "move tab right"),
-		),
+		Left:  &left,
+		Right: &right,
 	}
 }
 
@@ -82,12 +84,12 @@ func NewTabs(
 // keyMap defines a set of keybindings. To work for help it must satisfy
 // key.Map. It could also very easily be a map[string]key.Binding.
 type keyMap struct {
-	Left  key.Binding
-	Right key.Binding
+	Left  *key.Binding
+	Right *key.Binding
 }
 
-func (t *Tabs) GetKeyBindings() []key.Binding {
-	return []key.Binding{
+func (t *Tabs) GetKeyBindings() []*key.Binding {
+	return []*key.Binding{
 		t.settings.Keys.Left, t.settings.Keys.Right,
 	}
 }
@@ -135,13 +137,13 @@ func (t *Tabs) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 func (t *Tabs) updateActiveTab(msg tea.KeyMsg) {
 	oldActiveTab := t.activeTab
 	switch {
-	case key.Matches(msg, t.settings.Keys.Right):
+	case key.Matches(msg, *t.settings.Keys.Right):
 		if t.activeTab == len(t.Tabs)-1 {
 			t.activeTab = 0
 		} else {
 			t.activeTab = min(t.activeTab+1, len(t.Tabs)-1)
 		}
-	case key.Matches(msg, t.settings.Keys.Left):
+	case key.Matches(msg, *t.settings.Keys.Left):
 		if t.activeTab == 0 {
 			t.activeTab = len(t.Tabs) - 1
 		} else {

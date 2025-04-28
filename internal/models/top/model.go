@@ -12,6 +12,8 @@ import (
 	"github.com/fchastanet/shell-command-bookmarker/internal/models/keys"
 	"github.com/fchastanet/shell-command-bookmarker/internal/models/structure"
 	"github.com/fchastanet/shell-command-bookmarker/internal/models/styles"
+	"github.com/fchastanet/shell-command-bookmarker/internal/models/top/footer"
+	"github.com/fchastanet/shell-command-bookmarker/internal/models/top/help"
 	"github.com/fchastanet/shell-command-bookmarker/internal/services"
 	"github.com/fchastanet/shell-command-bookmarker/internal/version"
 	"github.com/fchastanet/shell-command-bookmarker/pkg/tui"
@@ -34,7 +36,6 @@ func FilterClosed() tea.Msg {
 }
 
 type Model struct {
-	err error
 	*models.PaneManager
 	appService   *services.AppService
 	styles       *styles.Styles
@@ -42,16 +43,15 @@ type Model struct {
 	globalKeyMap *keys.GlobalKeyMap
 	paneKeyMap   *keys.PaneNavigationKeyMap
 
-	prompt        *models.Prompt
-	spinner       *spinner.Model
-	info          string
-	versionWidget string
-	helpWidget    string
+	prompt      *models.Prompt
+	spinner     *spinner.Model
+	footerModel footer.Model
+
+	helpModel help.Model
 
 	width    int
 	height   int
 	mode     mode
-	showHelp bool
 	spinning bool
 }
 
@@ -69,24 +69,25 @@ func NewModel(
 	helpWidget := myStyles.HelpStyle.Main.Render("? help")
 	versionWidget := myStyles.FooterStyle.Version.Render(version.Get())
 
+	// Create help and footer components
+	helpModel := help.New(myStyles)
+	footerModel := footer.New(myStyles, helpWidget, versionWidget)
+
 	m := Model{
-		PaneManager:   models.NewPaneManager(makers, myStyles),
-		filterKeyMap:  keys.GetFilterKeyMap(),
-		globalKeyMap:  keys.GetGlobalKeyMap(),
-		paneKeyMap:    keys.GetPaneNavigationKeyMap(),
-		spinner:       &spinnerObj,
-		appService:    appService,
-		styles:        myStyles,
-		helpWidget:    helpWidget,
-		versionWidget: versionWidget,
-		width:         0,
-		height:        0,
-		mode:          normalMode,
-		showHelp:      false,
-		spinning:      false,
-		err:           nil,
-		info:          "",
-		prompt:        nil,
+		PaneManager:  models.NewPaneManager(makers, myStyles),
+		filterKeyMap: keys.GetFilterKeyMap(),
+		globalKeyMap: keys.GetGlobalKeyMap(),
+		paneKeyMap:   keys.GetPaneNavigationKeyMap(),
+		spinner:      &spinnerObj,
+		appService:   appService,
+		styles:       myStyles,
+		helpModel:    helpModel,
+		footerModel:  footerModel,
+		width:        0,
+		height:       0,
+		mode:         normalMode,
+		spinning:     false,
+		prompt:       nil,
 	}
 	return m
 }
@@ -127,8 +128,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, tea.Batch(cmd, blink)
 	case tea.KeyMsg:
 		// Pressing any key makes any info/error message in the footer disappear
-		m.info = ""
-		m.err = nil
+		m.footerModel.ClearMessages()
 		_, teaCmd := m.manageKeyInMode(msg)
 		if teaCmd != nil {
 			cmds = append(cmds, teaCmd)
@@ -136,12 +136,14 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		return m.manageKey(msg)
 	case tui.ErrorMsg:
-		m.err = error(msg)
+		m.footerModel.SetError(error(msg))
 	case tui.InfoMsg:
-		m.info = string(msg)
+		m.footerModel.SetInfo(string(msg))
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
 		m.height = msg.Height
+		m.helpModel.SetWidth(m.width)
+		m.footerModel.SetWidth(m.width)
 		m.PaneManager.Update(tea.WindowSizeMsg{
 			Height: m.viewHeight(),
 			Width:  m.viewWidth(),
@@ -180,13 +182,13 @@ func (m *Model) manageKeyInMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, cmd
 	case filterMode:
 		switch {
-		case key.Matches(msg, m.filterKeyMap.Blur):
+		case key.Matches(msg, *m.filterKeyMap.Blur):
 			// Switch back to normal mode, and send message to current model
 			// to blur the filter widget
 			m.mode = normalMode
 			cmd = m.FocusedModel().Update(tui.FilterBlurMsg{})
 			return m, cmd
-		case key.Matches(msg, m.filterKeyMap.Close):
+		case key.Matches(msg, *m.filterKeyMap.Close):
 			// Switch back to normal mode, and send message to current model
 			// to close the filter widget
 			m.mode = normalMode
@@ -213,26 +215,26 @@ func (m *Model) manageKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
 
 	switch {
-	case key.Matches(msg, m.globalKeyMap.Quit):
+	case key.Matches(msg, *m.globalKeyMap.Quit):
 		// ctrl-c quits the app, but not before prompting the user for
 		// confirmation.
 		return m, models.YesNoPrompt("Quit Shell Command Bookmarker?", tea.Quit)
-	case key.Matches(msg, m.globalKeyMap.Help):
+	case key.Matches(msg, *m.globalKeyMap.Help):
 		// '?' toggles help widget
-		m.showHelp = !m.showHelp
+		m.helpModel.Toggle()
 		// Help widget takes up space so update panes' dimensions
 		m.PaneManager.Update(tea.WindowSizeMsg{
 			Height: m.viewHeight(),
 			Width:  m.viewWidth(),
 		})
-	case key.Matches(msg, m.globalKeyMap.Filter):
+	case key.Matches(msg, *m.globalKeyMap.Filter):
 		// '/' enables filter mode if the current model indicates it
 		// supports it, which it does so by sending back a non-nil command.
 		if cmd = m.FocusedModel().Update(tui.FilterFocusReqMsg{}); cmd != nil {
 			m.mode = filterMode
 		}
 		return m, cmd
-	case key.Matches(msg, m.globalKeyMap.Search):
+	case key.Matches(msg, *m.globalKeyMap.Search):
 		return m, models.NavigateTo(structure.SearchKind, structure.WithPosition(structure.LeftPane))
 	default:
 	}
@@ -257,54 +259,49 @@ func (m *Model) View() string {
 		Width(m.viewWidth()).
 		Render(m.PaneManager.View()),
 	)
+
 	// Add help if enabled
-	if m.showHelp {
-		components = append(components, m.help())
+	if m.helpModel.IsVisible() {
+		// Update help bindings before rendering
+		m.updateHelpBindings()
+		components = append(components, m.helpModel.View())
 	}
-	// Compose footer
-	footer := m.helpWidget
-	switch {
-	case m.err != nil:
-		footer += m.styles.FooterStyle.ErrorStyle.
-			Width(m.availableFooterMsgWidth()).
-			Render(m.err.Error())
-	case m.info != "":
-		footer += m.styles.FooterStyle.InfoStyle.
-			Width(m.availableFooterMsgWidth()).
-			Render(m.info)
-	default:
-		footer += m.styles.FooterStyle.DefaultStyle.
-			Width(m.availableFooterMsgWidth()).
-			Render(m.info)
-	}
-	footer += m.versionWidget
+
 	// Add footer
-	components = append(components, m.styles.FooterStyle.Main.
-		MaxWidth(m.width).
-		Width(m.width).
-		Render(footer),
-	)
+	components = append(components, m.footerModel.View())
+
 	return strings.Join(components, "\n")
 }
 
-func (m *Model) availableFooterMsgWidth() int {
-	// -2 to accommodate padding
-	return max(0, m.width-lipgloss.Width(m.helpWidget)-lipgloss.Width(m.versionWidget))
-}
+// updateHelpBindings updates the key bindings displayed in help based on current mode
+func (m *Model) updateHelpBindings() {
+	// Compile list of bindings to render
+	bindings := []*key.Binding{}
 
-// type taskCompletionMsg struct {
-//	error
+	switch m.mode {
+	case promptMode:
+		bindings = append(bindings, m.prompt.HelpBindings()...)
+	case filterMode:
+		bindings = append(bindings, keys.KeyMapToSlice(*m.filterKeyMap)...)
+	case normalMode:
+		bindings = append(bindings, m.HelpBindings()...)
+		bindings = append(bindings, keys.KeyMapToSlice(*m.globalKeyMap)...)
+		bindings = append(bindings, keys.KeyMapToSlice(*m.paneKeyMap)...)
+	}
+
+	m.helpModel.SetBindings(bindings)
+}
 
 // viewHeight returns the height available to the panes
 //
 // TODO: rename contentHeight
 func (m *Model) viewHeight() int {
-	vh := m.height - m.styles.FooterStyle.Height
+	vh := m.height - m.footerModel.Height()
 	if m.mode == promptMode {
 		vh -= m.styles.PromptStyle.Height
 	}
-	if m.showHelp {
-		vh -= m.styles.HelpStyle.Height
+	if m.helpModel.IsVisible() {
+		vh -= m.helpModel.Height()
 	}
 	return max(m.styles.PaneStyle.MinContentHeight, vh)
 }
@@ -314,88 +311,4 @@ func (m *Model) viewHeight() int {
 // TODO: rename contentWidth
 func (m *Model) viewWidth() int {
 	return max(m.styles.PaneStyle.MinContentWidth, m.width)
-}
-
-// help renders key bindings
-func (m *Model) help() string {
-	// Compile list of bindings to render
-	bindings := []key.Binding{m.globalKeyMap.Help, m.globalKeyMap.Quit}
-	addDefaultBindings := true
-	switch m.mode {
-	case promptMode:
-		bindings = append(bindings, m.prompt.HelpBindings()...)
-		addDefaultBindings = false
-	case filterMode:
-		bindings = append(bindings, keys.KeyMapToSlice(*m.filterKeyMap)...)
-	case normalMode:
-		addDefaultBindings = true
-		bindings = append(bindings, m.HelpBindings()...)
-	}
-	if addDefaultBindings {
-		bindings = append(bindings, keys.KeyMapToSlice(*m.globalKeyMap)...)
-		bindings = append(bindings, keys.KeyMapToSlice(*m.paneKeyMap)...)
-	}
-	bindings = removeDuplicateBindings(bindings)
-
-	// Enumerate through each group of bindings, populating a series of
-	// pairs of columns, one for keys, one for descriptions
-	var (
-		pairs []string
-		width int
-		// Subtract 2 to accommodate borders
-		rows = m.styles.HelpStyle.Height - 2
-	)
-	for i := 0; i < len(bindings); i += rows {
-		var (
-			helpKeys     []string
-			descriptions []string
-		)
-		for j := i; j < min(i+rows, len(bindings)); j++ {
-			helpKeys = append(helpKeys, m.styles.HelpStyle.KeyStyle.Render(bindings[j].Help().Key))
-			descriptions = append(descriptions, m.styles.HelpStyle.DescStyle.Render(bindings[j].Help().Desc))
-		}
-		// Render pair of columns; beyond the first pair, render a three space
-		// left margin, in order to visually separate the pairs.
-		var cols []string
-		if len(pairs) > 0 {
-			cols = []string{"   "}
-		}
-		cols = append(cols,
-			strings.Join(helpKeys, "\n"),
-			strings.Join(descriptions, "\n"),
-		)
-
-		pair := lipgloss.JoinHorizontal(lipgloss.Top, cols...)
-		// check whether it exceeds the maximum width avail (the width of the
-		// terminal, subtracting 2 for the borders).
-		width += lipgloss.Width(pair)
-		if width > m.width-2 {
-			break
-		}
-		pairs = append(pairs, pair)
-	}
-	// Join pairs of columns and enclose in a border
-	content := lipgloss.JoinHorizontal(lipgloss.Top, pairs...)
-	return m.styles.PaneStyle.TopBorder.
-		Height(rows).
-		Width(m.width - m.styles.PaneStyle.BordersWidth).
-		Render(content)
-}
-
-// removeDuplicateBindings removes duplicate bindings from a list of bindings. A
-// binding is deemed a duplicate if another binding has the same list of keys.
-func removeDuplicateBindings(bindings []key.Binding) []key.Binding {
-	seen := make(map[string]struct{})
-	var i int
-	for _, b := range bindings {
-		bKey := strings.Join(b.Keys(), " ")
-		if _, ok := seen[bKey]; ok {
-			// duplicate, skip
-			continue
-		}
-		seen[bKey] = struct{}{}
-		bindings[i] = b
-		i++
-	}
-	return bindings[:i]
 }
