@@ -313,21 +313,21 @@ func (m *Model[V]) handleKeyMsg(msg tea.KeyMsg) (*Model[V], tea.Cmd) {
 func (m *Model[V]) handleNavigationKey(msg tea.KeyMsg) bool {
 	nav := m.navigation
 	switch {
-	case key.Matches(msg, nav.LineUp):
+	case key.Matches(msg, *nav.LineUp):
 		m.MoveUp(1)
-	case key.Matches(msg, nav.LineDown):
+	case key.Matches(msg, *nav.LineDown):
 		m.MoveDown(1)
-	case key.Matches(msg, nav.PageUp):
+	case key.Matches(msg, *nav.PageUp):
 		m.MoveUp(m.rowAreaHeight())
-	case key.Matches(msg, nav.PageDown):
+	case key.Matches(msg, *nav.PageDown):
 		m.MoveDown(m.rowAreaHeight())
-	case key.Matches(msg, nav.HalfPageUp):
+	case key.Matches(msg, *nav.HalfPageUp):
 		m.MoveUp(m.rowAreaHeight() / HalfPageMultiplier)
-	case key.Matches(msg, nav.HalfPageDown):
+	case key.Matches(msg, *nav.HalfPageDown):
 		m.MoveDown(m.rowAreaHeight() / HalfPageMultiplier)
-	case key.Matches(msg, nav.GotoTop):
+	case key.Matches(msg, *nav.GotoTop):
 		m.GotoTop()
-	case key.Matches(msg, nav.GotoBottom):
+	case key.Matches(msg, *nav.GotoBottom):
 		m.GotoBottom()
 	default:
 		return false
@@ -339,13 +339,13 @@ func (m *Model[V]) handleNavigationKey(msg tea.KeyMsg) bool {
 func (m *Model[V]) handleSelectionKey(msg tea.KeyMsg) bool {
 	nav := m.navigation
 	switch {
-	case key.Matches(msg, nav.Select):
+	case key.Matches(msg, *nav.Select):
 		m.ToggleSelection()
-	case key.Matches(msg, nav.SelectAll):
+	case key.Matches(msg, *nav.SelectAll):
 		m.SelectAll()
-	case key.Matches(msg, nav.SelectClear):
+	case key.Matches(msg, *nav.SelectClear):
 		m.DeselectAll()
-	case key.Matches(msg, nav.SelectRange):
+	case key.Matches(msg, *nav.SelectRange):
 		m.SelectRange()
 	default:
 		return false

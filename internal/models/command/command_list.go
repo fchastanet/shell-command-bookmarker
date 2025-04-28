@@ -199,13 +199,13 @@ func (m *resourceList) View() string {
 	return m.Model.View()
 }
 
-func (m *resourceList) HelpBindings() []key.Binding {
+func (m *resourceList) HelpBindings() []*key.Binding {
 	resourcesKeys := GetResourcesKeyMap()
 	commonKeys := keys.GetCommonKeyMap()
-	bindings := []key.Binding{
+	bindings := []*key.Binding{
 		commonKeys.Delete,
-		*resourcesKeys.Move,
-		*resourcesKeys.Reload,
+		resourcesKeys.Move,
+		resourcesKeys.Reload,
 	}
 	return bindings
 }

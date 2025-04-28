@@ -136,7 +136,7 @@ func (p *PaneManager) Update(msg tea.Msg) tea.Cmd {
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
 		switch {
-		case key.Matches(msg, p.commonKeyMap.Back):
+		case key.Matches(msg, *p.commonKeyMap.Back):
 			if p.focused != structure.TopRightPane {
 				// History is only maintained for the top right pane.
 				break
@@ -152,29 +152,29 @@ func (p *PaneManager) Update(msg tea.Msg) tea.Cmd {
 			// A new top right pane replaces any bottom right pane as well.
 			delete(p.panes, structure.BottomRightPane)
 			p.updateChildSizes()
-		case key.Matches(msg, p.globalKeyMap.ShrinkPaneWidth):
+		case key.Matches(msg, *p.globalKeyMap.ShrinkPaneWidth):
 			p.updateLeftWidth(-1)
 			p.updateChildSizes()
-		case key.Matches(msg, p.globalKeyMap.GrowPaneWidth):
+		case key.Matches(msg, *p.globalKeyMap.GrowPaneWidth):
 			p.updateLeftWidth(1)
 			p.updateChildSizes()
-		case key.Matches(msg, p.globalKeyMap.ShrinkPaneHeight):
+		case key.Matches(msg, *p.globalKeyMap.ShrinkPaneHeight):
 			p.updateTopRightHeight(-1)
 			p.updateChildSizes()
-		case key.Matches(msg, p.globalKeyMap.GrowPaneHeight):
+		case key.Matches(msg, *p.globalKeyMap.GrowPaneHeight):
 			p.updateTopRightHeight(1)
 			p.updateChildSizes()
-		case key.Matches(msg, p.paneKeyMap.SwitchPane):
+		case key.Matches(msg, *p.paneKeyMap.SwitchPane):
 			p.cycleFocusedPane(false)
-		case key.Matches(msg, p.paneKeyMap.SwitchPaneBack):
+		case key.Matches(msg, *p.paneKeyMap.SwitchPaneBack):
 			p.cycleFocusedPane(true)
-		case key.Matches(msg, p.globalKeyMap.ClosePane):
+		case key.Matches(msg, *p.globalKeyMap.ClosePane):
 			cmds = append(cmds, p.closeFocusedPane())
-		case key.Matches(msg, p.paneKeyMap.LeftPane):
+		case key.Matches(msg, *p.paneKeyMap.LeftPane):
 			p.focusPane(structure.LeftPane)
-		case key.Matches(msg, p.paneKeyMap.TopRightPane):
+		case key.Matches(msg, *p.paneKeyMap.TopRightPane):
 			p.focusPane(structure.TopRightPane)
-		case key.Matches(msg, p.paneKeyMap.BottomRightPane):
+		case key.Matches(msg, *p.paneKeyMap.BottomRightPane):
 			p.focusPane(structure.BottomRightPane)
 		default:
 			// Send remaining keys to focused pane
@@ -428,7 +428,7 @@ func (p *PaneManager) renderPane(position structure.Position) string {
 	)
 }
 
-func (p *PaneManager) HelpBindings() (bindings []key.Binding) {
+func (p *PaneManager) HelpBindings() (bindings []*key.Binding) {
 	if p.focused == structure.TopRightPane {
 		// Only the top right pane has the ability to "go back"
 		bindings = append(bindings, p.commonKeyMap.Back)
