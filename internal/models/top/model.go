@@ -26,6 +26,13 @@ const (
 	filterMode             // filter is visible and taking input
 )
 
+// indicate parent components that filter has been closed.
+type FilterClosedMsg struct{}
+
+func FilterClosed() tea.Msg {
+	return FilterClosedMsg{}
+}
+
 type Model struct {
 	err error
 	*models.PaneManager
@@ -173,13 +180,6 @@ func (m *Model) manageKeyInMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, cmd
 	case filterMode:
 		switch {
-		case key.Matches(msg, m.globalKeyMap.Quit):
-			// Allow user to quit app whilst in filter mode. In this case,
-			// switch back to normal mode, blur the filter widget, and let
-			// the key handler below handle the quit action.
-			m.mode = normalMode
-			cmd = m.FocusedModel().Update(tui.FilterBlurMsg{})
-			return m, cmd
 		case key.Matches(msg, m.filterKeyMap.Blur):
 			// Switch back to normal mode, and send message to current model
 			// to blur the filter widget
@@ -190,7 +190,11 @@ func (m *Model) manageKeyInMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			// Switch back to normal mode, and send message to current model
 			// to close the filter widget
 			m.mode = normalMode
-			cmd = m.FocusedModel().Update(tui.FilterCloseMsg{})
+			closeMsg := tui.FilterCloseMsg{}
+			cmd = m.FocusedModel().Update(closeMsg)
+			if cmd == nil {
+				return m, FilterClosed
+			}
 			return m, cmd
 		default:
 			// Wrap key message in a filter key message and send to current
