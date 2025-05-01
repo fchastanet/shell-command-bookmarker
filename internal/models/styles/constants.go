@@ -8,7 +8,7 @@ const (
 	HeightPrompt  = 3
 	HeightMinimum = 6
 	HeightMinPane = 4
-	HeightHelp    = 15
+	HeightHelp    = 16
 	MinHelpHeight = 1
 	HeightFooter  = 1
 	HeightHeader  = 1 // Height of the header component
