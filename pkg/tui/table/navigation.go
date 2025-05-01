@@ -94,8 +94,8 @@ func GetDefaultAction() *Action {
 		key.WithHelp(`/`, "filter"),
 	)
 	reload := key.NewBinding(
-		key.WithKeys("ctrl+r"),
-		key.WithHelp("ctrl+r", "reload"),
+		key.WithKeys("ctrl+r", "f5"),
+		key.WithHelp("f5/ctrl+r", "reload"),
 	)
 	enter := key.NewBinding(
 		key.WithKeys("enter"),

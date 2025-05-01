@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log/slog"
 
+	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/bubbles/spinner"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/fchastanet/shell-command-bookmarker/internal/models/structure"
@@ -146,46 +147,79 @@ func (m *resourceList) Init() tea.Cmd {
 }
 
 func (m *resourceList) Update(msg tea.Msg) tea.Cmd {
-	var (
-		cmd  tea.Cmd
-		cmds []tea.Cmd
-	)
+	var cmds []tea.Cmd
 
 	switch msg := msg.(type) {
 	case commandReloadedMsg:
-		m.reloading = false
-		if msg.err != nil {
-			return tui.ReportError(fmt.Errorf("reloading state failed: %w", msg.err))
-		}
-		return tui.ReportInfo("reloading finished")
+		return m.handleCommandReloaded(msg)
 	case tea.WindowSizeMsg:
-		m.width = msg.Width
-		m.height = msg.Height
-		m.Model.SetWidth(m.width)
-		m.Model.SetHeight(m.height)
-		m.Model.SetColumns(m.getColumns(m.width))
-
+		return m.handleWindowSize(msg)
 	case tea.BlurMsg:
 		m.Model.Blur()
 	case tea.FocusMsg:
-		m.Model.SetColumns(m.getColumns(m.width))
-		return func() tea.Msg {
-			rows, err := m.HistoryService.GetHistoryRows()
-			if err != nil {
-				slog.Error("Error getting history rows", "error", err)
-				return nil
-			}
-			m.Model.Focus()
-			// type conversion to []*models.Command
-			return table.BulkInsertMsg[*models.Command](rows)
+		return m.handleFocus()
+	case tea.KeyMsg:
+		if cmd := m.handleKeyMsg(msg); cmd != nil {
+			return cmd
 		}
 	}
 
 	// Handle keyboard and mouse events in the table widget
+	var cmd tea.Cmd
 	m.Model, cmd = m.Model.Update(msg)
 	cmds = append(cmds, cmd)
 
 	return tea.Batch(cmds...)
+}
+
+func (m *resourceList) handleCommandReloaded(msg commandReloadedMsg) tea.Cmd {
+	m.reloading = false
+	if msg.err != nil {
+		return tui.ReportError(fmt.Errorf("reloading state failed: %w", msg.err))
+	}
+	return tui.ReportInfo("reloading finished")
+}
+
+func (m *resourceList) handleWindowSize(msg tea.WindowSizeMsg) tea.Cmd {
+	m.width = msg.Width
+	m.height = msg.Height
+	m.Model.SetWidth(m.width)
+	m.Model.SetHeight(m.height)
+	m.Model.SetColumns(m.getColumns(m.width))
+	return nil
+}
+
+func (m *resourceList) handleFocus() tea.Cmd {
+	m.Model.SetColumns(m.getColumns(m.width))
+	return func() tea.Msg {
+		rows, err := m.HistoryService.GetHistoryRows()
+		if err != nil {
+			slog.Error("Error getting history rows", "error", err)
+			return nil
+		}
+		m.Model.Focus()
+		// type conversion to []*models.Command
+		return table.BulkInsertMsg[*models.Command](rows)
+	}
+}
+
+func (m *resourceList) handleKeyMsg(msg tea.KeyMsg) tea.Cmd {
+	// Handle reload key press
+	if key.Matches(msg, *table.GetDefaultAction().Reload) {
+		if m.reloading {
+			return nil
+		}
+		m.reloading = true
+		return func() tea.Msg {
+			rows, err := m.HistoryService.GetHistoryRows()
+			if err != nil {
+				return commandReloadedMsg{err: err}
+			}
+			m.Model.SetItems(rows...)
+			return commandReloadedMsg{err: nil}
+		}
+	}
+	return nil
 }
 
 func (m *resourceList) View() string {

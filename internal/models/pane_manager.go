@@ -67,7 +67,6 @@ type PaneManager struct {
 	// cache of previously made models
 	cache        CacheInterface
 	styles       *styles.Styles
-	commonKeyMap *keys.CommonKeyMap
 	globalKeyMap *keys.GlobalKeyMap
 	paneKeyMap   *keys.PaneNavigationKeyMap
 
@@ -110,7 +109,6 @@ func NewPaneManager(
 		panes:          make(map[structure.Position]pane),
 		leftPaneWidth:  myStyles.PaneStyle.DefaultLeftPaneWidth,
 		topRightHeight: myStyles.PaneStyle.DefaultTopRightPaneHeight,
-		commonKeyMap:   keys.GetCommonKeyMap(),
 		globalKeyMap:   keys.GetGlobalKeyMap(),
 		paneKeyMap:     keys.GetPaneNavigationKeyMap(),
 		// The left pane is the default focused pane.
@@ -136,7 +134,7 @@ func (p *PaneManager) Update(msg tea.Msg) tea.Cmd {
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
 		switch {
-		case key.Matches(msg, *p.commonKeyMap.Back):
+		case key.Matches(msg, *p.paneKeyMap.Back):
 			if p.focused != structure.TopRightPane {
 				// History is only maintained for the top right pane.
 				break
@@ -434,7 +432,7 @@ func (p *PaneManager) HelpBindings() (bindings []*key.Binding) {
 	}
 	if p.focused == structure.TopRightPane {
 		// Only the top right pane has the ability to "go back"
-		bindings = append(bindings, p.commonKeyMap.Back)
+		bindings = append(bindings, p.paneKeyMap.Back)
 	}
 	if model, ok := p.FocusedModel().(structure.ModelHelpBindings); ok {
 		bindings = append(bindings, model.HelpBindings()...)
