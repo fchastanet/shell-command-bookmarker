@@ -35,8 +35,8 @@ type PromptAction func(text string) tea.Cmd
 // asking the user for a yes/no answer. If yes is given then the action is
 // invoked.
 func YesNoPrompt(prompt string, action tea.Cmd) tea.Cmd {
-	cancel := key.NewBinding(key.WithKeys("n"))
-	yes := key.NewBinding(key.WithKeys("y"), key.WithHelp("y", "confirm"))
+	cancel := key.NewBinding(key.WithKeys("n", "N"))
+	yes := key.NewBinding(key.WithKeys("y", "Y", "ctrl+c"), key.WithHelp("y/ctrl+c", "confirm"))
 	return tui.CmdHandler(PromptMsg{
 		Prompt:         prompt + " (y/N): ",
 		InitialValue:   "",
