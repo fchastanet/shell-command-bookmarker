@@ -70,12 +70,14 @@ runtimes
 skipcq
 struct
 tagalign
+teatest
 termenv
 terminfo
 textinput
 tuimodel
 txtpbfmt
 Typef
+udiff
 unalias
 unconvert
 uniseg

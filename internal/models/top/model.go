@@ -1,7 +1,9 @@
 package top
 
 import (
+	"fmt"
 	"strings"
+	"time"
 
 	"github.com/charmbracelet/bubbles/cursor"
 	"github.com/charmbracelet/bubbles/key"
@@ -13,6 +15,7 @@ import (
 	"github.com/fchastanet/shell-command-bookmarker/internal/models/structure"
 	"github.com/fchastanet/shell-command-bookmarker/internal/models/styles"
 	"github.com/fchastanet/shell-command-bookmarker/internal/models/top/footer"
+	"github.com/fchastanet/shell-command-bookmarker/internal/models/top/header"
 	"github.com/fchastanet/shell-command-bookmarker/internal/models/top/help"
 	"github.com/fchastanet/shell-command-bookmarker/internal/services"
 	"github.com/fchastanet/shell-command-bookmarker/internal/version"
@@ -35,6 +38,12 @@ func FilterClosed() tea.Msg {
 	return FilterClosedMsg{}
 }
 
+// Define constants for magic numbers
+const (
+	performanceMonitorInterval = 5 * time.Second
+	bytesInMegabyte            = 1024 * 1024
+)
+
 type Model struct {
 	*models.PaneManager
 	appService   *services.AppService
@@ -46,6 +55,7 @@ type Model struct {
 	prompt      *models.Prompt
 	spinner     *spinner.Model
 	footerModel footer.Model
+	headerModel header.Model
 
 	helpModel help.Model
 
@@ -53,6 +63,9 @@ type Model struct {
 	height   int
 	mode     mode
 	spinning bool
+
+	// Performance monitoring state
+	perfMonitorActive bool
 }
 
 func NewModel(
@@ -73,95 +86,173 @@ func NewModel(
 	helpModel := help.New(myStyles)
 	footerModel := footer.New(myStyles, helpWidget, versionWidget)
 
+	// Create header component with application name
+	headerModel := header.New(myStyles, "Shell Command Bookmarker")
+
 	m := Model{
-		PaneManager:  models.NewPaneManager(makers, myStyles),
-		filterKeyMap: keys.GetFilterKeyMap(),
-		globalKeyMap: keys.GetGlobalKeyMap(),
-		paneKeyMap:   keys.GetPaneNavigationKeyMap(),
-		spinner:      &spinnerObj,
-		appService:   appService,
-		styles:       myStyles,
-		helpModel:    helpModel,
-		footerModel:  footerModel,
-		width:        0,
-		height:       0,
-		mode:         normalMode,
-		spinning:     false,
-		prompt:       nil,
+		PaneManager:       models.NewPaneManager(makers, myStyles),
+		filterKeyMap:      keys.GetFilterKeyMap(),
+		globalKeyMap:      keys.GetGlobalKeyMap(),
+		paneKeyMap:        keys.GetPaneNavigationKeyMap(),
+		spinner:           &spinnerObj,
+		appService:        appService,
+		styles:            myStyles,
+		helpModel:         helpModel,
+		footerModel:       footerModel,
+		headerModel:       headerModel,
+		width:             0,
+		height:            0,
+		mode:              normalMode,
+		spinning:          false,
+		prompt:            nil,
+		perfMonitorActive: false,
 	}
 	return m
 }
 
 func (m *Model) Init() tea.Cmd {
-	return tea.Batch(
+	return models.SafeCmd(tea.Batch(
 		m.PaneManager.Init(),
-	)
+	))
 }
 
-//nolint:cyclop // don't see how to simplify right now
 func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
-	m.appService.LoggerService.LogTeaMsg(msg)
-	var (
-		cmd  tea.Cmd
-		cmds []tea.Cmd
-	)
+	// Use enhanced logging for better debugging
+	m.appService.LoggerService.EnhancedLogTeaMsg(msg)
 
-	// Keep shared spinner spinning as long as there are tasks running.
+	return m.dispatchMessage(msg)
+}
+
+// dispatchMessage routes messages to their appropriate handlers
+func (m *Model) dispatchMessage(msg tea.Msg) (tea.Model, tea.Cmd) {
+	// First handle performance monitoring messages
+	if cmd := m.handlePerformanceMessages(msg); cmd != nil {
+		return m, cmd
+	}
+
+	// Then handle other specific message types
 	switch msg := msg.(type) {
 	case spinner.TickMsg:
-		var cmd tea.Cmd
-		*m.spinner, cmd = m.spinner.Update(msg)
-		if m.spinning {
-			// Continue spinning spinner.
-			return m, cmd
-		}
+		return m.handleSpinnerTick(msg)
 	case models.PromptMsg:
-		// Enable prompt widget
-		m.mode = promptMode
-		var blink tea.Cmd
-		m.prompt, blink = models.NewPrompt(&msg, m.styles.PromptStyle)
-		// Send out message to panes to resize themselves to make room for the prompt above it.
-		_ = m.PaneManager.Update(tea.WindowSizeMsg{
-			Height: m.viewHeight(),
-			Width:  m.viewWidth(),
-		})
-		return m, tea.Batch(cmd, blink)
+		return m.handlePrompt(&msg)
 	case tea.KeyMsg:
-		// Pressing any key makes any info/error message in the footer disappear
-		m.footerModel.ClearMessages()
-		_, teaCmd := m.manageKeyInMode(msg)
-		if teaCmd != nil {
-			cmds = append(cmds, teaCmd)
-			return m, tea.Batch(cmds...)
+		return m.handleKeyMsg(msg)
+	case tui.ErrorMsg, tui.InfoMsg:
+		return m.handleStatusMsg(msg)
+	case tea.WindowSizeMsg:
+		return m.handleWindowSize(msg)
+	case cursor.BlinkMsg:
+		return m.handleBlink(msg)
+	case tui.MemoryStatsMsg:
+		return m.handleMemoryStats(msg)
+	default:
+		return m.handleGenericMessage(msg)
+	}
+}
+
+// handlePerformanceMessages handles performance monitoring related messages
+func (m *Model) handlePerformanceMessages(msg tea.Msg) tea.Cmd {
+	switch msg.(type) {
+	case tui.PerformanceMonitorStartMsg:
+		if !m.perfMonitorActive {
+			m.perfMonitorActive = true
+			m.footerModel.SetInfo("Performance monitoring started")
+			return tui.PerformanceMonitorTick(performanceMonitorInterval)
 		}
-		return m.manageKey(msg)
+	case tui.PerformanceMonitorStopMsg:
+		if m.perfMonitorActive {
+			m.perfMonitorActive = false
+			m.footerModel.SetInfo("Performance monitoring stopped")
+			return nil
+		}
+	}
+	return nil
+}
+
+// handleGenericMessage handles any message types not explicitly handled in dispatchMessage
+func (m *Model) handleGenericMessage(msg tea.Msg) (tea.Model, tea.Cmd) {
+	// Send remaining msg types to pane manager to route accordingly.
+	return m, m.PaneManager.Update(msg)
+}
+
+// handleSpinnerTick processes spinner tick messages
+func (m *Model) handleSpinnerTick(msg spinner.TickMsg) (tea.Model, tea.Cmd) {
+	var cmd tea.Cmd
+	*m.spinner, cmd = m.spinner.Update(msg)
+	if m.spinning {
+		// Continue spinning spinner.
+		return m, cmd
+	}
+	return m, nil
+}
+
+// handlePrompt processes prompt messages
+func (m *Model) handlePrompt(msg *models.PromptMsg) (tea.Model, tea.Cmd) {
+	// Enable prompt widget
+	m.mode = promptMode
+	var blink tea.Cmd
+	m.prompt, blink = models.NewPrompt(msg, m.styles.PromptStyle)
+	// Send out message to panes to resize themselves to make room for the prompt above it.
+	_ = m.PaneManager.Update(tea.WindowSizeMsg{
+		Height: m.viewHeight(),
+		Width:  m.viewWidth(),
+	})
+	return m, blink
+}
+
+// handleKeyMsg processes key messages
+func (m *Model) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	// Pressing any key makes any info/error message in the footer disappear
+	m.footerModel.ClearMessages()
+	_, teaCmd := m.manageKeyInMode(msg)
+	if teaCmd != nil {
+		return m, teaCmd
+	}
+	return m.manageKey(msg)
+}
+
+// handleStatusMsg processes status messages
+func (m *Model) handleStatusMsg(msg tea.Msg) (tea.Model, tea.Cmd) {
+	switch msg := msg.(type) {
 	case tui.ErrorMsg:
 		m.footerModel.SetError(error(msg))
 	case tui.InfoMsg:
 		m.footerModel.SetInfo(string(msg))
-	case tea.WindowSizeMsg:
-		m.width = msg.Width
-		m.height = msg.Height
-		m.helpModel.SetWidth(m.width)
-		m.footerModel.SetWidth(m.width)
-		m.PaneManager.Update(tea.WindowSizeMsg{
-			Height: m.viewHeight(),
-			Width:  m.viewWidth(),
-		})
-	case cursor.BlinkMsg:
-		// Send blink message to prompt if in prompt mode otherwise forward it
-		// to the active pane to handle.
-		if m.mode == promptMode {
-			cmd = m.prompt.HandleBlink(msg)
-		} else {
-			cmd = m.FocusedModel().Update(msg)
-		}
-		return m, cmd
-	default:
-		// Send remaining msg types to pane manager to route accordingly.
-		cmds = append(cmds, m.PaneManager.Update(msg))
 	}
-	return m, tea.Batch(cmds...)
+	return m, nil
+}
+
+// handleWindowSize processes window size messages
+func (m *Model) handleWindowSize(msg tea.WindowSizeMsg) (tea.Model, tea.Cmd) {
+	m.width = msg.Width
+	m.height = msg.Height
+	m.helpModel.SetWidth(m.width)
+	m.footerModel.SetWidth(m.width)
+	m.headerModel.SetWidth(m.width) // Set the header width
+	return m, m.PaneManager.Update(tea.WindowSizeMsg{
+		Height: m.viewHeight(),
+		Width:  m.viewWidth(),
+	})
+}
+
+// handleBlink processes cursor blink messages
+func (m *Model) handleBlink(msg cursor.BlinkMsg) (tea.Model, tea.Cmd) {
+	// Send blink message to prompt if in prompt mode otherwise forward it
+	// to the active pane to handle.
+	if m.mode == promptMode {
+		return m, m.prompt.HandleBlink(msg)
+	}
+	return m, m.FocusedModel().Update(msg)
+}
+
+// handleMemoryStats processes and displays memory statistics
+func (m *Model) handleMemoryStats(msg tui.MemoryStatsMsg) (tea.Model, tea.Cmd) {
+	statsInfo := fmt.Sprintf("Memory: %d MB in use | %d MB total | %d MB sys | GC runs: %d",
+		msg.Alloc/bytesInMegabyte, msg.TotalAlloc/bytesInMegabyte, msg.Sys/bytesInMegabyte, msg.NumGC)
+
+	m.footerModel.SetInfo(statsInfo)
+	return m, nil
 }
 
 func (m *Model) manageKeyInMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
@@ -234,6 +325,12 @@ func (m *Model) manageKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.mode = filterMode
 		}
 		return m, cmd
+	case key.Matches(msg, *m.globalKeyMap.Debug):
+		// ctrl+d shows memory stats for debugging performance
+		if m.perfMonitorActive {
+			return m, tui.StopPerformanceMonitor()
+		}
+		return m, tui.StartPerformanceMonitor(performanceMonitorInterval)
 	case key.Matches(msg, *m.globalKeyMap.Search):
 		return m, models.NavigateTo(structure.SearchKind, structure.WithPosition(structure.LeftPane))
 	default:
@@ -248,6 +345,9 @@ func (m *Model) manageKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 func (m *Model) View() string {
 	// Start composing vertical stack of components that fill entire terminal.
 	var components []string
+
+	// Add header with application name
+	components = append(components, m.headerModel.View())
 
 	// Add prompt if in prompt mode.
 	if m.mode == promptMode {
@@ -292,23 +392,33 @@ func (m *Model) updateHelpBindings() {
 	m.helpModel.SetBindings(bindings)
 }
 
-// viewHeight returns the height available to the panes
-//
-// TODO: rename contentHeight
+// contentHeight returns the height available to the panes
 func (m *Model) viewHeight() int {
-	vh := m.height - m.footerModel.Height()
+	// Start with full height
+	vh := m.height
+
+	// Subtract header height
+	vh -= m.headerModel.Height()
+
+	// Subtract footer height
+	vh -= m.footerModel.Height()
+
+	// Subtract prompt height if in prompt mode
 	if m.mode == promptMode {
-		vh -= m.styles.PromptStyle.Height
+		vh -= lipgloss.Height(m.prompt.View(m.width))
 	}
+
+	// Subtract help height if visible
 	if m.helpModel.IsVisible() {
 		vh -= m.helpModel.Height()
 	}
+
+	// Ensure we don't go below minimum height
 	return max(m.styles.PaneStyle.MinContentHeight, vh)
 }
 
-// viewWidth retrieves the width available within the main view
-//
-// TODO: rename contentWidth
+// contentWidth returns the width available within the main view
 func (m *Model) viewWidth() int {
+	// Use full width but ensure we don't go below minimum width
 	return max(m.styles.PaneStyle.MinContentWidth, m.width)
 }

@@ -13,6 +13,7 @@ type Styles struct {
 	PaneStyle   *PaneStyle
 	HelpStyle   *HelpStyle
 	FooterStyle *FooterStyle
+	HeaderStyle *HeaderStyle
 	WindowStyle *WindowStyle
 	PromptStyle *PromptStyle
 	// ColorTheme is the color theme used in the application.
@@ -75,12 +76,18 @@ type PromptStyle struct {
 	Height      int
 }
 
+type HeaderStyle struct {
+	Main   *lipgloss.Style
+	Height int
+}
+
 func NewStyles() *Styles {
 	s := &Styles{
 		TableStyle:  nil,
 		PaneStyle:   nil,
 		HelpStyle:   nil,
 		FooterStyle: nil,
+		HeaderStyle: nil,
 		WindowStyle: nil,
 		PromptStyle: nil,
 		ColorTheme:  nil,
@@ -112,6 +119,7 @@ func (s *Styles) initBaseStyles(colorTheme *ColorTheme) {
 		Padding(0, PaddingSmall)
 
 	footerInline := regular.Inline(true)
+	headerInline := regular.Inline(true)
 	topBorder := regular.Border(lipgloss.NormalBorder())
 
 	docStyle := lipgloss.NewStyle().Padding(
@@ -154,7 +162,7 @@ func (s *Styles) initBaseStyles(colorTheme *ColorTheme) {
 		MinContentHeight:          HeightMinimum - HeightFooter,
 		MinContentWidth:           WidthMinContent,
 		FooterHeight:              HeightFooter,
-		HeaderHeight:              HeightFooter,
+		HeaderHeight:              HeightHeader,
 		TopBorder:                 &topBorder,
 		BordersWidth:              BordersWidth,
 	}
@@ -173,6 +181,13 @@ func (s *Styles) initBaseStyles(colorTheme *ColorTheme) {
 		InfoStyle:    &footerInfoStyle,
 		Main:         &footerInline,
 		Version:      &versionStyle,
+	}
+
+	// Initialize header style
+	headerStyle := headerInline.Background(colors.Blue).Foreground(colors.White).Bold(true)
+	s.HeaderStyle = &HeaderStyle{
+		Height: HeightHeader,
+		Main:   &headerStyle,
 	}
 }
 
