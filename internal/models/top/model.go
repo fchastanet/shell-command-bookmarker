@@ -20,6 +20,7 @@ import (
 	"github.com/fchastanet/shell-command-bookmarker/internal/services"
 	"github.com/fchastanet/shell-command-bookmarker/internal/version"
 	"github.com/fchastanet/shell-command-bookmarker/pkg/tui"
+	"github.com/fchastanet/shell-command-bookmarker/pkg/tui/table"
 )
 
 // alter how all messages are handled.
@@ -51,6 +52,7 @@ type Model struct {
 	filterKeyMap *keys.FilterKeyMap
 	globalKeyMap *keys.GlobalKeyMap
 	paneKeyMap   *keys.PaneNavigationKeyMap
+	tableKeyMap  *table.Navigation
 
 	prompt      *models.Prompt
 	spinner     *spinner.Model
@@ -94,6 +96,7 @@ func NewModel(
 		filterKeyMap:      keys.GetFilterKeyMap(),
 		globalKeyMap:      keys.GetGlobalKeyMap(),
 		paneKeyMap:        keys.GetPaneNavigationKeyMap(),
+		tableKeyMap:       keys.GetTableKeyMap(),
 		spinner:           &spinnerObj,
 		appService:        appService,
 		styles:            myStyles,
@@ -387,6 +390,7 @@ func (m *Model) updateHelpBindings() {
 		bindings = append(bindings, m.HelpBindings()...)
 		bindings = append(bindings, keys.KeyMapToSlice(*m.globalKeyMap)...)
 		bindings = append(bindings, keys.KeyMapToSlice(*m.paneKeyMap)...)
+		bindings = append(bindings, keys.KeyMapToSlice(*m.tableKeyMap)...)
 	}
 
 	m.helpModel.SetBindings(bindings)
