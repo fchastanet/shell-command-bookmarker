@@ -4,10 +4,8 @@ import (
 	"fmt"
 	"log/slog"
 
-	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/bubbles/spinner"
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/fchastanet/shell-command-bookmarker/internal/models/keys"
 	"github.com/fchastanet/shell-command-bookmarker/internal/models/structure"
 	"github.com/fchastanet/shell-command-bookmarker/internal/models/styles"
 	"github.com/fchastanet/shell-command-bookmarker/internal/services"
@@ -195,15 +193,4 @@ func (m *resourceList) View() string {
 		return "Pulling state " + m.spinner.View()
 	}
 	return m.Model.View()
-}
-
-func (m *resourceList) HelpBindings() []*key.Binding {
-	resourcesKeys := GetResourcesKeyMap()
-	commonKeys := keys.GetCommonKeyMap()
-	bindings := []*key.Binding{
-		commonKeys.Delete,
-		resourcesKeys.Move,
-		resourcesKeys.Reload,
-	}
-	return bindings
 }
