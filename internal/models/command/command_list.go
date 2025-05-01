@@ -170,8 +170,8 @@ func (m *resourceList) Update(msg tea.Msg) tea.Cmd {
 	case tea.BlurMsg:
 		m.Model.Blur()
 	case tea.FocusMsg:
+		m.Model.SetColumns(m.getColumns(m.width))
 		return func() tea.Msg {
-			m.Model.SetColumns(m.getColumns(m.width))
 			rows, err := m.HistoryService.GetHistoryRows()
 			if err != nil {
 				slog.Error("Error getting history rows", "error", err)
