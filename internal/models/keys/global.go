@@ -13,8 +13,8 @@ type GlobalKeyMap struct {
 
 func GetGlobalKeyMap() *GlobalKeyMap {
 	search := key.NewBinding(
-		key.WithKeys("ctrl+f", "f3", "ctrl+r"),
-		key.WithHelp("ctrl+f/ctrl+r/F3", "search"),
+		key.WithKeys("ctrl+f", "f3"),
+		key.WithHelp("ctrl+f/F3", "search"),
 	)
 	quit := key.NewBinding(
 		key.WithKeys("esc", "ctrl+c"),
