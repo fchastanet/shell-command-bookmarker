@@ -5,6 +5,10 @@ import (
 )
 
 // Navigation returns key bindings for table.
-func GetTableKeyMap() *table.Navigation {
+func GetTableNavigationKeyMap() *table.Navigation {
 	return table.GetDefaultNavigation()
+}
+
+func GetTableActionKeyMap() *table.Action {
+	return table.GetDefaultAction()
 }
