@@ -168,7 +168,6 @@ func (m *Model[V]) IsFocused() bool {
 
 func (m *Model[V]) Focus() {
 	m.focused = true
-	m.filter.Focus()
 }
 
 func (m *Model[V]) Blur() {
