@@ -8,7 +8,7 @@ const (
 	HeightPrompt  = 3
 	HeightMinimum = 6
 	HeightMinPane = 4
-	HeightHelp    = 12
+	HeightHelp    = 15
 	MinHelpHeight = 1
 	HeightFooter  = 1
 	HeightHeader  = 1 // Height of the header component
@@ -19,6 +19,9 @@ const (
 	WidthMinPane    = 20
 	WidthMinContent = 80
 	BordersWidth    = 2
+
+	// Help layout constants
+	HelpColumnMargin = 3
 
 	// Other layout constants
 	TopRightPaneHeight = 15

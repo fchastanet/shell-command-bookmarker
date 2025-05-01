@@ -5,23 +5,18 @@ import (
 )
 
 type Navigation struct {
-	LineUp          *key.Binding
-	LineDown        *key.Binding
-	PageUp          *key.Binding
-	PageDown        *key.Binding
-	HalfPageUp      *key.Binding
-	HalfPageDown    *key.Binding
-	GotoTop         *key.Binding
-	GotoBottom      *key.Binding
-	SwitchPane      *key.Binding
-	SwitchPaneBack  *key.Binding
-	LeftPane        *key.Binding
-	TopRightPane    *key.Binding
-	BottomRightPane *key.Binding
-	Select          *key.Binding
-	SelectAll       *key.Binding
-	SelectClear     *key.Binding
-	SelectRange     *key.Binding
+	LineUp       *key.Binding
+	LineDown     *key.Binding
+	PageUp       *key.Binding
+	PageDown     *key.Binding
+	HalfPageUp   *key.Binding
+	HalfPageDown *key.Binding
+	GotoTop      *key.Binding
+	GotoBottom   *key.Binding
+	Select       *key.Binding
+	SelectAll    *key.Binding
+	SelectClear  *key.Binding
+	SelectRange  *key.Binding
 }
 
 // GetNavigation returns key bindings for navigation.
@@ -58,26 +53,6 @@ func GetDefaultNavigation() *Navigation {
 		key.WithKeys("end", "G"),
 		key.WithHelp("G/end", "go to end"),
 	)
-	switchPane := key.NewBinding(
-		key.WithKeys("tab"),
-		key.WithHelp("tab", "next pane"),
-	)
-	switchPaneBack := key.NewBinding(
-		key.WithKeys("shift+tab"),
-		key.WithHelp("shift+tab", "last pane"),
-	)
-	leftPane := key.NewBinding(
-		key.WithKeys("0"),
-		key.WithHelp("0", "left pane"),
-	)
-	topRightPane := key.NewBinding(
-		key.WithKeys("1"),
-		key.WithHelp("1", "top right pane"),
-	)
-	bottomRightPane := key.NewBinding(
-		key.WithKeys("2"),
-		key.WithHelp("2", "bottom right pane"),
-	)
 	selectKey := key.NewBinding(
 		key.WithKeys(" "),
 		key.WithHelp("<space>", "select"),
@@ -96,22 +71,17 @@ func GetDefaultNavigation() *Navigation {
 	)
 
 	return &Navigation{
-		LineUp:          &lineUp,
-		LineDown:        &lineDown,
-		PageUp:          &pageUp,
-		PageDown:        &pageDown,
-		HalfPageUp:      &halfPageUp,
-		HalfPageDown:    &halfPageDown,
-		GotoTop:         &gotoTop,
-		GotoBottom:      &gotoBottom,
-		SwitchPane:      &switchPane,
-		SwitchPaneBack:  &switchPaneBack,
-		LeftPane:        &leftPane,
-		TopRightPane:    &topRightPane,
-		BottomRightPane: &bottomRightPane,
-		Select:          &selectKey,
-		SelectAll:       &selectAll,
-		SelectClear:     &selectClear,
-		SelectRange:     &selectRange,
+		LineUp:       &lineUp,
+		LineDown:     &lineDown,
+		PageUp:       &pageUp,
+		PageDown:     &pageDown,
+		HalfPageUp:   &halfPageUp,
+		HalfPageDown: &halfPageDown,
+		GotoTop:      &gotoTop,
+		GotoBottom:   &gotoBottom,
+		Select:       &selectKey,
+		SelectAll:    &selectAll,
+		SelectClear:  &selectClear,
+		SelectRange:  &selectRange,
 	}
 }
