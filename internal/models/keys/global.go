@@ -25,8 +25,8 @@ func GetGlobalKeyMap() *GlobalKeyMap {
 		key.WithHelp("h/?", "close help"),
 	)
 	debug := key.NewBinding(
-		key.WithKeys("ctrl+d"),
-		key.WithHelp("ctrl+d", "show debug info"),
+		key.WithKeys("f10", "f12"),
+		key.WithHelp("F10/F12", "show debug info"),
 	)
 
 	return &GlobalKeyMap{

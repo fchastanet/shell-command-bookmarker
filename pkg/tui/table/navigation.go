@@ -21,6 +21,8 @@ type Action struct {
 	SelectClear *key.Binding
 	SelectRange *key.Binding
 	Filter      *key.Binding
+	Reload      *key.Binding
+	Enter       *key.Binding
 }
 
 // GetNavigation returns key bindings for navigation.
@@ -91,6 +93,14 @@ func GetDefaultAction() *Action {
 		key.WithKeys("/"),
 		key.WithHelp(`/`, "filter"),
 	)
+	reload := key.NewBinding(
+		key.WithKeys("ctrl+r"),
+		key.WithHelp("ctrl+r", "reload"),
+	)
+	enter := key.NewBinding(
+		key.WithKeys("enter"),
+		key.WithHelp("enter", "view resource"),
+	)
 
 	return &Action{
 		Select:      &selectKey,
@@ -98,5 +108,7 @@ func GetDefaultAction() *Action {
 		SelectClear: &selectClear,
 		SelectRange: &selectRange,
 		Filter:      &filter,
+		Reload:      &reload,
+		Enter:       &enter,
 	}
 }
