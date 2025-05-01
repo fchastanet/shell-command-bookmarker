@@ -38,12 +38,12 @@ func GetDefaultNavigation() *Navigation {
 		key.WithHelp("pgdn", "page down"),
 	)
 	halfPageUp := key.NewBinding(
-		key.WithKeys("ctrl+u"),
-		key.WithHelp("ctrl+u", "½ page up"),
+		key.WithKeys("ctrl+pgup"),
+		key.WithHelp("ctrl+pgup", "½ page up"),
 	)
 	halfPageDown := key.NewBinding(
-		key.WithKeys("ctrl+d"),
-		key.WithHelp("ctrl+d", "½ page down"),
+		key.WithKeys("ctrl+pgdown"),
+		key.WithHelp("ctrl+pgdown", "½ page down"),
 	)
 	gotoTop := key.NewBinding(
 		key.WithKeys("home", "g"),
