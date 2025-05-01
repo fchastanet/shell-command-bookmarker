@@ -143,13 +143,7 @@ func (m *resourceList) getColumns(width int) []table.Column {
 
 func (m *resourceList) Init() tea.Cmd {
 	return func() tea.Msg {
-		m.Model.SetColumns(m.getColumns(m.width))
-		rows, err := m.HistoryService.GetHistoryRows()
-		if err != nil {
-			slog.Error("Error getting history rows", "error", err)
-			return nil
-		}
-		return table.BulkInsertMsg[*models.Command](rows)
+		return tea.FocusMsg{}
 	}
 }
 
@@ -176,13 +170,17 @@ func (m *resourceList) Update(msg tea.Msg) tea.Cmd {
 	case tea.BlurMsg:
 		m.Model.Blur()
 	case tea.FocusMsg:
-		rows, err := m.HistoryService.GetHistoryRows()
-		if err != nil {
-			slog.Error("Error getting history rows", "error", err)
-			return nil
+		return func() tea.Msg {
+			m.Model.SetColumns(m.getColumns(m.width))
+			rows, err := m.HistoryService.GetHistoryRows()
+			if err != nil {
+				slog.Error("Error getting history rows", "error", err)
+				return nil
+			}
+			m.Model.Focus()
+			// type conversion to []*models.Command
+			return table.BulkInsertMsg[*models.Command](rows)
 		}
-		m.Model.SetRows(rows)
-		m.Model.Focus()
 	}
 
 	// Handle keyboard and mouse events in the table widget
