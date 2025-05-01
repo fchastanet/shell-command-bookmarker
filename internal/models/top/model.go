@@ -47,12 +47,13 @@ const (
 
 type Model struct {
 	*models.PaneManager
-	appService   *services.AppService
-	styles       *styles.Styles
-	filterKeyMap *keys.FilterKeyMap
-	globalKeyMap *keys.GlobalKeyMap
-	paneKeyMap   *keys.PaneNavigationKeyMap
-	tableKeyMap  *table.Navigation
+	appService            *services.AppService
+	styles                *styles.Styles
+	filterKeyMap          *keys.FilterKeyMap
+	globalKeyMap          *keys.GlobalKeyMap
+	paneKeyMap            *keys.PaneNavigationKeyMap
+	tableNavigationKeyMap *table.Navigation
+	tableActionKeyMap     *table.Action
 
 	prompt      *models.Prompt
 	spinner     *spinner.Model
@@ -92,23 +93,24 @@ func NewModel(
 	headerModel := header.New(myStyles, "Shell Command Bookmarker")
 
 	m := Model{
-		PaneManager:       models.NewPaneManager(makers, myStyles),
-		filterKeyMap:      keys.GetFilterKeyMap(),
-		globalKeyMap:      keys.GetGlobalKeyMap(),
-		paneKeyMap:        keys.GetPaneNavigationKeyMap(),
-		tableKeyMap:       keys.GetTableKeyMap(),
-		spinner:           &spinnerObj,
-		appService:        appService,
-		styles:            myStyles,
-		helpModel:         helpModel,
-		footerModel:       footerModel,
-		headerModel:       headerModel,
-		width:             0,
-		height:            0,
-		mode:              normalMode,
-		spinning:          false,
-		prompt:            nil,
-		perfMonitorActive: false,
+		PaneManager:           models.NewPaneManager(makers, myStyles),
+		filterKeyMap:          keys.GetFilterKeyMap(),
+		globalKeyMap:          keys.GetGlobalKeyMap(),
+		paneKeyMap:            keys.GetPaneNavigationKeyMap(),
+		tableNavigationKeyMap: keys.GetTableNavigationKeyMap(),
+		tableActionKeyMap:     keys.GetTableActionKeyMap(),
+		spinner:               &spinnerObj,
+		appService:            appService,
+		styles:                myStyles,
+		helpModel:             helpModel,
+		footerModel:           footerModel,
+		headerModel:           headerModel,
+		width:                 0,
+		height:                0,
+		mode:                  normalMode,
+		spinning:              false,
+		prompt:                nil,
+		perfMonitorActive:     false,
 	}
 	return m
 }
@@ -321,7 +323,7 @@ func (m *Model) manageKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			Height: m.viewHeight(),
 			Width:  m.viewWidth(),
 		})
-	case key.Matches(msg, *m.tableKeyMap.Filter):
+	case key.Matches(msg, *m.tableActionKeyMap.Filter):
 		// '/' enables filter mode if the current model indicates it
 		// supports it, which it does so by sending back a non-nil command.
 		if cmd = m.FocusedModel().Update(tui.FilterFocusReqMsg{}); cmd != nil {
@@ -393,9 +395,10 @@ func (m *Model) updateHelpBindings() {
 		if len(m.HelpBindings()) > 0 {
 			m.helpModel.AddBindingSet("Pane Actions", m.HelpBindings())
 		}
-		m.helpModel.AddBindingSet("Global Controls", keys.KeyMapToSlice(*m.globalKeyMap))
+		m.helpModel.AddBindingSet("Global", keys.KeyMapToSlice(*m.globalKeyMap))
 		m.helpModel.AddBindingSet("Navigation", keys.KeyMapToSlice(*m.paneKeyMap))
-		m.helpModel.AddBindingSet("Table Controls", keys.KeyMapToSlice(*m.tableKeyMap))
+		m.helpModel.AddBindingSet("Table Nav", keys.KeyMapToSlice(*m.tableNavigationKeyMap))
+		m.helpModel.AddBindingSet("Table Actions", keys.KeyMapToSlice(*m.tableActionKeyMap))
 	}
 }
 

@@ -13,11 +13,14 @@ type Navigation struct {
 	HalfPageDown *key.Binding
 	GotoTop      *key.Binding
 	GotoBottom   *key.Binding
-	Select       *key.Binding
-	SelectAll    *key.Binding
-	SelectClear  *key.Binding
-	SelectRange  *key.Binding
-	Filter       *key.Binding
+}
+
+type Action struct {
+	Select      *key.Binding
+	SelectAll   *key.Binding
+	SelectClear *key.Binding
+	SelectRange *key.Binding
+	Filter      *key.Binding
 }
 
 // GetNavigation returns key bindings for navigation.
@@ -54,6 +57,20 @@ func GetDefaultNavigation() *Navigation {
 		key.WithKeys("end", "G"),
 		key.WithHelp("G/end", "go to end"),
 	)
+
+	return &Navigation{
+		LineUp:       &lineUp,
+		LineDown:     &lineDown,
+		PageUp:       &pageUp,
+		PageDown:     &pageDown,
+		HalfPageUp:   &halfPageUp,
+		HalfPageDown: &halfPageDown,
+		GotoTop:      &gotoTop,
+		GotoBottom:   &gotoBottom,
+	}
+}
+
+func GetDefaultAction() *Action {
 	selectKey := key.NewBinding(
 		key.WithKeys(" "),
 		key.WithHelp("<space>", "select"),
@@ -75,19 +92,11 @@ func GetDefaultNavigation() *Navigation {
 		key.WithHelp(`/`, "filter"),
 	)
 
-	return &Navigation{
-		LineUp:       &lineUp,
-		LineDown:     &lineDown,
-		PageUp:       &pageUp,
-		PageDown:     &pageDown,
-		HalfPageUp:   &halfPageUp,
-		HalfPageDown: &halfPageDown,
-		GotoTop:      &gotoTop,
-		GotoBottom:   &gotoBottom,
-		Select:       &selectKey,
-		SelectAll:    &selectAll,
-		SelectClear:  &selectClear,
-		SelectRange:  &selectRange,
-		Filter:       &filter,
+	return &Action{
+		Select:      &selectKey,
+		SelectAll:   &selectAll,
+		SelectClear: &selectClear,
+		SelectRange: &selectRange,
+		Filter:      &filter,
 	}
 }

@@ -21,11 +21,12 @@ const HalfPageMultiplier = 2
 type Model[V resource.Identifiable] struct {
 	borderColor lipgloss.TerminalColor
 
-	previewKind resource.Kind
-	styles      *Style
-	navigation  *Navigation
-	rowRenderer RowRenderer[V]
-	rendered    map[resource.ID]RenderedRow
+	previewKind      resource.Kind
+	styles           *Style
+	navigationKeyMap *Navigation
+	actionKeyMap     *Action
+	rowRenderer      RowRenderer[V]
+	rendered         map[resource.ID]RenderedRow
 
 	// items are the unfiltered set of items available to the table.
 	items    map[resource.ID]V
@@ -89,32 +90,36 @@ func New[V resource.Identifiable](
 	filter.Prompt = "Filter: "
 
 	m := Model[V]{
-		focused:         false,
-		styles:          tableStyles,
-		navigation:      nil,
-		cols:            make([]Column, len(cols)),
-		rows:            []V{},
-		rowRenderer:     fn,
-		items:           make(map[resource.ID]V),
-		rendered:        make(map[resource.ID]RenderedRow),
-		selected:        make(map[resource.ID]V),
-		selectable:      true,
-		filter:          filter,
-		border:          lipgloss.NormalBorder(),
-		borderColor:     lipgloss.NoColor{},
-		currentRowIndex: -1,
-		currentRowID:    resource.ID(0),
-		sortFunc:        nil,
-		start:           0,
-		width:           width,
-		height:          height,
-		previewKind:     resource.DefaultKind{},
+		focused:          false,
+		styles:           tableStyles,
+		navigationKeyMap: nil,
+		actionKeyMap:     nil,
+		cols:             make([]Column, len(cols)),
+		rows:             []V{},
+		rowRenderer:      fn,
+		items:            make(map[resource.ID]V),
+		rendered:         make(map[resource.ID]RenderedRow),
+		selected:         make(map[resource.ID]V),
+		selectable:       true,
+		filter:           filter,
+		border:           lipgloss.NormalBorder(),
+		borderColor:      lipgloss.NoColor{},
+		currentRowIndex:  -1,
+		currentRowID:     resource.ID(0),
+		sortFunc:         nil,
+		start:            0,
+		width:            width,
+		height:           height,
+		previewKind:      resource.DefaultKind{},
 	}
 	for _, fn := range opts {
 		fn(&m)
 	}
-	if m.navigation == nil {
-		m.navigation = GetDefaultNavigation()
+	if m.navigationKeyMap == nil {
+		m.navigationKeyMap = GetDefaultNavigation()
+	}
+	if m.actionKeyMap == nil {
+		m.actionKeyMap = GetDefaultAction()
 	}
 
 	// Copy column structs onto receiver, because the caller may modify columns.
@@ -143,7 +148,13 @@ func WithSortFunc[V resource.Identifiable](sortFunc func(V, V) int) Option[V] {
 // WithNavigation configures the table to use the given navigation keys.
 func WithNavigation[V resource.Identifiable](nav *Navigation) Option[V] {
 	return func(m *Model[V]) {
-		m.navigation = nav
+		m.navigationKeyMap = nav
+	}
+}
+
+func WithAction[V resource.Identifiable](action *Action) Option[V] {
+	return func(m *Model[V]) {
+		m.actionKeyMap = action
 	}
 }
 
@@ -310,7 +321,7 @@ func (m *Model[V]) handleKeyMsg(msg tea.KeyMsg) (*Model[V], tea.Cmd) {
 
 // handleNavigationKey handles all navigation key presses
 func (m *Model[V]) handleNavigationKey(msg tea.KeyMsg) bool {
-	nav := m.navigation
+	nav := m.navigationKeyMap
 	switch {
 	case key.Matches(msg, *nav.LineUp):
 		m.MoveUp(1)
@@ -336,7 +347,7 @@ func (m *Model[V]) handleNavigationKey(msg tea.KeyMsg) bool {
 
 // handleSelectionKey handles all selection key presses
 func (m *Model[V]) handleSelectionKey(msg tea.KeyMsg) bool {
-	nav := m.navigation
+	nav := m.actionKeyMap
 	switch {
 	case key.Matches(msg, *nav.Select):
 		m.ToggleSelection()

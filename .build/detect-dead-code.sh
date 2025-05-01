@@ -14,6 +14,7 @@ deadcode \
 # remove the ignored lines
 sed -i -E \
   -e '/^pkg\/tui\/table\/table.go:.*: unreachable func: WithNavigation$/d' \
+  -e '/^pkg\/tui\/table\/table.go:.*: unreachable func: WithAction$/d' \
   -e '/^pkg\/tui\/table\/table.go:.*: unreachable func: WithSelectable$/d' \
   -e '/^pkg\/tui\/table\/truncation.go:.*: unreachable func: TruncateLeft$/d' \
   "${tempFile}"
