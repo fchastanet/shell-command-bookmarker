@@ -8,6 +8,7 @@ EPOCHSECONDS
 exitcode
 GOBIN
 golangci
+inotifywait
 lastpipe
 ldflags
 mktemp
@@ -17,6 +18,7 @@ NONINTERACTIVE
 nullglob
 Pathchk
 pipefail
+pkill
 posix
 realpath
 TMPDIR

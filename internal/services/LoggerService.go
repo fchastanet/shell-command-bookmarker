@@ -1,6 +1,7 @@
 package services
 
 import (
+	"fmt"
 	"io"
 	"log/slog"
 	"os"
@@ -55,6 +56,23 @@ func (s *LoggerService) LogTeaMsg(msg tea.Msg) {
 	if s.dumpFileHandler == nil {
 		return
 	}
+	spew.Fdump(s.dumpFileHandler, msg)
+}
+
+// EnhancedLogTeaMsg provides detailed logging of tea messages, with special handling for key events
+func (s *LoggerService) EnhancedLogTeaMsg(msg tea.Msg) {
+	if s.dumpFileHandler == nil {
+		return
+	}
+
+	// Special handling for key messages to make debugging easier
+	if keyMsg, ok := msg.(tea.KeyMsg); ok {
+		fmt.Fprintf(s.dumpFileHandler, "KeyMsg: Type=%v, Runes=%v, String=%q\n",
+			keyMsg.Type, keyMsg.Runes, keyMsg.String())
+		return
+	}
+
+	// For all other message types, use spew for detailed dumps
 	spew.Fdump(s.dumpFileHandler, msg)
 }
 

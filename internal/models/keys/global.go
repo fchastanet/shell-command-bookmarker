@@ -14,6 +14,7 @@ type GlobalKeyMap struct {
 	ClosePane        *key.Binding
 	Quit             *key.Binding
 	Help             *key.Binding
+	Debug            *key.Binding
 }
 
 func GetGlobalKeyMap() *GlobalKeyMap {
@@ -53,6 +54,10 @@ func GetGlobalKeyMap() *GlobalKeyMap {
 		key.WithKeys("h", "?"),
 		key.WithHelp("h/?", "close help"),
 	)
+	debug := key.NewBinding(
+		key.WithKeys("ctrl+d"),
+		key.WithHelp("ctrl+d", "show debug info"),
+	)
 
 	return &GlobalKeyMap{
 		Search:           &search,
@@ -64,5 +69,6 @@ func GetGlobalKeyMap() *GlobalKeyMap {
 		ClosePane:        &closePane,
 		Quit:             &quit,
 		Help:             &help,
+		Debug:            &debug,
 	}
 }

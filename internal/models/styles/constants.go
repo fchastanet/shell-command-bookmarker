@@ -11,6 +11,7 @@ const (
 	HeightHelp    = 12
 	MinHelpHeight = 1
 	HeightFooter  = 1
+	HeightHeader  = 1 // Height of the header component
 
 	// Width constants
 	WidthLeftPane   = 40
