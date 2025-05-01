@@ -17,6 +17,7 @@ type Navigation struct {
 	SelectAll    *key.Binding
 	SelectClear  *key.Binding
 	SelectRange  *key.Binding
+	Filter       *key.Binding
 }
 
 // GetNavigation returns key bindings for navigation.
@@ -69,6 +70,10 @@ func GetDefaultNavigation() *Navigation {
 		key.WithKeys(`ctrl+@`),
 		key.WithHelp(`ctrl+<space>`, "select range"),
 	)
+	filter := key.NewBinding(
+		key.WithKeys("/"),
+		key.WithHelp(`/`, "filter"),
+	)
 
 	return &Navigation{
 		LineUp:       &lineUp,
@@ -83,5 +88,6 @@ func GetDefaultNavigation() *Navigation {
 		SelectAll:    &selectAll,
 		SelectClear:  &selectClear,
 		SelectRange:  &selectRange,
+		Filter:       &filter,
 	}
 }

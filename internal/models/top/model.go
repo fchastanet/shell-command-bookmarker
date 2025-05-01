@@ -321,7 +321,7 @@ func (m *Model) manageKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			Height: m.viewHeight(),
 			Width:  m.viewWidth(),
 		})
-	case key.Matches(msg, *m.globalKeyMap.Filter):
+	case key.Matches(msg, *m.tableKeyMap.Filter):
 		// '/' enables filter mode if the current model indicates it
 		// supports it, which it does so by sending back a non-nil command.
 		if cmd = m.FocusedModel().Update(tui.FilterFocusReqMsg{}); cmd != nil {
