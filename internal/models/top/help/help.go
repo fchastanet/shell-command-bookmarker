@@ -8,23 +8,29 @@ import (
 	"github.com/fchastanet/shell-command-bookmarker/internal/models/styles"
 )
 
+// BindingSet represents a group of key bindings with a title
+type BindingSet struct {
+	Title    string
+	Bindings []*key.Binding
+}
+
 // Model represents the help component
 type Model struct {
-	helpStyle *lipgloss.Style
-	styles    *styles.Styles
-	bindings  []*key.Binding
-	width     int
-	showHelp  bool
+	helpStyle   *lipgloss.Style
+	styles      *styles.Styles
+	bindingSets []BindingSet
+	width       int
+	showHelp    bool
 }
 
 // New creates a new help component
 func New(myStyles *styles.Styles) Model {
 	return Model{
-		width:     0,
-		styles:    myStyles,
-		showHelp:  false,
-		bindings:  []*key.Binding{},
-		helpStyle: myStyles.HelpStyle.Main,
+		width:       0,
+		styles:      myStyles,
+		showHelp:    false,
+		bindingSets: []BindingSet{},
+		helpStyle:   myStyles.HelpStyle.Main,
 	}
 }
 
@@ -56,9 +62,17 @@ func (m *Model) SetWidth(width int) {
 	m.width = width
 }
 
-// SetBindings updates the key bindings displayed in help
-func (m *Model) SetBindings(bindings []*key.Binding) {
-	m.bindings = bindings
+// AddBindingSet adds a set of bindings with a title
+func (m *Model) AddBindingSet(title string, bindings []*key.Binding) {
+	m.bindingSets = append(m.bindingSets, BindingSet{
+		Title:    title,
+		Bindings: bindings,
+	})
+}
+
+// ClearBindingSets removes all binding sets
+func (m *Model) ClearBindingSets() {
+	m.bindingSets = []BindingSet{}
 }
 
 // GetHelpWidget returns the help widget text
@@ -72,47 +86,67 @@ func (m *Model) View() string {
 		return ""
 	}
 
-	bindings := removeDuplicateBindings(m.bindings)
+	// Subtract 2 to accommodate borders
+	rows := m.styles.HelpStyle.Height - m.styles.HelpStyle.BordersWidth
 
-	// Enumerate through each group of bindings, populating a series of
-	// pairs of columns, one for keys, one for descriptions
-	var (
-		pairs []string
-		width int
-		// Subtract 2 to accommodate borders
-		rows = m.styles.HelpStyle.Height - 2
-	)
-	for i := 0; i < len(bindings); i += rows {
-		var (
-			helpKeys     []string
-			descriptions []string
-		)
-		for j := i; j < min(i+rows, len(bindings)); j++ {
+	return m.viewBindingSets(rows)
+}
+
+// viewBindingSets renders the help component with binding sets
+func (m *Model) viewBindingSets(rows int) string {
+	columns := make([]string, 0, len(m.bindingSets))
+	totalWidth := 0
+
+	// Process each binding set
+	for _, set := range m.bindingSets {
+		bindings := removeDuplicateBindings(set.Bindings)
+		if len(bindings) == 0 {
+			continue
+		}
+
+		// Render the title with explicit left alignment
+		title := m.styles.HelpStyle.TitleStyle.
+			Render(set.Title)
+
+		var helpKeys []string
+		var descriptions []string
+
+		// Add the title as the first row
+		helpKeys = append(helpKeys, title)
+		descriptions = append(descriptions, "")
+
+		// Add the bindings
+		for j := 0; j < min(rows-1, len(bindings)); j++ {
 			helpKeys = append(helpKeys, m.styles.HelpStyle.KeyStyle.Render(bindings[j].Help().Key))
 			descriptions = append(descriptions, m.styles.HelpStyle.DescStyle.Render(bindings[j].Help().Desc))
 		}
-		// Render pair of columns; beyond the first pair, render a three space
-		// left margin, in order to visually separate the pairs.
-		var cols []string
-		if len(pairs) > 0 {
-			cols = []string{"   "}
-		}
-		cols = append(cols,
+
+		// Create columns for this set
+		cols := []string{
 			strings.Join(helpKeys, "\n"),
 			strings.Join(descriptions, "\n"),
-		)
+		}
 
-		pair := lipgloss.JoinHorizontal(lipgloss.Top, cols...)
-		// check whether it exceeds the maximum width avail (the width of the
-		// terminal, subtracting 2 for the borders).
-		width += lipgloss.Width(pair)
-		if width > m.width-2 {
+		// Add spacing between sets
+		if len(columns) > 0 {
+			columns = append(columns, "   ")
+		}
+
+		// Join the columns horizontally
+		setContent := lipgloss.JoinHorizontal(lipgloss.Top, cols...)
+
+		// Check if adding this set would exceed available width
+		newWidth := totalWidth + lipgloss.Width(setContent) + m.styles.HelpStyle.ColumnMargin
+		if len(columns) > 0 && newWidth > m.width-m.styles.HelpStyle.BordersWidth {
 			break
 		}
-		pairs = append(pairs, pair)
+
+		totalWidth = newWidth
+		columns = append(columns, setContent)
 	}
-	// Join pairs of columns and enclose in a border
-	content := lipgloss.JoinHorizontal(lipgloss.Top, pairs...)
+
+	// Join all sets horizontally and enclose in a border
+	content := lipgloss.JoinHorizontal(lipgloss.Top, columns...)
 	return m.styles.PaneStyle.TopBorder.
 		Height(rows).
 		Width(m.width - m.styles.PaneStyle.BordersWidth).

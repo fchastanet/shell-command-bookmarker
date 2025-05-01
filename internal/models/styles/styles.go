@@ -62,11 +62,14 @@ type WindowStyle struct {
 }
 
 type HelpStyle struct {
-	Main      *lipgloss.Style
-	KeyStyle  *lipgloss.Style
-	DescStyle *lipgloss.Style
+	Main       *lipgloss.Style
+	KeyStyle   *lipgloss.Style
+	DescStyle  *lipgloss.Style
+	TitleStyle *lipgloss.Style // Style for binding set titles
 	// Height of help widget, including borders
-	Height int
+	Height       int
+	ColumnMargin int
+	BordersWidth int
 }
 
 type PromptStyle struct {
@@ -201,11 +204,18 @@ func (s *Styles) initComponentStyles(colorTheme *ColorTheme) {
 	helpMainStyle := padded.Background(colors.Grey).Foreground(colors.White)
 	helpKeyStyle := bold.Foreground(colorTheme.HelpKey).Margin(0, 1, 0, 0)
 	helpDescStyle := regular.Foreground(colorTheme.HelpDesc)
+	helpTitleStyle := bold.
+		Foreground(colors.Blue).
+		Underline(true).
+		AlignHorizontal(lipgloss.Left)
 	s.HelpStyle = &HelpStyle{
-		Height:    HeightHelp,
-		Main:      &helpMainStyle,
-		KeyStyle:  &helpKeyStyle,
-		DescStyle: &helpDescStyle,
+		Height:       HeightHelp,
+		Main:         &helpMainStyle,
+		KeyStyle:     &helpKeyStyle,
+		DescStyle:    &helpDescStyle,
+		TitleStyle:   &helpTitleStyle,
+		ColumnMargin: HelpColumnMargin,
+		BordersWidth: BordersWidth,
 	}
 
 	// Initialize table style

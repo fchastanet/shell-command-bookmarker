@@ -378,22 +378,25 @@ func (m *Model) View() string {
 
 // updateHelpBindings updates the key bindings displayed in help based on current mode
 func (m *Model) updateHelpBindings() {
-	// Compile list of bindings to render
-	bindings := []*key.Binding{}
+	// Clear previous binding sets
+	m.helpModel.ClearBindingSets()
 
 	switch m.mode {
 	case promptMode:
-		bindings = append(bindings, m.prompt.HelpBindings()...)
+		// For prompt mode, just use a single set
+		m.helpModel.AddBindingSet("Prompt Controls", m.prompt.HelpBindings())
 	case filterMode:
-		bindings = append(bindings, keys.KeyMapToSlice(*m.filterKeyMap)...)
+		// For filter mode, just use a single set
+		m.helpModel.AddBindingSet("Filter Controls", keys.KeyMapToSlice(*m.filterKeyMap))
 	case normalMode:
-		bindings = append(bindings, m.HelpBindings()...)
-		bindings = append(bindings, keys.KeyMapToSlice(*m.globalKeyMap)...)
-		bindings = append(bindings, keys.KeyMapToSlice(*m.paneKeyMap)...)
-		bindings = append(bindings, keys.KeyMapToSlice(*m.tableKeyMap)...)
+		// For normal mode, organize bindings into logical groups
+		if len(m.HelpBindings()) > 0 {
+			m.helpModel.AddBindingSet("Pane Actions", m.HelpBindings())
+		}
+		m.helpModel.AddBindingSet("Global Controls", keys.KeyMapToSlice(*m.globalKeyMap))
+		m.helpModel.AddBindingSet("Navigation", keys.KeyMapToSlice(*m.paneKeyMap))
+		m.helpModel.AddBindingSet("Table Controls", keys.KeyMapToSlice(*m.tableKeyMap))
 	}
-
-	m.helpModel.SetBindings(bindings)
 }
 
 // contentHeight returns the height available to the panes
