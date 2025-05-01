@@ -429,6 +429,9 @@ func (p *PaneManager) renderPane(position structure.Position) string {
 }
 
 func (p *PaneManager) HelpBindings() (bindings []*key.Binding) {
+	if len(p.panes) == 1 {
+		return bindings
+	}
 	if p.focused == structure.TopRightPane {
 		// Only the top right pane has the ability to "go back"
 		bindings = append(bindings, p.commonKeyMap.Back)

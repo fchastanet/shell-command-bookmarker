@@ -392,11 +392,10 @@ func (m *Model) updateHelpBindings() {
 		m.helpModel.AddBindingSet("Filter Controls", keys.KeyMapToSlice(*m.filterKeyMap))
 	case normalMode:
 		// For normal mode, organize bindings into logical groups
+		m.helpModel.AddBindingSet("Global", keys.KeyMapToSlice(*m.globalKeyMap))
 		if len(m.HelpBindings()) > 0 {
 			m.helpModel.AddBindingSet("Pane Actions", m.HelpBindings())
 		}
-		m.helpModel.AddBindingSet("Global", keys.KeyMapToSlice(*m.globalKeyMap))
-		m.helpModel.AddBindingSet("Navigation", keys.KeyMapToSlice(*m.paneKeyMap))
 		m.helpModel.AddBindingSet("Table Nav", keys.KeyMapToSlice(*m.tableNavigationKeyMap))
 		m.helpModel.AddBindingSet("Table Actions", keys.KeyMapToSlice(*m.tableActionKeyMap))
 	}
