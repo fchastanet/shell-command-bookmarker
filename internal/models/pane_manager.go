@@ -152,23 +152,23 @@ func (p *PaneManager) Update(msg tea.Msg) tea.Cmd {
 			// A new top right pane replaces any bottom right pane as well.
 			delete(p.panes, structure.BottomRightPane)
 			p.updateChildSizes()
-		case key.Matches(msg, *p.globalKeyMap.ShrinkPaneWidth):
+		case key.Matches(msg, *p.paneKeyMap.ShrinkPaneWidth):
 			p.updateLeftWidth(-1)
 			p.updateChildSizes()
-		case key.Matches(msg, *p.globalKeyMap.GrowPaneWidth):
+		case key.Matches(msg, *p.paneKeyMap.GrowPaneWidth):
 			p.updateLeftWidth(1)
 			p.updateChildSizes()
-		case key.Matches(msg, *p.globalKeyMap.ShrinkPaneHeight):
+		case key.Matches(msg, *p.paneKeyMap.ShrinkPaneHeight):
 			p.updateTopRightHeight(-1)
 			p.updateChildSizes()
-		case key.Matches(msg, *p.globalKeyMap.GrowPaneHeight):
+		case key.Matches(msg, *p.paneKeyMap.GrowPaneHeight):
 			p.updateTopRightHeight(1)
 			p.updateChildSizes()
 		case key.Matches(msg, *p.paneKeyMap.SwitchPane):
 			p.cycleFocusedPane(false)
 		case key.Matches(msg, *p.paneKeyMap.SwitchPaneBack):
 			p.cycleFocusedPane(true)
-		case key.Matches(msg, *p.globalKeyMap.ClosePane):
+		case key.Matches(msg, *p.paneKeyMap.ClosePane):
 			cmds = append(cmds, p.closeFocusedPane())
 		case key.Matches(msg, *p.paneKeyMap.LeftPane):
 			p.focusPane(structure.LeftPane)

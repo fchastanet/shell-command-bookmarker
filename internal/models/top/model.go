@@ -148,7 +148,8 @@ func (m *Model) dispatchMessage(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case cursor.BlinkMsg:
 		return m.handleBlink(msg)
 	case tui.MemoryStatsMsg:
-		return m.handleMemoryStats(msg)
+		m.handleMemoryStats(msg)
+		return m, tui.PerformanceMonitorTick(performanceMonitorInterval)
 	default:
 		return m.handleGenericMessage(msg)
 	}
@@ -250,12 +251,11 @@ func (m *Model) handleBlink(msg cursor.BlinkMsg) (tea.Model, tea.Cmd) {
 }
 
 // handleMemoryStats processes and displays memory statistics
-func (m *Model) handleMemoryStats(msg tui.MemoryStatsMsg) (tea.Model, tea.Cmd) {
+func (m *Model) handleMemoryStats(msg tui.MemoryStatsMsg) {
 	statsInfo := fmt.Sprintf("Memory: %d MB in use | %d MB total | %d MB sys | GC runs: %d",
 		msg.Alloc/bytesInMegabyte, msg.TotalAlloc/bytesInMegabyte, msg.Sys/bytesInMegabyte, msg.NumGC)
 
 	m.footerModel.SetInfo(statsInfo)
-	return m, nil
 }
 
 func (m *Model) manageKeyInMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {

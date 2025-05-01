@@ -5,16 +5,11 @@ import (
 )
 
 type GlobalKeyMap struct {
-	Search           *key.Binding
-	Filter           *key.Binding
-	ShrinkPaneHeight *key.Binding
-	GrowPaneHeight   *key.Binding
-	ShrinkPaneWidth  *key.Binding
-	GrowPaneWidth    *key.Binding
-	ClosePane        *key.Binding
-	Quit             *key.Binding
-	Help             *key.Binding
-	Debug            *key.Binding
+	Search *key.Binding
+	Filter *key.Binding
+	Quit   *key.Binding
+	Help   *key.Binding
+	Debug  *key.Binding
 }
 
 func GetGlobalKeyMap() *GlobalKeyMap {
@@ -25,26 +20,6 @@ func GetGlobalKeyMap() *GlobalKeyMap {
 	filter := key.NewBinding(
 		key.WithKeys("/"),
 		key.WithHelp(`/`, "filter"),
-	)
-	shrinkPaneHeight := key.NewBinding(
-		key.WithKeys("-"),
-		key.WithHelp("-", "reduce height"),
-	)
-	growPaneHeight := key.NewBinding(
-		key.WithKeys("+"),
-		key.WithHelp("+", "increase height"),
-	)
-	shrinkPaneWidth := key.NewBinding(
-		key.WithKeys("<"),
-		key.WithHelp("<", "reduce width"),
-	)
-	growPaneWidth := key.NewBinding(
-		key.WithKeys(">"),
-		key.WithHelp(">", "increase width"),
-	)
-	closePane := key.NewBinding(
-		key.WithKeys("X"),
-		key.WithHelp("X", "close pane"),
 	)
 	quit := key.NewBinding(
 		key.WithKeys("esc", "ctrl+c"),
@@ -60,15 +35,10 @@ func GetGlobalKeyMap() *GlobalKeyMap {
 	)
 
 	return &GlobalKeyMap{
-		Search:           &search,
-		Filter:           &filter,
-		ShrinkPaneHeight: &shrinkPaneHeight,
-		GrowPaneHeight:   &growPaneHeight,
-		ShrinkPaneWidth:  &shrinkPaneWidth,
-		GrowPaneWidth:    &growPaneWidth,
-		ClosePane:        &closePane,
-		Quit:             &quit,
-		Help:             &help,
-		Debug:            &debug,
+		Search: &search,
+		Filter: &filter,
+		Quit:   &quit,
+		Help:   &help,
+		Debug:  &debug,
 	}
 }
