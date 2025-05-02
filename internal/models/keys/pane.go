@@ -8,8 +8,8 @@ type PaneNavigationKeyMap struct {
 	SwitchPane       *key.Binding
 	SwitchPaneBack   *key.Binding
 	LeftPane         *key.Binding
-	TopRightPane     *key.Binding
-	BottomRightPane  *key.Binding
+	TopPane          *key.Binding
+	BottomPane       *key.Binding
 	ShrinkPaneHeight *key.Binding
 	GrowPaneHeight   *key.Binding
 	ShrinkPaneWidth  *key.Binding
@@ -32,11 +32,11 @@ func GetPaneNavigationKeyMap() *PaneNavigationKeyMap {
 		key.WithKeys("0"),
 		key.WithHelp("0", "left pane"),
 	)
-	topRightPane := key.NewBinding(
+	topPane := key.NewBinding(
 		key.WithKeys("1"),
-		key.WithHelp("1", "top right pane"),
+		key.WithHelp("1", "top pane"),
 	)
-	bottomRightPane := key.NewBinding(
+	bottomPane := key.NewBinding(
 		key.WithKeys("2"),
 		key.WithHelp("2", "bottom right pane"),
 	)
@@ -69,8 +69,8 @@ func GetPaneNavigationKeyMap() *PaneNavigationKeyMap {
 		SwitchPane:       &switchPane,
 		SwitchPaneBack:   &switchPaneBack,
 		LeftPane:         &leftPane,
-		TopRightPane:     &topRightPane,
-		BottomRightPane:  &bottomRightPane,
+		TopPane:          &topPane,
+		BottomPane:       &bottomPane,
 		ShrinkPaneHeight: &shrinkPaneHeight,
 		GrowPaneHeight:   &growPaneHeight,
 		ShrinkPaneWidth:  &shrinkPaneWidth,

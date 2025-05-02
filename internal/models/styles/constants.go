@@ -24,6 +24,6 @@ const (
 	HelpColumnMargin = 3
 
 	// Other layout constants
-	TopRightPaneHeight = 15
-	HalfDivider        = 2
+	TopPaneHeight = 15
+	HalfDivider   = 2
 )

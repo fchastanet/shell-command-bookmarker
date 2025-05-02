@@ -16,6 +16,7 @@ type Styles struct {
 	HeaderStyle *HeaderStyle
 	WindowStyle *WindowStyle
 	PromptStyle *PromptStyle
+	EditorStyle *EditorStyle
 	// ColorTheme is the color theme used in the application.
 	ColorTheme *ColorTheme
 }
@@ -36,8 +37,8 @@ type PaneStyle struct {
 	// defaultLeftPaneWidth is the default width of the left pane.
 	DefaultLeftPaneWidth  int
 	DefaultRightPaneWidth int
-	// defaultTopRightPaneHeight is the default height of the top right pane.
-	DefaultTopRightPaneHeight int
+	// defaultTopPaneHeight is the default height of the top right pane.
+	DefaultTopPaneHeight int
 	// minimum width of each pane
 	MinPaneWidth int
 	// minimum height of each pane
@@ -79,6 +80,14 @@ type PromptStyle struct {
 	Height      int
 }
 
+// EditorStyle contains styling for the command editor component
+type EditorStyle struct {
+	Title          *lipgloss.Style
+	Label          *lipgloss.Style
+	HelpText       *lipgloss.Style
+	ContentPadding int
+}
+
 type HeaderStyle struct {
 	Main   *lipgloss.Style
 	Height int
@@ -93,6 +102,7 @@ func NewStyles() *Styles {
 		HeaderStyle: nil,
 		WindowStyle: nil,
 		PromptStyle: nil,
+		EditorStyle: nil,
 		ColorTheme:  nil,
 	}
 
@@ -157,17 +167,17 @@ func (s *Styles) initBaseStyles(colorTheme *ColorTheme) {
 
 	// Initialize pane style
 	s.PaneStyle = &PaneStyle{
-		DefaultLeftPaneWidth:      WidthLeftPane,
-		DefaultRightPaneWidth:     WidthRightPane,
-		DefaultTopRightPaneHeight: TopRightPaneHeight,
-		MinPaneWidth:              WidthMinPane,
-		MinPaneHeight:             HeightMinPane,
-		MinContentHeight:          HeightMinimum - HeightFooter,
-		MinContentWidth:           WidthMinContent,
-		FooterHeight:              HeightFooter,
-		HeaderHeight:              HeightHeader,
-		TopBorder:                 &topBorder,
-		BordersWidth:              BordersWidth,
+		DefaultLeftPaneWidth:  WidthLeftPane,
+		DefaultRightPaneWidth: WidthRightPane,
+		DefaultTopPaneHeight:  TopPaneHeight,
+		MinPaneWidth:          WidthMinPane,
+		MinPaneHeight:         HeightMinPane,
+		MinContentHeight:      HeightMinimum - HeightFooter,
+		MinContentWidth:       WidthMinContent,
+		FooterHeight:          HeightFooter,
+		HeaderHeight:          HeightHeader,
+		TopBorder:             &topBorder,
+		BordersWidth:          BordersWidth,
 	}
 
 	// Initialize footer style
@@ -220,6 +230,17 @@ func (s *Styles) initComponentStyles(colorTheme *ColorTheme) {
 
 	// Initialize table style
 	s.TableStyle = table.GetDefaultStyle()
+
+	// Initialize editor style
+	titleStyle := bold.Foreground(colors.Black)
+	labelStyle := bold.Foreground(colors.DarkGrey)
+	helpTextStyle := regular.Foreground(colors.Grey)
+	s.EditorStyle = &EditorStyle{
+		Title:          &titleStyle,
+		Label:          &labelStyle,
+		HelpText:       &helpTextStyle,
+		ContentPadding: PaddingSmall,
+	}
 }
 
 func (s *Styles) Init() {
@@ -244,9 +265,9 @@ func (s *Styles) checkDimension() {
 	}
 	slog.Debug("checking dimensions of styles",
 		"minPaneHeight", s.PaneStyle.MinPaneHeight,
-		"minTopRightPaneHeight", s.PaneStyle.DefaultTopRightPaneHeight,
+		"minTopRightPaneHeight", s.PaneStyle.DefaultTopPaneHeight,
 	)
-	if s.PaneStyle.MinPaneHeight > s.PaneStyle.DefaultTopRightPaneHeight {
+	if s.PaneStyle.MinPaneHeight > s.PaneStyle.DefaultTopPaneHeight {
 		panic("default top right pane height must not be lower than the overall minimum height")
 	}
 	slog.Debug("checking dimensions of styles",
