@@ -9,4 +9,10 @@ type RowDefaultActionMsg[V resource.Identifiable] struct {
 	RowID resource.ID   // The ID of the selected row
 }
 
+// RowSelectedActionMsg is sent when a row is selected (usually by navigating with arrow keys)
+type RowSelectedActionMsg[V resource.Identifiable] struct {
+	Row   V           // The selected row
+	RowID resource.ID // The ID of the selected row
+}
+
 type ReloadMsg[V resource.Identifiable] struct{}
