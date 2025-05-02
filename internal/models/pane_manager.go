@@ -191,17 +191,7 @@ func (p *PaneManager) Update(msg tea.Msg) tea.Cmd {
 	case structure.NavigationMsg:
 		cmds = append(cmds, p.setPane(msg))
 	case table.RowDefaultActionMsg[*models.Command]:
-		// Handle row default action by opening the editor in the bottom right pane
-		cmd := p.setPane(
-			structure.NavigationMsg{
-				Page: structure.Page{
-					Kind: structure.CommandEditorKind,
-					ID:   msg.RowID,
-				},
-				Position:     structure.BottomPane,
-				DisableFocus: false,
-			},
-		)
+		cmd := p.setBottomPane(msg)
 		cmds = append(cmds, cmd)
 	default:
 		// Send remaining message types to cached panes.
@@ -226,6 +216,27 @@ func (p *PaneManager) Update(msg tea.Msg) tea.Cmd {
 		}
 	}
 	return tea.Batch(cmds...)
+}
+
+func (p *PaneManager) setBottomPane(msg table.RowDefaultActionMsg[*models.Command]) tea.Cmd {
+	// Handle row default action by opening the editor in the bottom right pane
+	bottomPane := p.panes[structure.BottomPane]
+	if bottomPane.page.ID == msg.RowID {
+		// The bottom right pane is already showing the editor for this command
+		// so just bring it into focus.
+		p.focusPane(structure.BottomPane)
+		return nil
+	}
+	return p.setPane(
+		structure.NavigationMsg{
+			Page: structure.Page{
+				Kind: structure.CommandEditorKind,
+				ID:   msg.RowID,
+			},
+			Position:     structure.BottomPane,
+			DisableFocus: true,
+		},
+	)
 }
 
 // FocusedModel retrieves the model of the focused pane.
