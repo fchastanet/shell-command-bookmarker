@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"log/slog"
 
-	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/bubbles/spinner"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/fchastanet/shell-command-bookmarker/internal/models/structure"
@@ -20,11 +19,6 @@ type ListMaker struct {
 	App     *services.AppService
 	Styles  *styles.Styles
 	Spinner *spinner.Model
-}
-
-// commandReloadedMsg is sent when a command reload has finished.
-type commandReloadedMsg struct {
-	err error
 }
 
 const (
@@ -150,18 +144,16 @@ func (m *resourceList) Update(msg tea.Msg) tea.Cmd {
 	var cmds []tea.Cmd
 
 	switch msg := msg.(type) {
-	case commandReloadedMsg:
-		return m.handleCommandReloaded(msg)
+	case table.RowDefaultActionMsg[*models.Command]:
+		return m.handleRowDefaultAction(msg)
+	case table.ReloadMsg[*models.Command]:
+		return m.handleReload()
 	case tea.WindowSizeMsg:
 		return m.handleWindowSize(msg)
 	case tea.BlurMsg:
 		m.Model.Blur()
 	case tea.FocusMsg:
 		return m.handleFocus()
-	case tea.KeyMsg:
-		if cmd := m.handleKeyMsg(msg); cmd != nil {
-			return cmd
-		}
 	}
 
 	// Handle keyboard and mouse events in the table widget
@@ -172,12 +164,8 @@ func (m *resourceList) Update(msg tea.Msg) tea.Cmd {
 	return tea.Batch(cmds...)
 }
 
-func (m *resourceList) handleCommandReloaded(msg commandReloadedMsg) tea.Cmd {
-	m.reloading = false
-	if msg.err != nil {
-		return tui.ReportError(fmt.Errorf("reloading state failed: %w", msg.err))
-	}
-	return tui.ReportInfo("reloading finished")
+func (m *resourceList) handleRowDefaultAction(msg table.RowDefaultActionMsg[*models.Command]) tea.Cmd {
+	return tui.ReportInfo("row selected: %d", msg.Row.GetID())
 }
 
 func (m *resourceList) handleWindowSize(msg tea.WindowSizeMsg) tea.Cmd {
@@ -203,23 +191,20 @@ func (m *resourceList) handleFocus() tea.Cmd {
 	}
 }
 
-func (m *resourceList) handleKeyMsg(msg tea.KeyMsg) tea.Cmd {
-	// Handle reload key press
-	if key.Matches(msg, *table.GetDefaultAction().Reload) {
-		if m.reloading {
-			return nil
-		}
-		m.reloading = true
-		return func() tea.Msg {
-			rows, err := m.HistoryService.GetHistoryRows()
-			if err != nil {
-				return commandReloadedMsg{err: err}
-			}
-			m.Model.SetItems(rows...)
-			return commandReloadedMsg{err: nil}
-		}
+func (m *resourceList) handleReload() tea.Cmd {
+	if m.reloading {
+		return nil
 	}
-	return nil
+	m.reloading = true
+	return func() tea.Msg {
+		rows, err := m.HistoryService.GetHistoryRows()
+		m.reloading = false
+		if err != nil {
+			return tui.ReportError(fmt.Errorf("reloading state failed: %w", err))
+		}
+		m.Model.SetItems(rows...)
+		return tui.ReportInfo("reloading finished")
+	}
 }
 
 func (m *resourceList) View() string {
