@@ -9,16 +9,18 @@ import (
 	"github.com/fchastanet/shell-command-bookmarker/internal/models/structure"
 	"github.com/fchastanet/shell-command-bookmarker/internal/models/styles"
 	"github.com/fchastanet/shell-command-bookmarker/internal/services"
-	"github.com/fchastanet/shell-command-bookmarker/internal/services/models"
+	dbmodels "github.com/fchastanet/shell-command-bookmarker/internal/services/models"
 	"github.com/fchastanet/shell-command-bookmarker/pkg/resource"
 	"github.com/fchastanet/shell-command-bookmarker/pkg/tui"
 	"github.com/fchastanet/shell-command-bookmarker/pkg/tui/table"
 )
 
 type ListMaker struct {
-	App     *services.AppService
-	Styles  *styles.Styles
-	Spinner *spinner.Model
+	App              *services.AppService
+	NavigationKeyMap *table.Navigation
+	ActionKeyMap     *table.Action
+	Styles           *styles.Styles
+	Spinner          *spinner.Model
 }
 
 const (
@@ -79,7 +81,7 @@ func (mm *ListMaker) Make(_ resource.ID, width, height int) (structure.ChildMode
 		statusColumn: &statusColumn,
 	}
 
-	renderer := func(cmd *models.Command) table.RenderedRow {
+	renderer := func(cmd *dbmodels.Command) table.RenderedRow {
 		return table.RenderedRow{
 			idColumn.Key:     fmt.Sprintf("%d", cmd.GetID()),
 			titleColumn.Key:  cmd.Title,
@@ -94,15 +96,17 @@ func (mm *ListMaker) Make(_ resource.ID, width, height int) (structure.ChildMode
 		renderer,
 		width,
 		height,
-		table.WithSortFunc(models.CommandSorter),
-		table.WithPreview[*models.Command](structure.CommandKind),
+		table.WithSortFunc(dbmodels.CommandSorter),
+		table.WithPreview[*dbmodels.Command](structure.CommandKind),
+		table.WithNavigation[*dbmodels.Command](mm.NavigationKeyMap),
+		table.WithAction[*dbmodels.Command](mm.ActionKeyMap),
 	)
 	m.Model = &tbl
 	return m, nil
 }
 
 type commandsList struct {
-	Model *table.Model[*models.Command]
+	Model *table.Model[*dbmodels.Command]
 	*services.AppService
 	styles  *styles.Styles
 	spinner *spinner.Model
@@ -144,9 +148,7 @@ func (m *commandsList) Update(msg tea.Msg) tea.Cmd {
 	var cmds []tea.Cmd
 
 	switch msg := msg.(type) {
-	case table.RowDefaultActionMsg[*models.Command]:
-		return m.handleRowDefaultAction(msg)
-	case table.ReloadMsg[*models.Command]:
+	case table.ReloadMsg[*dbmodels.Command]:
 		return m.handleReload()
 	case tea.WindowSizeMsg:
 		return m.handleWindowSize(msg)
@@ -162,10 +164,6 @@ func (m *commandsList) Update(msg tea.Msg) tea.Cmd {
 	cmds = append(cmds, cmd)
 
 	return tea.Batch(cmds...)
-}
-
-func (m *commandsList) handleRowDefaultAction(msg table.RowDefaultActionMsg[*models.Command]) tea.Cmd {
-	return tui.ReportInfo("row selected: %d", msg.Row.GetID())
 }
 
 func (m *commandsList) handleWindowSize(msg tea.WindowSizeMsg) tea.Cmd {
@@ -186,8 +184,8 @@ func (m *commandsList) handleFocus() tea.Cmd {
 			return nil
 		}
 		m.Model.Focus()
-		// type conversion to []*models.Command
-		return table.BulkInsertMsg[*models.Command](rows)
+
+		return table.BulkInsertMsg[*dbmodels.Command](rows)
 	}
 }
 

@@ -58,7 +58,7 @@ func (s *DBService) SaveCommand(command *models.Command) error {
 }
 
 // GetCommandByID retrieves a command by its database ID
-func (s *DBService) GetCommandByID(id int) (*models.Command, error) {
+func (s *DBService) GetCommandByID(id uint) (*models.Command, error) {
 	slog.Debug("Retrieving command by id from database", "id", id)
 	// Use QueryRow for single row retrieval
 	row := s.dbAdapter.GetDB().QueryRow(
@@ -213,4 +213,26 @@ func (s *DBService) GetAllCommands() ([]*models.Command, error) {
 		commands = append(commands, &command)
 	}
 	return commands, nil
+}
+
+// UpdateCommand updates an existing command in the database
+func (s *DBService) UpdateCommand(command *models.Command) error {
+	slog.Debug("Updating command in database", "command", command)
+	// Use Exec for UPDATE statements
+	_, err := s.dbAdapter.GetDB().Exec(
+		`UPDATE command
+		SET title = ?, description = ?, script = ?,
+		    status = ?, lint_issues = ?, lint_status = ?,
+		    elapsed = ?, modification_datetime = ?
+		WHERE id = ?`,
+		command.Title, command.Description, command.Script,
+		string(command.Status), command.LintIssues, string(command.LintStatus),
+		command.Elapsed, time.Now().Format(time.DateTime), command.ID,
+	)
+	if err != nil {
+		slog.Error("Error updating command in database", "id", command.ID, "error", err)
+		return err
+	}
+	slog.Info("Command updated successfully", "id", command.ID)
+	return nil
 }

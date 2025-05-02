@@ -21,17 +21,25 @@ func makeMakers(
 	app *services.AppService,
 	myStyles *styles.Styles,
 	spinnerObj *spinner.Model,
+	keyMaps *KeyMaps,
 ) func(kind resource.Kind) models.Maker {
 	makers := make(map[string]models.Maker)
 	makers["commandList"] = &command.ListMaker{
-		App:     app,
-		Styles:  myStyles,
-		Spinner: spinnerObj,
+		App:              app,
+		Styles:           myStyles,
+		Spinner:          spinnerObj,
+		NavigationKeyMap: keyMaps.tableNavigation,
+		ActionKeyMap:     keyMaps.tableAction,
 	}
 	makers["search"] = &command.SearchMaker{
 		App:     app,
 		Styles:  myStyles,
 		Spinner: spinnerObj,
+	}
+	makers["commandEditor"] = &command.EditorMaker{
+		App:          app,
+		Styles:       myStyles,
+		EditorKeyMap: keyMaps.editor,
 	}
 	return func(kind resource.Kind) models.Maker {
 		key := kind.Key()

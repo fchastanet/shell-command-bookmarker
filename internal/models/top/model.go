@@ -67,18 +67,23 @@ const (
 // MessageClearTickMsg represents a tick to check if messages should be cleared
 type MessageClearTickMsg struct{}
 
+type KeyMaps struct {
+	filter          *keys.FilterKeyMap
+	global          *keys.GlobalKeyMap
+	pane            *keys.PaneNavigationKeyMap
+	tableNavigation *table.Navigation
+	tableAction     *table.Action
+	editor          *keys.EditorKeyMap
+}
+
 type Model struct {
 	// Time when the current message should be cleared
 	messageClearTime time.Time
 
 	*models.PaneManager
-	appService            *services.AppService
-	styles                *styles.Styles
-	filterKeyMap          *keys.FilterKeyMap
-	globalKeyMap          *keys.GlobalKeyMap
-	paneKeyMap            *keys.PaneNavigationKeyMap
-	tableNavigationKeyMap *table.Navigation
-	tableActionKeyMap     *table.Action
+	appService *services.AppService
+	styles     *styles.Styles
+	keyMaps    *KeyMaps
 
 	prompt      *models.Prompt
 	spinner     *spinner.Model
@@ -109,8 +114,17 @@ func NewModel(
 	// https://github.com/charmbracelet/bubbletea/issues/1036#issuecomment-2158563056
 	_ = lipgloss.HasDarkBackground()
 
+	keyMaps := &KeyMaps{
+		editor:          keys.GetDefaultEditorKeyMap(),
+		filter:          keys.GetFilterKeyMap(),
+		global:          keys.GetGlobalKeyMap(),
+		pane:            keys.GetPaneNavigationKeyMap(),
+		tableNavigation: keys.GetTableNavigationKeyMap(),
+		tableAction:     keys.GetTableActionKeyMap(),
+	}
+
 	spinnerObj := spinner.New(spinner.WithSpinner(spinner.Line))
-	makers := makeMakers(appService, myStyles, &spinnerObj)
+	makers := makeMakers(appService, myStyles, &spinnerObj, keyMaps)
 
 	helpWidget := myStyles.HelpStyle.Main.Render("? help")
 	versionWidget := myStyles.FooterStyle.Version.Render(version.Get())
@@ -123,26 +137,27 @@ func NewModel(
 	headerModel := header.New(myStyles, "Shell Command Bookmarker")
 
 	m := Model{
-		PaneManager:           models.NewPaneManager(makers, myStyles),
-		filterKeyMap:          keys.GetFilterKeyMap(),
-		globalKeyMap:          keys.GetGlobalKeyMap(),
-		paneKeyMap:            keys.GetPaneNavigationKeyMap(),
-		tableNavigationKeyMap: keys.GetTableNavigationKeyMap(),
-		tableActionKeyMap:     keys.GetTableActionKeyMap(),
-		spinner:               &spinnerObj,
-		appService:            appService,
-		styles:                myStyles,
-		helpModel:             helpModel,
-		footerModel:           footerModel,
-		headerModel:           headerModel,
-		width:                 0,
-		height:                0,
-		mode:                  normalMode,
-		spinning:              false,
-		prompt:                nil,
-		messageClearTime:      time.Time{},
-		perfMonitorActive:     false,
-		quitting:              false,
+		PaneManager: models.NewPaneManager(
+			makers,
+			myStyles,
+			keyMaps.global,
+			keyMaps.pane,
+		),
+		spinner:           &spinnerObj,
+		appService:        appService,
+		styles:            myStyles,
+		keyMaps:           keyMaps,
+		helpModel:         helpModel,
+		footerModel:       footerModel,
+		headerModel:       headerModel,
+		width:             0,
+		height:            0,
+		mode:              normalMode,
+		spinning:          false,
+		prompt:            nil,
+		messageClearTime:  time.Time{},
+		perfMonitorActive: false,
+		quitting:          false,
 	}
 	return m
 }
@@ -337,13 +352,13 @@ func (m *Model) manageKeyInMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, cmd
 	case filterMode:
 		switch {
-		case key.Matches(msg, *m.filterKeyMap.Blur):
+		case key.Matches(msg, *m.keyMaps.filter.Blur):
 			// Switch back to normal mode, and send message to current model
 			// to blur the filter widget
 			m.mode = normalMode
 			cmd = m.FocusedModel().Update(tui.FilterBlurMsg{})
 			return m, cmd
-		case key.Matches(msg, *m.filterKeyMap.Close):
+		case key.Matches(msg, *m.keyMaps.filter.Close):
 			// Switch back to normal mode, and send message to current model
 			// to close the filter widget
 			m.mode = normalMode
@@ -370,11 +385,11 @@ func (m *Model) manageKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
 
 	switch {
-	case key.Matches(msg, *m.globalKeyMap.Quit):
+	case key.Matches(msg, *m.keyMaps.global.Quit):
 		// ctrl-c quits the app, but not before prompting the user for
 		// confirmation.
 		return m, models.YesNoPrompt("Quit Shell Command Bookmarker?", QuitWithClearScreen())
-	case key.Matches(msg, *m.globalKeyMap.Help):
+	case key.Matches(msg, *m.keyMaps.global.Help):
 		// '?' toggles help widget
 		m.helpModel.Toggle()
 		// Help widget takes up space so update panes' dimensions
@@ -382,20 +397,20 @@ func (m *Model) manageKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			Height: m.viewHeight(),
 			Width:  m.viewWidth(),
 		})
-	case key.Matches(msg, *m.tableActionKeyMap.Filter):
+	case key.Matches(msg, *m.keyMaps.tableAction.Filter):
 		// '/' enables filter mode if the current model indicates it
 		// supports it, which it does so by sending back a non-nil command.
 		if cmd = m.FocusedModel().Update(tui.FilterFocusReqMsg{}); cmd != nil {
 			m.mode = filterMode
 		}
 		return m, cmd
-	case key.Matches(msg, *m.globalKeyMap.Debug):
+	case key.Matches(msg, *m.keyMaps.global.Debug):
 		// ctrl+d shows memory stats for debugging performance
 		if m.perfMonitorActive {
 			return m, tui.StopPerformanceMonitor()
 		}
 		return m, tui.StartPerformanceMonitor(performanceMonitorInterval)
-	case key.Matches(msg, *m.globalKeyMap.Search):
+	case key.Matches(msg, *m.keyMaps.global.Search):
 		return m, models.NavigateTo(structure.SearchKind, structure.WithPosition(structure.LeftPane))
 	default:
 	}
@@ -453,15 +468,15 @@ func (m *Model) updateHelpBindings() {
 		m.helpModel.AddBindingSet("Prompt Controls", m.prompt.HelpBindings())
 	case filterMode:
 		// For filter mode, just use a single set
-		m.helpModel.AddBindingSet("Filter Controls", keys.KeyMapToSlice(*m.filterKeyMap))
+		m.helpModel.AddBindingSet("Filter Controls", keys.KeyMapToSlice(*m.keyMaps.filter))
 	case normalMode:
 		// For normal mode, organize bindings into logical groups
-		m.helpModel.AddBindingSet("Global", keys.KeyMapToSlice(*m.globalKeyMap))
+		m.helpModel.AddBindingSet("Global", keys.KeyMapToSlice(*m.keyMaps.global))
 		if len(m.HelpBindings()) > 0 {
 			m.helpModel.AddBindingSet("Pane Actions", m.HelpBindings())
 		}
-		m.helpModel.AddBindingSet("Table Nav", keys.KeyMapToSlice(*m.tableNavigationKeyMap))
-		m.helpModel.AddBindingSet("Table Actions", keys.KeyMapToSlice(*m.tableActionKeyMap))
+		m.helpModel.AddBindingSet("Table Nav", keys.KeyMapToSlice(*m.keyMaps.tableNavigation))
+		m.helpModel.AddBindingSet("Table Actions", keys.KeyMapToSlice(*m.keyMaps.tableAction))
 	}
 }
 

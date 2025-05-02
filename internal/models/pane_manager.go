@@ -11,8 +11,10 @@ import (
 	"github.com/fchastanet/shell-command-bookmarker/internal/models/keys"
 	"github.com/fchastanet/shell-command-bookmarker/internal/models/structure"
 	"github.com/fchastanet/shell-command-bookmarker/internal/models/styles"
+	"github.com/fchastanet/shell-command-bookmarker/internal/services/models"
 	"github.com/fchastanet/shell-command-bookmarker/pkg/resource"
 	"github.com/fchastanet/shell-command-bookmarker/pkg/tui"
+	"github.com/fchastanet/shell-command-bookmarker/pkg/tui/table"
 	"golang.org/x/exp/maps"
 )
 
@@ -74,7 +76,7 @@ type PaneManager struct {
 	makerFactory func(kind resource.Kind) Maker
 	// panes tracks currently visible panes
 	panes map[structure.Position]pane
-	// history tracks previously visited models for the top right pane.
+	// history tracks previously visited models for the top pane.
 	history []pane
 	// the position of the currently focused pane
 	focused structure.Position
@@ -83,8 +85,8 @@ type PaneManager struct {
 	// leftPaneWidth is the width of the left pane when sharing the terminal
 	// with other panes.
 	leftPaneWidth int
-	// topRightPaneHeight is the height of the top right pane.
-	topRightHeight int
+	// topPaneHeight is the height of the top pane.
+	topPaneHeight int
 }
 
 type pane struct {
@@ -101,18 +103,20 @@ type tablePane interface {
 func NewPaneManager(
 	makerFactory func(kind resource.Kind) Maker,
 	myStyles *styles.Styles,
+	globalKeyMap *keys.GlobalKeyMap,
+	paneKeyMap *keys.PaneNavigationKeyMap,
 ) *PaneManager {
 	p := &PaneManager{
-		makerFactory:   makerFactory,
-		styles:         myStyles,
-		cache:          structure.NewCache(),
-		panes:          make(map[structure.Position]pane),
-		leftPaneWidth:  myStyles.PaneStyle.DefaultLeftPaneWidth,
-		topRightHeight: myStyles.PaneStyle.DefaultTopRightPaneHeight,
-		globalKeyMap:   keys.GetGlobalKeyMap(),
-		paneKeyMap:     keys.GetPaneNavigationKeyMap(),
+		makerFactory:  makerFactory,
+		styles:        myStyles,
+		cache:         structure.NewCache(),
+		panes:         make(map[structure.Position]pane),
+		leftPaneWidth: myStyles.PaneStyle.DefaultLeftPaneWidth,
+		topPaneHeight: myStyles.PaneStyle.DefaultTopPaneHeight,
+		globalKeyMap:  globalKeyMap,
+		paneKeyMap:    paneKeyMap,
 		// The left pane is the default focused pane.
-		focused: structure.LeftPane,
+		focused: structure.TopPane,
 		width:   0,
 		height:  0,
 		history: make([]pane, 0),
@@ -122,7 +126,7 @@ func NewPaneManager(
 
 func (p *PaneManager) Init() tea.Cmd {
 	return p.setPane(structure.NavigationMsg{
-		Position:     structure.LeftPane,
+		Position:     structure.TopPane,
 		Page:         structure.Page{Kind: structure.CommandListKind, ID: 0},
 		DisableFocus: false,
 	})
@@ -135,7 +139,7 @@ func (p *PaneManager) Update(msg tea.Msg) tea.Cmd {
 	case tea.KeyMsg:
 		switch {
 		case key.Matches(msg, *p.paneKeyMap.Back):
-			if p.focused != structure.TopRightPane {
+			if p.focused != structure.TopPane {
 				// History is only maintained for the top right pane.
 				break
 			}
@@ -146,9 +150,9 @@ func (p *PaneManager) Update(msg tea.Msg) tea.Cmd {
 			// Pop current model from history
 			p.history = p.history[:len(p.history)-1]
 			// Set pane to last model
-			p.panes[structure.TopRightPane] = p.history[len(p.history)-1]
+			p.panes[structure.TopPane] = p.history[len(p.history)-1]
 			// A new top right pane replaces any bottom right pane as well.
-			delete(p.panes, structure.BottomRightPane)
+			delete(p.panes, structure.BottomPane)
 			p.updateChildSizes()
 		case key.Matches(msg, *p.paneKeyMap.ShrinkPaneWidth):
 			p.updateLeftWidth(-1)
@@ -170,10 +174,10 @@ func (p *PaneManager) Update(msg tea.Msg) tea.Cmd {
 			cmds = append(cmds, p.closeFocusedPane())
 		case key.Matches(msg, *p.paneKeyMap.LeftPane):
 			p.focusPane(structure.LeftPane)
-		case key.Matches(msg, *p.paneKeyMap.TopRightPane):
-			p.focusPane(structure.TopRightPane)
-		case key.Matches(msg, *p.paneKeyMap.BottomRightPane):
-			p.focusPane(structure.BottomRightPane)
+		case key.Matches(msg, *p.paneKeyMap.TopPane):
+			p.focusPane(structure.TopPane)
+		case key.Matches(msg, *p.paneKeyMap.BottomPane):
+			p.focusPane(structure.BottomPane)
 		default:
 			// Send remaining keys to focused pane
 			cmds = append(cmds, p.updateModel(p.focused, msg))
@@ -186,6 +190,19 @@ func (p *PaneManager) Update(msg tea.Msg) tea.Cmd {
 		p.updateChildSizes()
 	case structure.NavigationMsg:
 		cmds = append(cmds, p.setPane(msg))
+	case table.RowDefaultActionMsg[*models.Command]:
+		// Handle row default action by opening the editor in the bottom right pane
+		cmd := p.setPane(
+			structure.NavigationMsg{
+				Page: structure.Page{
+					Kind: structure.CommandEditorKind,
+					ID:   msg.RowID,
+				},
+				Position:     structure.BottomPane,
+				DisableFocus: false,
+			},
+		)
+		cmds = append(cmds, cmd)
 	default:
 		// Send remaining message types to cached panes.
 		cachedMsgs := p.cache.UpdateAll(msg)
@@ -196,12 +213,12 @@ func (p *PaneManager) Update(msg tea.Msg) tea.Cmd {
 	// ensure the bottom left pane corresponds to that current row, e.g. if the
 	// top right pane is a tasks table, then the bottom right pane shows the
 	// output for the current task row.
-	if pane, ok := p.panes[structure.TopRightPane]; ok {
-		if table, ok := pane.model.(tablePane); ok {
-			if kind, id, ok := table.PreviewCurrentRow(); ok {
+	if pane, ok := p.panes[structure.TopPane]; ok {
+		if tableModel, ok := pane.model.(tablePane); ok {
+			if kind, id, ok := tableModel.PreviewCurrentRow(); ok {
 				cmd := p.setPane(structure.NavigationMsg{
 					Page:         structure.Page{Kind: kind, ID: id},
-					Position:     structure.BottomRightPane,
+					Position:     structure.BottomPane,
 					DisableFocus: true,
 				})
 				cmds = append(cmds, cmd)
@@ -263,19 +280,19 @@ func (p *PaneManager) updateLeftWidth(delta int) {
 }
 
 func (p *PaneManager) updateTopRightHeight(delta int) {
-	if _, ok := p.panes[structure.TopRightPane]; !ok {
+	if _, ok := p.panes[structure.TopPane]; !ok {
 		// There is no horizontal split to adjust
 		return
-	} else if _, ok := p.panes[structure.BottomRightPane]; !ok {
+	} else if _, ok := p.panes[structure.BottomPane]; !ok {
 		// There is no horizontal split to adjust
 		return
 	}
-	if p.focused == structure.BottomRightPane {
+	if p.focused == structure.BottomPane {
 		delta = -delta
 	}
 	paneStyle := p.styles.PaneStyle
-	p.topRightHeight = clamp(
-		p.topRightHeight+delta,
+	p.topPaneHeight = clamp(
+		p.topPaneHeight+delta,
 		paneStyle.MinPaneHeight,
 		p.height-paneStyle.MinPaneWidth,
 	)
@@ -324,12 +341,12 @@ func (p *PaneManager) setPane(msg structure.NavigationMsg) (cmd tea.Cmd) {
 		model: model,
 		page:  msg.Page,
 	}
-	if msg.Position == structure.TopRightPane {
+	if msg.Position == structure.TopPane {
 		// A new top right pane replaces any bottom right pane as well.
-		delete(p.panes, structure.BottomRightPane)
+		delete(p.panes, structure.BottomPane)
 		// Track the models for the top right pane, so that the user can go back
 		// to previous
-		p.history = append(p.history, p.panes[structure.TopRightPane])
+		p.history = append(p.history, p.panes[structure.TopPane])
 	}
 	p.updateChildSizes()
 	if !msg.DisableFocus {
@@ -352,7 +369,7 @@ func (p *PaneManager) paneWidth(position structure.Position) int {
 		if len(p.panes) > 1 {
 			return p.leftPaneWidth
 		}
-	case structure.TopRightPane, structure.BottomRightPane:
+	case structure.TopPane, structure.BottomPane:
 		paneStyle := p.styles.PaneStyle
 		if _, ok := p.panes[structure.LeftPane]; ok {
 			return max(
@@ -366,13 +383,13 @@ func (p *PaneManager) paneWidth(position structure.Position) int {
 
 func (p *PaneManager) paneHeight(position structure.Position) int {
 	switch position {
-	case structure.TopRightPane:
-		if _, ok := p.panes[structure.BottomRightPane]; ok {
-			return p.topRightHeight
+	case structure.TopPane:
+		if _, ok := p.panes[structure.BottomPane]; ok {
+			return p.topPaneHeight
 		}
-	case structure.BottomRightPane:
-		if _, ok := p.panes[structure.TopRightPane]; ok {
-			return p.height - p.topRightHeight
+	case structure.BottomPane:
+		if _, ok := p.panes[structure.TopPane]; ok {
+			return p.height - p.topPaneHeight
 		}
 	case structure.LeftPane:
 		return p.height
@@ -386,8 +403,8 @@ func (p *PaneManager) View() string {
 			p.renderPane(structure.LeftPane),
 			lipgloss.JoinVertical(lipgloss.Top,
 				removeEmptyStrings(
-					p.renderPane(structure.TopRightPane),
-					p.renderPane(structure.BottomRightPane),
+					p.renderPane(structure.TopPane),
+					p.renderPane(structure.BottomPane),
 				)...,
 			),
 		)...,
@@ -416,10 +433,10 @@ func (p *PaneManager) renderPane(position structure.Position) string {
 		switch position {
 		case structure.LeftPane:
 			borderTexts[styles.TopRightBorder] = p.paneKeyMap.LeftPane.Keys()[0]
-		case structure.TopRightPane:
-			borderTexts[styles.TopRightBorder] = p.paneKeyMap.TopRightPane.Keys()[0]
-		case structure.BottomRightPane:
-			borderTexts[styles.TopRightBorder] = p.paneKeyMap.BottomRightPane.Keys()[0]
+		case structure.TopPane:
+			borderTexts[styles.TopRightBorder] = p.paneKeyMap.TopPane.Keys()[0]
+		case structure.BottomPane:
+			borderTexts[styles.TopRightBorder] = p.paneKeyMap.BottomPane.Keys()[0]
 		}
 	}
 	return styles.Borderize(
@@ -431,7 +448,7 @@ func (p *PaneManager) HelpBindings() (bindings []*key.Binding) {
 	if len(p.panes) == 1 {
 		return bindings
 	}
-	if p.focused == structure.TopRightPane {
+	if p.focused == structure.TopPane {
 		// Only the top right pane has the ability to "go back"
 		bindings = append(bindings, p.paneKeyMap.Back)
 	}

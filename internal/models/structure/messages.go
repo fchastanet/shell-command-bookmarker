@@ -7,12 +7,10 @@ import (
 type Position int
 
 const (
-	// TopRightPane occupies the top right area of the terminal. Mutually
-	// exclusive with RightPane.
-	TopRightPane Position = iota
-	// BottomRightPane occupies the bottom right area of the terminal. Mutually
-	// exclusive with RightPane.
-	BottomRightPane
+	// TopPane occupies the top area of the terminal.
+	TopPane Position = iota
+	// BottomPane occupies the bottom area of the terminal.
+	BottomPane
 	// LeftPane occupies the left side of the terminal.
 	LeftPane
 )
