@@ -307,8 +307,8 @@ func (m *Model[V]) handleFilterMsg(msg tea.Msg) (*Model[V], tea.Cmd) {
 // handleKeyMsg processes key press messages
 func (m *Model[V]) handleKeyMsg(msg tea.KeyMsg) (*Model[V], tea.Cmd) {
 	// Group navigation keys
-	if cmd := m.handleNavigationKey(msg); cmd {
-		return m, nil
+	if cmd := m.handleNavigationKey(msg); cmd != nil {
+		return m, cmd
 	}
 
 	// Group selection keys
@@ -344,7 +344,7 @@ func (m *Model[V]) handleActionKey(msg tea.KeyMsg) tea.Cmd {
 }
 
 // handleNavigationKey handles all navigation key presses
-func (m *Model[V]) handleNavigationKey(msg tea.KeyMsg) bool {
+func (m *Model[V]) handleNavigationKey(msg tea.KeyMsg) tea.Cmd {
 	nav := m.navigationKeyMap
 	switch {
 	case key.Matches(msg, *nav.LineUp):
@@ -364,9 +364,13 @@ func (m *Model[V]) handleNavigationKey(msg tea.KeyMsg) bool {
 	case key.Matches(msg, *nav.GotoBottom):
 		m.GotoBottom()
 	default:
-		return false
+		return nil
 	}
-	return true
+
+	return tui.CmdHandler(RowSelectedActionMsg[V]{
+		Row:   m.rows[m.currentRowIndex],
+		RowID: m.currentRowID,
+	})
 }
 
 // handleSelectionKey handles all selection key presses

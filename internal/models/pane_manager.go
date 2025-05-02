@@ -94,10 +94,6 @@ type pane struct {
 	page  structure.Page
 }
 
-type tablePane interface {
-	PreviewCurrentRow() (resource.Kind, resource.ID, bool)
-}
-
 // NewPaneManager constructs the pane manager with at least the explorer, which
 // occupies the left pane.
 func NewPaneManager(
@@ -191,47 +187,38 @@ func (p *PaneManager) Update(msg tea.Msg) tea.Cmd {
 	case structure.NavigationMsg:
 		cmds = append(cmds, p.setPane(msg))
 	case table.RowDefaultActionMsg[*models.Command]:
-		cmd := p.setBottomPane(msg)
+		cmd := p.setBottomPane(msg.RowID, true)
 		cmds = append(cmds, cmd)
+	case table.RowSelectedActionMsg[*models.Command]:
+		if _, ok := p.panes[structure.BottomPane]; ok {
+			cmd := p.setBottomPane(msg.RowID, false)
+			cmds = append(cmds, cmd)
+		}
 	default:
 		// Send remaining message types to cached panes.
 		cachedMsgs := p.cache.UpdateAll(msg)
 		cmds = append(cmds, cachedMsgs...)
 	}
 
-	// Check that if the top right pane is a table with a current row, then
-	// ensure the bottom left pane corresponds to that current row, e.g. if the
-	// top right pane is a tasks table, then the bottom right pane shows the
-	// output for the current task row.
-	if pane, ok := p.panes[structure.TopPane]; ok {
-		if tableModel, ok := pane.model.(tablePane); ok {
-			if kind, id, ok := tableModel.PreviewCurrentRow(); ok {
-				cmd := p.setPane(structure.NavigationMsg{
-					Page:         structure.Page{Kind: kind, ID: id},
-					Position:     structure.BottomPane,
-					DisableFocus: true,
-				})
-				cmds = append(cmds, cmd)
-			}
-		}
-	}
 	return tea.Batch(cmds...)
 }
 
-func (p *PaneManager) setBottomPane(msg table.RowDefaultActionMsg[*models.Command]) tea.Cmd {
+func (p *PaneManager) setBottomPane(rowID resource.ID, focusIfSameRowID bool) tea.Cmd {
 	// Handle row default action by opening the editor in the bottom right pane
 	bottomPane := p.panes[structure.BottomPane]
-	if bottomPane.page.ID == msg.RowID {
+	if bottomPane.page.ID == rowID {
 		// The bottom right pane is already showing the editor for this command
 		// so just bring it into focus.
-		p.focusPane(structure.BottomPane)
+		if focusIfSameRowID {
+			p.focusPane(structure.BottomPane)
+		}
 		return nil
 	}
 	return p.setPane(
 		structure.NavigationMsg{
 			Page: structure.Page{
 				Kind: structure.CommandEditorKind,
-				ID:   msg.RowID,
+				ID:   rowID,
 			},
 			Position:     structure.BottomPane,
 			DisableFocus: true,
