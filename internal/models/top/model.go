@@ -39,6 +39,22 @@ func FilterClosed() tea.Msg {
 	return FilterClosedMsg{}
 }
 
+// QuitClearScreenMsg is a message type for quitting with screen clearing
+type QuitClearScreenMsg struct{}
+
+// QuitWithClearScreen returns a command that will quit the application with a clear screen
+func QuitWithClearScreen() tea.Cmd {
+	return tea.Sequence(
+		tea.ExitAltScreen, // Exit alternate screen if it was used
+		func() tea.Msg {
+			return tea.WindowSizeMsg{Width: 0, Height: 0}
+		},
+		func() tea.Msg {
+			return QuitClearScreenMsg{}
+		},
+	)
+}
+
 // Define constants for magic numbers
 const (
 	performanceMonitorInterval = 5 * time.Second
@@ -80,6 +96,9 @@ type Model struct {
 
 	// Performance monitoring state
 	perfMonitorActive bool
+
+	// Flag to indicate we're quitting and should clear the screen
+	quitting bool
 }
 
 func NewModel(
@@ -123,6 +142,7 @@ func NewModel(
 		prompt:                nil,
 		messageClearTime:      time.Time{},
 		perfMonitorActive:     false,
+		quitting:              false,
 	}
 	return m
 }
@@ -141,6 +161,8 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 // dispatchMessage routes messages to their appropriate handlers
+//
+//nolint:cyclop // not really complex
 func (m *Model) dispatchMessage(msg tea.Msg) (tea.Model, tea.Cmd) {
 	// First handle performance monitoring messages
 	if cmd := m.handlePerformanceMessages(msg); cmd != nil {
@@ -149,6 +171,9 @@ func (m *Model) dispatchMessage(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	// Then handle other specific message types
 	switch msg := msg.(type) {
+	case QuitClearScreenMsg:
+		m.quitting = true
+		return m, tea.Quit
 	case spinner.TickMsg:
 		return m.handleSpinnerTick(msg)
 	case models.PromptMsg:
@@ -348,7 +373,7 @@ func (m *Model) manageKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case key.Matches(msg, *m.globalKeyMap.Quit):
 		// ctrl-c quits the app, but not before prompting the user for
 		// confirmation.
-		return m, models.YesNoPrompt("Quit Shell Command Bookmarker?", tea.Quit)
+		return m, models.YesNoPrompt("Quit Shell Command Bookmarker?", QuitWithClearScreen())
 	case key.Matches(msg, *m.globalKeyMap.Help):
 		// '?' toggles help widget
 		m.helpModel.Toggle()
@@ -382,6 +407,11 @@ func (m *Model) manageKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 }
 
 func (m *Model) View() string {
+	// When quitting, return an empty string with height 0 to clear the screen
+	if m.quitting {
+		return lipgloss.NewStyle().Height(0).Render("")
+	}
+
 	// Start composing vertical stack of components that fill entire terminal.
 	var components []string
 
