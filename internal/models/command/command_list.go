@@ -196,15 +196,21 @@ func (m *commandsList) handleReload() tea.Cmd {
 		return nil
 	}
 	m.reloading = true
-	return func() tea.Msg {
-		rows, err := m.HistoryService.GetHistoryRows()
-		m.reloading = false
-		if err != nil {
-			return tui.ReportError(fmt.Errorf("reloading state failed: %w", err))
-		}
-		m.Model.SetItems(rows...)
-		return tui.ReportInfo("reloading finished")
-	}
+	return tea.Batch(
+		tui.ReportInfo("reloading started"),
+		func() tea.Msg {
+			defer func() {
+				m.reloading = false
+			}()
+			rows, err := m.HistoryService.GetHistoryRows()
+			if err != nil {
+				return tui.ErrorMsg(fmt.Errorf("reloading state failed: %w", err))
+			}
+			m.Model.SetItems(rows...)
+
+			return tui.InfoMsg("reloading finished")
+		},
+	)
 }
 
 func (m *commandsList) View() string {

@@ -332,17 +332,13 @@ func (m *Model[V]) handleActionKey(msg tea.KeyMsg) tea.Cmd {
 		if !ok {
 			return nil
 		}
-		return func() tea.Msg {
-			return RowDefaultActionMsg[V]{
-				Row:   row,
-				RowID: row.GetID(),
-				Kind:  m.previewKind,
-			}
-		}
+		return tui.CmdHandler(RowDefaultActionMsg[V]{
+			Row:   row,
+			RowID: row.GetID(),
+			Kind:  m.previewKind,
+		})
 	case key.Matches(msg, *actions.Reload):
-		return func() tea.Msg {
-			return ReloadMsg[V]{}
-		}
+		return tui.CmdHandler(ReloadMsg[V]{})
 	}
 	return nil
 }
