@@ -43,9 +43,18 @@ func FilterClosed() tea.Msg {
 const (
 	performanceMonitorInterval = 5 * time.Second
 	bytesInMegabyte            = 1024 * 1024
+
+	// How long messages remain displayed before auto-clearing
+	messageDisplayDuration = 2 * time.Second
 )
 
+// MessageClearTickMsg represents a tick to check if messages should be cleared
+type MessageClearTickMsg struct{}
+
 type Model struct {
+	// Time when the current message should be cleared
+	messageClearTime time.Time
+
 	*models.PaneManager
 	appService            *services.AppService
 	styles                *styles.Styles
@@ -62,9 +71,11 @@ type Model struct {
 
 	helpModel help.Model
 
-	width    int
-	height   int
-	mode     mode
+	width  int
+	height int
+	mode   mode
+
+	// Whether the spinner is currently active
 	spinning bool
 
 	// Performance monitoring state
@@ -110,6 +121,7 @@ func NewModel(
 		mode:                  normalMode,
 		spinning:              false,
 		prompt:                nil,
+		messageClearTime:      time.Time{},
 		perfMonitorActive:     false,
 	}
 	return m
@@ -143,7 +155,7 @@ func (m *Model) dispatchMessage(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.handlePrompt(&msg)
 	case tea.KeyMsg:
 		return m.handleKeyMsg(msg)
-	case tui.ErrorMsg, tui.InfoMsg:
+	case tui.ErrorMsg, tui.InfoMsg, MessageClearTickMsg:
 		return m.handleStatusMsg(msg)
 	case tea.WindowSizeMsg:
 		return m.handleWindowSize(msg)
@@ -209,8 +221,6 @@ func (m *Model) handlePrompt(msg *models.PromptMsg) (tea.Model, tea.Cmd) {
 
 // handleKeyMsg processes key messages
 func (m *Model) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
-	// Pressing any key makes any info/error message in the footer disappear
-	m.footerModel.ClearMessages()
 	_, teaCmd := m.manageKeyInMode(msg)
 	if teaCmd != nil {
 		return m, teaCmd
@@ -220,13 +230,37 @@ func (m *Model) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 // handleStatusMsg processes status messages
 func (m *Model) handleStatusMsg(msg tea.Msg) (tea.Model, tea.Cmd) {
+	var cmds []tea.Cmd
+
 	switch msg := msg.(type) {
 	case tui.ErrorMsg:
 		m.footerModel.SetError(error(msg))
+		m.messageClearTime = time.Now().Add(messageDisplayDuration)
+		cmds = append(cmds, scheduleClearMessage(messageDisplayDuration))
 	case tui.InfoMsg:
 		m.footerModel.SetInfo(string(msg))
+		m.messageClearTime = time.Now().Add(messageDisplayDuration)
+		cmds = append(cmds, scheduleClearMessage(messageDisplayDuration))
+	case MessageClearTickMsg:
+		// Only clear the message if the current time is after the scheduled clear time
+		// This ensures a new message that resets the clear time won't be cleared prematurely
+		if !m.messageClearTime.IsZero() && time.Now().After(m.messageClearTime) {
+			m.footerModel.ClearMessages()
+			m.messageClearTime = time.Time{}
+		}
+	}
+
+	if len(cmds) > 0 {
+		return m, tea.Batch(cmds...)
 	}
 	return m, nil
+}
+
+// scheduleClearMessage creates a tick command that triggers after the specified duration
+func scheduleClearMessage(d time.Duration) tea.Cmd {
+	return tea.Tick(d, func(_ time.Time) tea.Msg {
+		return MessageClearTickMsg{}
+	})
 }
 
 // handleWindowSize processes window size messages

@@ -65,7 +65,7 @@ func (mm *ListMaker) Make(_ resource.ID, width, height int) (structure.ChildMode
 		RightAlign:     false,
 	}
 
-	m := &resourceList{
+	m := &commandsList{
 		AppService:   mm.App,
 		Model:        nil,
 		reloading:    false,
@@ -101,7 +101,7 @@ func (mm *ListMaker) Make(_ resource.ID, width, height int) (structure.ChildMode
 	return m, nil
 }
 
-type resourceList struct {
+type commandsList struct {
 	Model *table.Model[*models.Command]
 	*services.AppService
 	styles  *styles.Styles
@@ -117,7 +117,7 @@ type resourceList struct {
 	width     int
 }
 
-func (m *resourceList) getColumns(width int) []table.Column {
+func (m *commandsList) getColumns(width int) []table.Column {
 	slog.Debug("getColumns", "width", width)
 	const columnsCount = 4
 	w := width -
@@ -134,13 +134,13 @@ func (m *resourceList) getColumns(width int) []table.Column {
 	}
 }
 
-func (m *resourceList) Init() tea.Cmd {
+func (m *commandsList) Init() tea.Cmd {
 	return func() tea.Msg {
 		return tea.FocusMsg{}
 	}
 }
 
-func (m *resourceList) Update(msg tea.Msg) tea.Cmd {
+func (m *commandsList) Update(msg tea.Msg) tea.Cmd {
 	var cmds []tea.Cmd
 
 	switch msg := msg.(type) {
@@ -164,11 +164,11 @@ func (m *resourceList) Update(msg tea.Msg) tea.Cmd {
 	return tea.Batch(cmds...)
 }
 
-func (m *resourceList) handleRowDefaultAction(msg table.RowDefaultActionMsg[*models.Command]) tea.Cmd {
+func (m *commandsList) handleRowDefaultAction(msg table.RowDefaultActionMsg[*models.Command]) tea.Cmd {
 	return tui.ReportInfo("row selected: %d", msg.Row.GetID())
 }
 
-func (m *resourceList) handleWindowSize(msg tea.WindowSizeMsg) tea.Cmd {
+func (m *commandsList) handleWindowSize(msg tea.WindowSizeMsg) tea.Cmd {
 	m.width = msg.Width
 	m.height = msg.Height
 	m.Model.SetWidth(m.width)
@@ -177,7 +177,7 @@ func (m *resourceList) handleWindowSize(msg tea.WindowSizeMsg) tea.Cmd {
 	return nil
 }
 
-func (m *resourceList) handleFocus() tea.Cmd {
+func (m *commandsList) handleFocus() tea.Cmd {
 	m.Model.SetColumns(m.getColumns(m.width))
 	return func() tea.Msg {
 		rows, err := m.HistoryService.GetHistoryRows()
@@ -191,7 +191,7 @@ func (m *resourceList) handleFocus() tea.Cmd {
 	}
 }
 
-func (m *resourceList) handleReload() tea.Cmd {
+func (m *commandsList) handleReload() tea.Cmd {
 	if m.reloading {
 		return nil
 	}
@@ -207,7 +207,7 @@ func (m *resourceList) handleReload() tea.Cmd {
 	}
 }
 
-func (m *resourceList) View() string {
+func (m *commandsList) View() string {
 	if m.reloading {
 		return "Pulling state " + m.spinner.View()
 	}
