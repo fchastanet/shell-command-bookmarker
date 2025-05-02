@@ -193,8 +193,6 @@ func (m *Model) dispatchMessage(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.handleSpinnerTick(msg)
 	case models.PromptMsg:
 		return m.handlePrompt(&msg)
-	case tea.KeyMsg:
-		return m.handleKeyMsg(msg)
 	case tui.ErrorMsg, tui.InfoMsg, MessageClearTickMsg:
 		return m.handleStatusMsg(msg)
 	case tea.WindowSizeMsg:
@@ -204,9 +202,16 @@ func (m *Model) dispatchMessage(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tui.MemoryStatsMsg:
 		m.handleMemoryStats(msg)
 		return m, tui.PerformanceMonitorTick(performanceMonitorInterval)
-	default:
-		return m.handleGenericMessage(msg)
 	}
+	_, cmd := m.sendMessageToPaneManager(msg)
+	if cmd != nil {
+		return m, cmd
+	}
+
+	if keyMsg, ok := msg.(tea.KeyMsg); ok {
+		return m.handleKeyMsg(keyMsg)
+	}
+	return m, nil
 }
 
 // handlePerformanceMessages handles performance monitoring related messages
@@ -228,8 +233,8 @@ func (m *Model) handlePerformanceMessages(msg tea.Msg) tea.Cmd {
 	return nil
 }
 
-// handleGenericMessage handles any message types not explicitly handled in dispatchMessage
-func (m *Model) handleGenericMessage(msg tea.Msg) (tea.Model, tea.Cmd) {
+// sendMessageToPaneManager handles any message types not explicitly handled in dispatchMessage
+func (m *Model) sendMessageToPaneManager(msg tea.Msg) (tea.Model, tea.Cmd) {
 	// Send remaining msg types to pane manager to route accordingly.
 	return m, m.PaneManager.Update(msg)
 }

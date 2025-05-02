@@ -131,12 +131,46 @@ func (p *PaneManager) Init() tea.Cmd {
 //nolint:funlen,cyclop // I don't know how to simplify right now
 func (p *PaneManager) Update(msg tea.Msg) tea.Cmd {
 	var cmds []tea.Cmd
+	updatePanes := true
 	switch msg := msg.(type) {
-	case tea.KeyMsg:
+	case tea.WindowSizeMsg:
+		p.width = msg.Width
+		p.height = msg.Height
+		p.updateLeftWidth(0)
+		p.updateTopRightHeight(0)
+		p.updateChildSizes()
+		updatePanes = false
+	case structure.NavigationMsg:
+		cmds = append(cmds, p.setPane(msg))
+		updatePanes = false
+	case table.RowDefaultActionMsg[*models.Command]:
+		cmd := p.setBottomPane(msg.RowID, true)
+		cmds = append(cmds, cmd)
+		updatePanes = false
+	case table.RowSelectedActionMsg[*models.Command]:
+		if _, ok := p.panes[structure.BottomPane]; ok {
+			cmd := p.setBottomPane(msg.RowID, false)
+			cmds = append(cmds, cmd)
+		}
+		updatePanes = false
+	}
+
+	if updatePanes {
+		// Send keys to focused pane
+		cmd := p.updateModel(p.focused, msg)
+		if cmd != nil {
+			cmds = append(cmds, cmd)
+			return tea.Batch(cmds...)
+		}
+	}
+
+	if keyMsg, ok := msg.(tea.KeyMsg); ok {
+		// Handle key events for the pane manager
+		handledKey := true
 		switch {
-		case key.Matches(msg, *p.paneKeyMap.Back):
+		case key.Matches(keyMsg, *p.paneKeyMap.Back):
 			if p.focused != structure.TopPane {
-				// History is only maintained for the top right pane.
+				// History is only maintained for the top pane.
 				break
 			}
 			if len(p.history) == 1 {
@@ -150,51 +184,37 @@ func (p *PaneManager) Update(msg tea.Msg) tea.Cmd {
 			// A new top right pane replaces any bottom right pane as well.
 			delete(p.panes, structure.BottomPane)
 			p.updateChildSizes()
-		case key.Matches(msg, *p.paneKeyMap.ShrinkPaneWidth):
+		case key.Matches(keyMsg, *p.paneKeyMap.ShrinkPaneWidth):
 			p.updateLeftWidth(-1)
 			p.updateChildSizes()
-		case key.Matches(msg, *p.paneKeyMap.GrowPaneWidth):
+		case key.Matches(keyMsg, *p.paneKeyMap.GrowPaneWidth):
 			p.updateLeftWidth(1)
 			p.updateChildSizes()
-		case key.Matches(msg, *p.paneKeyMap.ShrinkPaneHeight):
+		case key.Matches(keyMsg, *p.paneKeyMap.ShrinkPaneHeight):
 			p.updateTopRightHeight(-1)
 			p.updateChildSizes()
-		case key.Matches(msg, *p.paneKeyMap.GrowPaneHeight):
+		case key.Matches(keyMsg, *p.paneKeyMap.GrowPaneHeight):
 			p.updateTopRightHeight(1)
 			p.updateChildSizes()
-		case key.Matches(msg, *p.paneKeyMap.SwitchPane):
+		case key.Matches(keyMsg, *p.paneKeyMap.SwitchPane):
 			p.cycleFocusedPane(false)
-		case key.Matches(msg, *p.paneKeyMap.SwitchPaneBack):
+		case key.Matches(keyMsg, *p.paneKeyMap.SwitchPaneBack):
 			p.cycleFocusedPane(true)
-		case key.Matches(msg, *p.paneKeyMap.ClosePane):
+		case key.Matches(keyMsg, *p.paneKeyMap.ClosePane):
 			cmds = append(cmds, p.closeFocusedPane())
-		case key.Matches(msg, *p.paneKeyMap.LeftPane):
+		case key.Matches(keyMsg, *p.paneKeyMap.LeftPane):
 			p.focusPane(structure.LeftPane)
-		case key.Matches(msg, *p.paneKeyMap.TopPane):
+		case key.Matches(keyMsg, *p.paneKeyMap.TopPane):
 			p.focusPane(structure.TopPane)
-		case key.Matches(msg, *p.paneKeyMap.BottomPane):
+		case key.Matches(keyMsg, *p.paneKeyMap.BottomPane):
 			p.focusPane(structure.BottomPane)
 		default:
-			// Send remaining keys to focused pane
-			cmds = append(cmds, p.updateModel(p.focused, msg))
+			handledKey = false
 		}
-	case tea.WindowSizeMsg:
-		p.width = msg.Width
-		p.height = msg.Height
-		p.updateLeftWidth(0)
-		p.updateTopRightHeight(0)
-		p.updateChildSizes()
-	case structure.NavigationMsg:
-		cmds = append(cmds, p.setPane(msg))
-	case table.RowDefaultActionMsg[*models.Command]:
-		cmd := p.setBottomPane(msg.RowID, true)
-		cmds = append(cmds, cmd)
-	case table.RowSelectedActionMsg[*models.Command]:
-		if _, ok := p.panes[structure.BottomPane]; ok {
-			cmd := p.setBottomPane(msg.RowID, false)
-			cmds = append(cmds, cmd)
+		if handledKey {
+			cmds = append(cmds, tui.GetDummyCmd())
 		}
-	default:
+	} else if updatePanes {
 		// Send remaining message types to cached panes.
 		cachedMsgs := p.cache.UpdateAll(msg)
 		cmds = append(cmds, cachedMsgs...)
