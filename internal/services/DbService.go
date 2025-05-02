@@ -210,7 +210,6 @@ func (s *DBService) GetAllCommands() ([]*models.Command, error) {
 		if err != nil {
 			return nil, err
 		}
-		slog.Debug("Command retrieved from database", "command", command)
 		commands = append(commands, &command)
 	}
 	return commands, nil

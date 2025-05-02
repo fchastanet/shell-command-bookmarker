@@ -188,7 +188,8 @@ func (p *PaneManager) Update(msg tea.Msg) tea.Cmd {
 		cmds = append(cmds, p.setPane(msg))
 	default:
 		// Send remaining message types to cached panes.
-		cmds = p.cache.UpdateAll(msg)
+		cachedMsgs := p.cache.UpdateAll(msg)
+		cmds = append(cmds, cachedMsgs...)
 	}
 
 	// Check that if the top right pane is a table with a current row, then
