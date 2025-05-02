@@ -316,7 +316,35 @@ func (m *Model[V]) handleKeyMsg(msg tea.KeyMsg) (*Model[V], tea.Cmd) {
 		return m, nil
 	}
 
+	// Handle action keys
+	if cmd := m.handleActionKey(msg); cmd != nil {
+		return m, cmd
+	}
+
 	return m, nil
+}
+
+func (m *Model[V]) handleActionKey(msg tea.KeyMsg) tea.Cmd {
+	actions := m.actionKeyMap
+	switch {
+	case key.Matches(msg, *actions.Enter):
+		row, ok := m.CurrentRow()
+		if !ok {
+			return nil
+		}
+		return func() tea.Msg {
+			return RowDefaultActionMsg[V]{
+				Row:   row,
+				RowID: row.GetID(),
+				Kind:  m.previewKind,
+			}
+		}
+	case key.Matches(msg, *actions.Reload):
+		return func() tea.Msg {
+			return ReloadMsg[V]{}
+		}
+	}
+	return nil
 }
 
 // handleNavigationKey handles all navigation key presses
