@@ -94,3 +94,13 @@ type FilterCloseMsg struct{}
 
 // FilterKeyMsg is a key entered by the user into the filter widget
 type FilterKeyMsg tea.KeyMsg
+
+// DummyMsg can be used to indicate that Update method has treated a message
+// but does not need to return a command.
+type DummyMsg struct{}
+
+func GetDummyCmd() tea.Cmd {
+	return func() tea.Msg {
+		return DummyMsg{}
+	}
+}
