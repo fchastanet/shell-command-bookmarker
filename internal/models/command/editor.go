@@ -194,9 +194,14 @@ func (m *commandEditor) save() tea.Cmd {
 	return tui.ReportInfo("No changes to save for command #%d", m.command.ID)
 }
 
+type EditorCancelledMsg struct{}
+
 // cancel returns from the editor without saving
 func (m *commandEditor) cancel() tea.Cmd {
-	return tui.ReportInfo("Edit cancelled for command #%d", m.command.ID)
+	return tea.Batch(
+		tui.ReportInfo("Edit cancelled for command #%d", m.command.ID),
+		tui.CmdHandler(EditorCancelledMsg{}),
+	)
 }
 
 // BorderText returns text to display in the border
