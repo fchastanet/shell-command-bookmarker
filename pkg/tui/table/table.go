@@ -800,9 +800,9 @@ func (m *Model[V]) renderRow(rowIdx int) string {
 			style = style.AlignHorizontal(lipgloss.Right)
 		}
 		inlined := style.Render(truncated)
-		// Apply block-styling to content
+		// Apply block-styling to content - using content width for proper padding
 		boxed := lipgloss.NewStyle().
-			Padding(0, 1).
+			PaddingRight(1 + m.styles.Cell.GetPaddingLeft()).
 			Render(inlined)
 		styledCells[i] = boxed
 	}
@@ -810,8 +810,7 @@ func (m *Model[V]) renderRow(rowIdx int) string {
 	// Join cells together to form a row, ensuring it doesn't exceed maximum
 	// table width
 	renderedRow := lipgloss.JoinHorizontal(lipgloss.Left, styledCells...)
-	// Join cells together to form a row, ensuring it doesn't exceed maximum
-	// table width
+	// Apply row style
 	renderedRow = rowStyle.
 		MaxWidth(m.width).
 		Render(renderedRow)
