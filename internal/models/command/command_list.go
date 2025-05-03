@@ -24,10 +24,11 @@ type ListMaker struct {
 }
 
 const (
-	idColumnPercentWidth     = 3
-	titleColumnPercentWidth  = 19
-	scriptColumnPercentWidth = 71
-	statusColumnPercentWidth = 7
+	idColumnPercentWidth         = 3
+	titleColumnPercentWidth      = 19
+	scriptColumnPercentWidth     = 65
+	statusColumnPercentWidth     = 7
+	lintStatusColumnPercentWidth = 6
 
 	percent    = 100
 	sidesCount = 2
@@ -66,27 +67,37 @@ func (mm *ListMaker) Make(_ resource.ID, width, height int) (structure.ChildMode
 		TruncationFunc: table.GetDefaultTruncationFunc(),
 		RightAlign:     false,
 	}
+	lintStatusColumn := table.Column{
+		Key:            "lintStatus",
+		Title:          "Lint",
+		FlexFactor:     0,
+		Width:          0,
+		TruncationFunc: table.GetDefaultTruncationFunc(),
+		RightAlign:     false,
+	}
 
 	m := &commandsList{
-		AppService:   mm.App,
-		Model:        nil,
-		reloading:    false,
-		spinner:      mm.Spinner,
-		width:        width,
-		height:       height,
-		styles:       mm.Styles,
-		idColumn:     &idColumn,
-		titleColumn:  &titleColumn,
-		scriptColumn: &scriptColumn,
-		statusColumn: &statusColumn,
+		AppService:       mm.App,
+		Model:            nil,
+		reloading:        false,
+		spinner:          mm.Spinner,
+		width:            width,
+		height:           height,
+		styles:           mm.Styles,
+		idColumn:         &idColumn,
+		titleColumn:      &titleColumn,
+		scriptColumn:     &scriptColumn,
+		statusColumn:     &statusColumn,
+		lintStatusColumn: &lintStatusColumn,
 	}
 
 	renderer := func(cmd *dbmodels.Command) table.RenderedRow {
 		return table.RenderedRow{
-			idColumn.Key:     fmt.Sprintf("%d", cmd.GetID()),
-			titleColumn.Key:  cmd.Title,
-			scriptColumn.Key: cmd.Script,
-			statusColumn.Key: string(cmd.Status),
+			idColumn.Key:         fmt.Sprintf("%d", cmd.GetID()),
+			titleColumn.Key:      cmd.Title,
+			scriptColumn.Key:     cmd.Script,
+			statusColumn.Key:     string(cmd.Status),
+			lintStatusColumn.Key: string(cmd.LintStatus),
 		}
 	}
 
@@ -111,10 +122,11 @@ type commandsList struct {
 	styles  *styles.Styles
 	spinner *spinner.Model
 
-	idColumn     *table.Column
-	titleColumn  *table.Column
-	scriptColumn *table.Column
-	statusColumn *table.Column
+	idColumn         *table.Column
+	titleColumn      *table.Column
+	scriptColumn     *table.Column
+	statusColumn     *table.Column
+	lintStatusColumn *table.Column
 
 	reloading bool
 	height    int
@@ -123,18 +135,20 @@ type commandsList struct {
 
 func (m *commandsList) getColumns(width int) []table.Column {
 	slog.Debug("getColumns", "width", width)
-	const columnsCount = 4
+	const columnsCount = 5
 	w := width -
 		columnsCount*m.styles.TableStyle.Cell.GetHorizontalPadding()*sidesCount
 	m.idColumn.Width = idColumnPercentWidth * w / percent
 	m.titleColumn.Width = titleColumnPercentWidth * w / percent
 	m.scriptColumn.Width = scriptColumnPercentWidth * w / percent
 	m.statusColumn.Width = statusColumnPercentWidth * w / percent
+	m.lintStatusColumn.Width = lintStatusColumnPercentWidth * w / percent
 	return []table.Column{
 		*m.idColumn,
 		*m.titleColumn,
 		*m.scriptColumn,
 		*m.statusColumn,
+		*m.lintStatusColumn,
 	}
 }
 
