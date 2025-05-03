@@ -217,6 +217,8 @@ func (m *commandsList) Update(msg tea.Msg) tea.Cmd {
 		m.Model.Blur()
 	case tea.FocusMsg:
 		return m.handleFocus()
+	case table.RowDeleteActionMsg[*dbmodels.Command]:
+		return m.handleDeleteRow(msg)
 	}
 
 	// Handle keyboard and mouse events in the table widget
@@ -266,16 +268,57 @@ func (m *commandsList) handleReload(msg table.ReloadMsg[*dbmodels.Command]) tea.
 				return tui.ErrorMsg(fmt.Errorf("reloading state failed: %w", err))
 			}
 			m.Model.SetItems(rows...)
+
 			if msg.RowID != -1 {
 				m.Model.GotoID(msg.RowID)
+				if msg.InfoMsg != nil {
+					return *msg.InfoMsg
+				}
 				return tui.InfoMsg(fmt.Sprintf(
 					"reloading finished, selected new item %d", msg.RowID,
 				))
 			}
 
+			if msg.InfoMsg != nil {
+				return *msg.InfoMsg
+			}
 			return tui.InfoMsg("reloading finished")
 		},
 	)
+}
+
+// handleDeleteRow handles a request to delete a command row
+func (m *commandsList) handleDeleteRow(msg table.RowDeleteActionMsg[*dbmodels.Command]) tea.Cmd {
+	cmd := msg.Row
+	if cmd == nil {
+		return nil
+	}
+
+	confirmMessage := fmt.Sprintf("Delete command #%d: %s?", cmd.GetID(), cmd.Title)
+
+	// Pass our wrapper function as the action to YesNoPrompt
+	return tui.YesNoPrompt(confirmMessage, func() tea.Msg {
+		nextRowID := m.Model.GetNextRowIDRelativeToCurrentRow()
+		// Mark the command as deleted in the database
+		originalStatus := cmd.Status
+		cmd.Status = dbmodels.CommandStatusDeleted
+		err := m.DBService.UpdateCommand(cmd)
+		if err != nil {
+			slog.Error("Error marking command as deleted", "error", err, "id", cmd.GetID())
+			// Revert status change if update fails
+			cmd.Status = originalStatus
+			return tui.ErrorMsg(fmt.Errorf("failed to mark command as deleted: %w", err))
+		}
+
+		// Return a message that will trigger the reload
+		infoMsg := tui.InfoMsg(fmt.Sprintf(
+			"Command #%d marked as deleted", cmd.GetID(),
+		))
+		return table.ReloadMsg[*dbmodels.Command]{
+			RowID:   nextRowID,
+			InfoMsg: &infoMsg,
+		}
+	})
 }
 
 func (m *commandsList) View() string {

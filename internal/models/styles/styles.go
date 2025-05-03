@@ -4,6 +4,7 @@ import (
 	"log/slog"
 
 	"github.com/charmbracelet/lipgloss"
+	"github.com/fchastanet/shell-command-bookmarker/pkg/tui"
 	"github.com/fchastanet/shell-command-bookmarker/pkg/tui/colors"
 	"github.com/fchastanet/shell-command-bookmarker/pkg/tui/table"
 )
@@ -15,7 +16,7 @@ type Styles struct {
 	FooterStyle *FooterStyle
 	HeaderStyle *HeaderStyle
 	WindowStyle *WindowStyle
-	PromptStyle *PromptStyle
+	PromptStyle *tui.PromptStyle
 	EditorStyle *EditorStyle
 	// ColorTheme is the color theme used in the application.
 	ColorTheme *ColorTheme
@@ -71,13 +72,6 @@ type HelpStyle struct {
 	Height       int
 	ColumnMargin int
 	BordersWidth int
-}
-
-type PromptStyle struct {
-	ThickBorder *lipgloss.Style
-	Regular     *lipgloss.Style
-	PlaceHolder *lipgloss.Style
-	Height      int
 }
 
 // EditorStyle contains styling for the command editor component
@@ -165,7 +159,7 @@ func (s *Styles) initBaseStyles(colorTheme *ColorTheme) {
 
 	// Initialize prompt style
 	placeholder := lipgloss.NewStyle().Faint(true)
-	s.PromptStyle = &PromptStyle{
+	s.PromptStyle = &tui.PromptStyle{
 		ThickBorder: &thickBorder,
 		Regular:     &regular,
 		PlaceHolder: &placeholder,

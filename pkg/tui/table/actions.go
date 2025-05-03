@@ -10,6 +10,7 @@ type Action struct {
 	Filter      *key.Binding
 	Reload      *key.Binding
 	Enter       *key.Binding
+	Delete      *key.Binding
 }
 
 func GetDefaultAction() *Action {
@@ -41,6 +42,10 @@ func GetDefaultAction() *Action {
 		key.WithKeys("enter"),
 		key.WithHelp("enter", "view resource"),
 	)
+	deleteKey := key.NewBinding(
+		key.WithKeys("delete", "d"),
+		key.WithHelp("delete/d", "delete row"),
+	)
 
 	return &Action{
 		Select:      &selectKey,
@@ -50,5 +55,6 @@ func GetDefaultAction() *Action {
 		Filter:      &filter,
 		Reload:      &reload,
 		Enter:       &enter,
+		Delete:      &deleteKey,
 	}
 }
