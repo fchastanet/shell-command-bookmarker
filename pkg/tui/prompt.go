@@ -1,12 +1,10 @@
-package models
+package tui
 
 import (
 	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
-	"github.com/fchastanet/shell-command-bookmarker/internal/models/styles"
-	"github.com/fchastanet/shell-command-bookmarker/pkg/tui"
 )
 
 // PromptMsg enables the prompt widget.
@@ -31,13 +29,20 @@ type PromptMsg struct {
 
 type PromptAction func(text string) tea.Cmd
 
+type PromptStyle struct {
+	ThickBorder *lipgloss.Style
+	Regular     *lipgloss.Style
+	PlaceHolder *lipgloss.Style
+	Height      int
+}
+
 // YesNoPrompt sends a message to enable the prompt widget, specifically
 // asking the user for a yes/no answer. If yes is given then the action is
 // invoked.
 func YesNoPrompt(prompt string, action tea.Cmd) tea.Cmd {
 	cancel := key.NewBinding(key.WithKeys("n", "N"))
 	yes := key.NewBinding(key.WithKeys("y", "Y", "ctrl+c"), key.WithHelp("y/ctrl+c", "confirm"))
-	return tui.CmdHandler(PromptMsg{
+	return CmdHandler(PromptMsg{
 		Prompt:         prompt + " (y/N): ",
 		InitialValue:   "",
 		Placeholder:    "",
@@ -50,7 +55,7 @@ func YesNoPrompt(prompt string, action tea.Cmd) tea.Cmd {
 	})
 }
 
-func NewPrompt(msg *PromptMsg, style *styles.PromptStyle) (*Prompt, tea.Cmd) {
+func NewPrompt(msg *PromptMsg, style *PromptStyle) (*Prompt, tea.Cmd) {
 	model := textinput.New()
 	model.Prompt = msg.Prompt
 	model.SetValue(msg.InitialValue)
@@ -72,7 +77,7 @@ func NewPrompt(msg *PromptMsg, style *styles.PromptStyle) (*Prompt, tea.Cmd) {
 // Prompt is a widget that prompts the user for input and triggers an action.
 type Prompt struct {
 	action         PromptAction
-	style          styles.PromptStyle
+	style          PromptStyle
 	trigger        *key.Binding
 	cancel         *key.Binding
 	model          textinput.Model
@@ -87,7 +92,7 @@ func (p *Prompt) HandleKey(msg tea.KeyMsg) (closePrompt bool, cmd tea.Cmd) {
 		cmd = p.action(p.model.Value())
 		closePrompt = true
 	case key.Matches(msg, *p.cancel), p.cancelAnyOther:
-		cmd = tui.ReportInfo("canceled operation")
+		cmd = ReportInfo("canceled operation")
 		closePrompt = true
 	default:
 		p.model, cmd = p.model.Update(msg)

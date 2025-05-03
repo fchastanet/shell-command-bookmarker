@@ -339,7 +339,18 @@ func (m *Model[V]) handleActionKey(msg tea.KeyMsg) tea.Cmd {
 			Kind:  m.previewKind,
 		})
 	case key.Matches(msg, *actions.Reload):
-		return tui.CmdHandler(ReloadMsg[V]{RowID: -1})
+		return tui.CmdHandler(ReloadMsg[V]{
+			RowID: -1, InfoMsg: nil,
+		})
+	case key.Matches(msg, *actions.Delete):
+		row, ok := m.CurrentRow()
+		if !ok {
+			return nil
+		}
+		return tui.CmdHandler(RowDeleteActionMsg[V]{
+			Row:   row,
+			RowID: row.GetID(),
+		})
 	}
 	return nil
 }
@@ -746,6 +757,21 @@ func (m *Model[V]) GotoTop() {
 // GotoBottom makes the bottom row the current row.
 func (m *Model[V]) GotoBottom() {
 	m.MoveDown(len(m.rows))
+}
+
+// GetNextRowIDRelativeToCurrentRow returns the ID of the row after the current row
+// If the current row is the last row, it returns previous row ID
+// If the current row is the last row, it returns 0
+func (m *Model[V]) GetNextRowIDRelativeToCurrentRow() resource.ID {
+	if m.currentRowIndex+1 >= len(m.rows) {
+		// If the current row is the last row, return previous row ID
+		if m.currentRowIndex-1 >= 0 {
+			return m.rows[m.currentRowIndex-1].GetID()
+		}
+		// If the current row is the first row, return 0
+		return resource.ID(0)
+	}
+	return m.rows[m.currentRowIndex+1].GetID()
 }
 
 func (m *Model[V]) headersView() string {

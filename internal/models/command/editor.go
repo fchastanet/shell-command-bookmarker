@@ -274,12 +274,14 @@ func (m *commandEditor) save() tea.Cmd {
 		m.command = newCommand
 
 		// Trigger table reload to reflect changes
-		return tea.Batch(
-			tui.ReportInfo("Command #%d saved successfully", m.command.ID),
-			tui.CmdHandler(table.ReloadMsg[*dbmodels.Command]{
-				RowID: resource.ID(m.command.ID),
-			}),
-		)
+		infoMsg := tui.InfoMsg(fmt.Sprintf(
+			"Command #%d saved successfully", m.command.ID,
+		))
+
+		return tui.CmdHandler(table.ReloadMsg[*dbmodels.Command]{
+			RowID:   resource.ID(m.command.ID),
+			InfoMsg: &infoMsg,
+		})
 	}
 
 	return tui.ReportInfo("No changes to save for command #%d", m.command.ID)

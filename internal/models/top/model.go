@@ -85,7 +85,7 @@ type Model struct {
 	styles     *styles.Styles
 	keyMaps    *KeyMaps
 
-	prompt      *models.Prompt
+	prompt      *tui.Prompt
 	spinner     *spinner.Model
 	footerModel footer.Model
 	headerModel header.Model
@@ -191,7 +191,7 @@ func (m *Model) dispatchMessage(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, tea.Quit
 	case spinner.TickMsg:
 		return m.handleSpinnerTick(msg)
-	case models.PromptMsg:
+	case tui.PromptMsg:
 		return m.handlePrompt(&msg)
 	case tui.ErrorMsg, tui.InfoMsg, MessageClearTickMsg:
 		return m.handleStatusMsg(msg)
@@ -251,11 +251,11 @@ func (m *Model) handleSpinnerTick(msg spinner.TickMsg) (tea.Model, tea.Cmd) {
 }
 
 // handlePrompt processes prompt messages
-func (m *Model) handlePrompt(msg *models.PromptMsg) (tea.Model, tea.Cmd) {
+func (m *Model) handlePrompt(msg *tui.PromptMsg) (tea.Model, tea.Cmd) {
 	// Enable prompt widget
 	m.mode = promptMode
 	var blink tea.Cmd
-	m.prompt, blink = models.NewPrompt(msg, m.styles.PromptStyle)
+	m.prompt, blink = tui.NewPrompt(msg, m.styles.PromptStyle)
 	// Send out message to panes to resize themselves to make room for the prompt above it.
 	_ = m.PaneManager.Update(tea.WindowSizeMsg{
 		Height: m.viewHeight(),
@@ -393,7 +393,7 @@ func (m *Model) manageKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case key.Matches(msg, *m.keyMaps.global.Quit):
 		// ctrl-c quits the app, but not before prompting the user for
 		// confirmation.
-		return m, models.YesNoPrompt("Quit Shell Command Bookmarker?", QuitWithClearScreen())
+		return m, tui.YesNoPrompt("Quit Shell Command Bookmarker?", QuitWithClearScreen())
 	case key.Matches(msg, *m.keyMaps.global.Help):
 		// '?' toggles help widget
 		m.helpModel.Toggle()
