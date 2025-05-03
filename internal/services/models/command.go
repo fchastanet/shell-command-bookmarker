@@ -10,7 +10,11 @@ type CommandStatus string
 
 const (
 	CommandStatusImported   CommandStatus = "IMPORTED"
+	CommandStatusSaved      CommandStatus = "SAVED"
+	CommandStatusDeleted    CommandStatus = "DELETED"
+	CommandStatusObsolete   CommandStatus = "OBSOLETE"
 	CommandStatusBookmarked CommandStatus = "BOOKMARKED"
+	CommandStatusArchived   CommandStatus = "ARCHIVED"
 )
 
 type Command struct {
@@ -22,12 +26,14 @@ type Command struct {
 	Status               CommandStatus
 	LintIssues           string
 	LintStatus           LintStatus
-	ID                   uint
+	ID                   int64
 	Elapsed              int
 }
 
 type CommandStatusEnum struct {
 	Imported   CommandStatus
+	Saved      CommandStatus
+	Obsolete   CommandStatus
 	Bookmarked CommandStatus
 }
 

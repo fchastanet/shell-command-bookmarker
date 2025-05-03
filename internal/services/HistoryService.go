@@ -50,11 +50,17 @@ func NewHistoryService(
 }
 
 func (s *HistoryService) GetHistoryRows() ([]*models.Command, error) {
-	cmds, err := s.dbService.GetAllCommands()
+	// Only fetch commands with the statuses we want to display
+	cmds, err := s.dbService.GetCommands(
+		models.CommandStatusImported,
+		models.CommandStatusSaved,
+		models.CommandStatusBookmarked,
+	)
 	if err != nil {
 		slog.Error("Error getting history rows", "error", err)
 		return []*models.Command{}, err
 	}
+
 	return cmds, nil
 }
 
@@ -223,6 +229,100 @@ func (s *HistoryService) processCmd(historyCmd processors.HistoryCommand) (proce
 	}
 	slog.Info("Command saved successfully", "command", cmd)
 	return processors.CommandImportedStatusNew, nil
+}
+
+func (s *HistoryService) UpdateCommand(command *models.Command) (newCommand *models.Command, err error) {
+	slog.Debug("Updating command", "id", command.ID, "status", command.Status)
+
+	// If it's an IMPORTED command being updated, we need to handle duplication
+	if command.Status == models.CommandStatusImported {
+		originalCmd := *command
+
+		// Step 1: Mark the original command as obsolete
+		if err := s.duplicateCommandAsObsolete(command); err != nil {
+			slog.Error("Failed to mark original command as obsolete", "id", command.ID, "error", err)
+			return nil, err
+		}
+
+		newCommand, err = s.createNewCommandFromImportedCommand(command)
+		if err != nil {
+			slog.Error("Failed to create new command from imported command", "error", err)
+			return nil, err
+		}
+
+		slog.Info("Created new saved command from imported command", "oldId", originalCmd.ID, "newId", newCommand.ID)
+		return newCommand, nil
+	}
+
+	// For non-IMPORTED commands, just update directly
+	command.ModificationDatetime = time.Now()
+	// Lint the new command
+	s.lintCommand(command)
+	err = s.dbService.UpdateCommand(command)
+	if err != nil {
+		slog.Error("Error updating command in database", "id", command.ID, "error", err)
+		return nil, err
+	}
+	return command, nil
+}
+
+func (s *HistoryService) createNewCommandFromImportedCommand(command *models.Command) (*models.Command, error) {
+	// Step 2: Create a new command with SAVED status
+	newCmd := models.Command{
+		ID:                   0, // New ID will be generated
+		Title:                command.Title,
+		Description:          command.Description,
+		Script:               command.Script,
+		Status:               models.CommandStatusSaved,
+		LintIssues:           command.LintIssues,
+		LintStatus:           command.LintStatus,
+		Elapsed:              command.Elapsed,
+		CreationDatetime:     command.CreationDatetime,
+		ModificationDatetime: time.Now(),
+	}
+
+	// Lint the new command
+	s.lintCommand(command)
+
+	// Save the new command
+	if err := s.dbService.SaveCommand(&newCmd); err != nil {
+		slog.Error("Error saving new command", "error", err)
+		return nil, err
+	}
+	return &newCmd, nil
+}
+
+func (s *HistoryService) lintCommand(command *models.Command) {
+	if command.Status != models.CommandStatusSaved {
+		slog.Warn("Command is not in a state that can be linted", "id", command.ID, "status", command.Status)
+		return
+	}
+
+	issues, err := s.lintService.LintScript(command.Script)
+	if err != nil && len(issues) == 0 {
+		slog.Error("Error linting command", "command", command, "error", err)
+		command.LintStatus = models.LintStatusShellcheckFailed
+		command.LintIssues = "[]"
+	} else {
+		command.LintStatus = s.lintService.GetLintResultingStatus(issues)
+		command.LintIssues = s.lintService.FormatLintIssuesAsJSON(issues)
+	}
+	slog.Info("Command linted successfully",
+		"command", command,
+		"lintStatus", command.LintStatus,
+		"lintIssues", command.LintIssues,
+	)
+}
+
+func (s *HistoryService) duplicateCommandAsObsolete(command *models.Command) error {
+	command.Status = models.CommandStatusObsolete
+	command.ModificationDatetime = time.Now()
+	if err := s.dbService.UpdateCommand(command); err != nil {
+		slog.Error("Failed to mark original command as obsolete", "id", command.ID, "error", err)
+		return err
+	}
+	slog.Info("Original command marked as obsolete", "id", command.ID)
+	return nil
 }
 
 func matchOneOfRegexp(line string, regexps []*regexp.Regexp) bool {
