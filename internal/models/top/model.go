@@ -419,10 +419,6 @@ func (m *Model) manageKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, models.NavigateTo(structure.SearchKind, structure.WithPosition(structure.LeftPane))
 	default:
 	}
-	// Send all other keys to panes.
-	if cmd := m.PaneManager.Update(msg); cmd != nil {
-		return m, cmd
-	}
 	return m, nil
 }
 
