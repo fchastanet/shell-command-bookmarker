@@ -90,17 +90,9 @@ func (mm *ListMaker) Make(_ resource.ID, width, height int) (structure.ChildMode
 		statusColumn:     &statusColumn,
 		lintStatusColumn: &lintStatusColumn,
 	}
-
 	renderer := func(cmd *dbmodels.Command) table.RenderedRow {
-		return table.RenderedRow{
-			idColumn.Key:         fmt.Sprintf("%d", cmd.GetID()),
-			titleColumn.Key:      cmd.Title,
-			scriptColumn.Key:     cmd.Script,
-			statusColumn.Key:     string(cmd.Status),
-			lintStatusColumn.Key: string(cmd.LintStatus),
-		}
+		return mm.renderRow(cmd, m)
 	}
-
 	tbl := table.New(
 		mm.Styles.TableStyle,
 		m.getColumns(0),
@@ -114,6 +106,61 @@ func (mm *ListMaker) Make(_ resource.ID, width, height int) (structure.ChildMode
 	)
 	m.Model = &tbl
 	return m, nil
+}
+
+func (mm *ListMaker) renderRow(
+	cmd *dbmodels.Command,
+	commandsListModel *commandsList,
+) table.RenderedRow {
+	return table.RenderedRow{
+		commandsListModel.idColumn.Key:         fmt.Sprintf("%d", cmd.GetID()),
+		commandsListModel.titleColumn.Key:      cmd.Title,
+		commandsListModel.scriptColumn.Key:     cmd.Script,
+		commandsListModel.statusColumn.Key:     formatStatus(cmd, commandsListModel.styles.EditorStyle),
+		commandsListModel.lintStatusColumn.Key: formatLintStatus(cmd, commandsListModel.styles.EditorStyle),
+	}
+}
+
+func formatStatus(
+	cmd *dbmodels.Command,
+	editorStyle *styles.EditorStyle,
+) string {
+	switch cmd.Status {
+	case dbmodels.CommandStatusBookmarked:
+		return editorStyle.StatusOK.Render(string(cmd.Status))
+	case dbmodels.CommandStatusSaved:
+		return editorStyle.StatusOK.Render(string(cmd.Status))
+	case dbmodels.CommandStatusImported:
+		return editorStyle.ReadonlyValue.Render(string(cmd.Status))
+	case dbmodels.CommandStatusObsolete:
+		return editorStyle.StatusDisabled.Render(string(cmd.Status))
+	case dbmodels.CommandStatusArchived:
+		return editorStyle.StatusDisabled.Render(string(cmd.Status))
+	case dbmodels.CommandStatusDeleted:
+		return editorStyle.StatusWarning.Render(string(cmd.Status))
+	default:
+		return string(cmd.Status)
+	}
+}
+
+func formatLintStatus(
+	cmd *dbmodels.Command,
+	editorStyle *styles.EditorStyle,
+) string {
+	switch cmd.LintStatus {
+	case dbmodels.LintStatusOK:
+		return editorStyle.StatusOK.Render("OK")
+	case dbmodels.LintStatusWarning:
+		return editorStyle.StatusWarning.Render("Warning")
+	case dbmodels.LintStatusError:
+		return editorStyle.StatusError.Render("Error")
+	case dbmodels.LintStatusShellcheckFailed:
+		return editorStyle.StatusError.Render("Shellcheck Failed")
+	case dbmodels.LintStatusNotAvailable:
+		return editorStyle.StatusDisabled.Render("Not Available")
+	default:
+		return editorStyle.StatusDisabled.Render("Not Available")
+	}
 }
 
 type commandsList struct {
