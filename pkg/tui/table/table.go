@@ -12,6 +12,7 @@ import (
 	"github.com/charmbracelet/lipgloss"
 	"github.com/fchastanet/shell-command-bookmarker/pkg/resource"
 	"github.com/fchastanet/shell-command-bookmarker/pkg/tui"
+	"github.com/fchastanet/shell-command-bookmarker/pkg/utils"
 	"golang.org/x/exp/maps"
 )
 
@@ -799,8 +800,19 @@ func (m *Model[V]) renderRow(rowIdx int) string {
 		if col.RightAlign {
 			style = style.AlignHorizontal(lipgloss.Right)
 		}
+
+		if current || selected {
+			// For highlighted rows, ignore any styling in the cell content
+			// and just apply the row's background/foreground colors
+			style.
+				Background(rowStyle.GetBackground()).
+				Foreground(rowStyle.GetForeground())
+
+			truncated = utils.RemoveAnsiCodes(truncated)
+		}
+		// For normal rows, just apply the regular styling
 		inlined := style.Render(truncated)
-		// Apply block-styling to content - using content width for proper padding
+		// Apply block-styling to content
 		boxed := lipgloss.NewStyle().
 			PaddingRight(1 + m.styles.Cell.GetPaddingLeft()).
 			Render(inlined)
