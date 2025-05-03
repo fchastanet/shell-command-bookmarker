@@ -15,7 +15,6 @@ type PaneNavigationKeyMap struct {
 	ShrinkPaneWidth  *key.Binding
 	GrowPaneWidth    *key.Binding
 	ClosePane        *key.Binding
-	Back             *key.Binding
 }
 
 // Navigation returns key bindings for navigation.
@@ -60,10 +59,6 @@ func GetPaneNavigationKeyMap() *PaneNavigationKeyMap {
 		key.WithKeys(">"),
 		key.WithHelp(">", "increase width"),
 	)
-	back := key.NewBinding(
-		key.WithKeys("esc"),
-		key.WithHelp("esc", "back"),
-	)
 
 	return &PaneNavigationKeyMap{
 		SwitchPane:       &switchPane,
@@ -76,6 +71,5 @@ func GetPaneNavigationKeyMap() *PaneNavigationKeyMap {
 		ShrinkPaneWidth:  &shrinkPaneWidth,
 		GrowPaneWidth:    &growPaneWidth,
 		ClosePane:        &closePane,
-		Back:             &back,
 	}
 }

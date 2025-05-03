@@ -77,8 +77,6 @@ type PaneManager struct {
 	makerFactory func(kind resource.Kind) Maker
 	// panes tracks currently visible panes
 	panes map[structure.Position]pane
-	// history tracks previously visited models for the top pane.
-	history []pane
 	// the position of the currently focused pane
 	focused structure.Position
 	// total width and height of the terminal space available to panes.
@@ -116,7 +114,6 @@ func NewPaneManager(
 		focused: structure.TopPane,
 		width:   0,
 		height:  0,
-		history: make([]pane, 0),
 	}
 	return p
 }
@@ -129,35 +126,15 @@ func (p *PaneManager) Init() tea.Cmd {
 	})
 }
 
-//nolint:funlen,cyclop // I don't know how to simplify right now
 func (p *PaneManager) Update(msg tea.Msg) tea.Cmd {
 	var cmds []tea.Cmd
 	updatePanes := true
-	switch msg := msg.(type) {
-	case tea.WindowSizeMsg:
-		p.width = msg.Width
-		p.height = msg.Height
-		p.updateLeftWidth(0)
-		p.updateTopRightHeight(0)
-		p.updateChildSizes()
-		updatePanes = false
-	case structure.NavigationMsg:
-		cmds = append(cmds, p.setPane(msg))
-		updatePanes = false
-	case table.RowDefaultActionMsg[*models.Command]:
-		cmd := p.setBottomPane(msg.RowID, true)
-		cmds = append(cmds, cmd)
-		updatePanes = false
-	case table.RowSelectedActionMsg[*models.Command]:
-		if _, ok := p.panes[structure.BottomPane]; ok {
-			cmd := p.setBottomPane(msg.RowID, false)
+
+	// Handle special messages
+	if cmd, handled := p.handleSpecialMessages(msg); handled {
+		if cmd != nil {
 			cmds = append(cmds, cmd)
 		}
-		updatePanes = false
-	case command.EditorCancelledMsg:
-		// The command editor was cancelled, so we need to close the bottom pane
-		// and focus the top pane.
-		cmds = append(cmds, p.closeFocusedPane())
 		updatePanes = false
 	}
 
@@ -172,61 +149,142 @@ func (p *PaneManager) Update(msg tea.Msg) tea.Cmd {
 
 	if keyMsg, ok := msg.(tea.KeyMsg); ok {
 		// Handle key events for the pane manager
-		handledKey := true
-		switch {
-		case key.Matches(keyMsg, *p.paneKeyMap.Back):
-			if p.focused != structure.TopPane {
-				// History is only maintained for the top pane.
-				break
-			}
-			if len(p.history) == 1 {
-				// At dawn of history; can't go further back.
-				return tui.ReportError(ErrAlreadyAtFirstPage)
-			}
-			// Pop current model from history
-			p.history = p.history[:len(p.history)-1]
-			// Set pane to last model
-			p.panes[structure.TopPane] = p.history[len(p.history)-1]
-			// A new top right pane replaces any bottom right pane as well.
-			delete(p.panes, structure.BottomPane)
-			p.updateChildSizes()
-		case key.Matches(keyMsg, *p.paneKeyMap.ShrinkPaneWidth):
-			p.updateLeftWidth(-1)
-			p.updateChildSizes()
-		case key.Matches(keyMsg, *p.paneKeyMap.GrowPaneWidth):
-			p.updateLeftWidth(1)
-			p.updateChildSizes()
-		case key.Matches(keyMsg, *p.paneKeyMap.ShrinkPaneHeight):
-			p.updateTopRightHeight(-1)
-			p.updateChildSizes()
-		case key.Matches(keyMsg, *p.paneKeyMap.GrowPaneHeight):
-			p.updateTopRightHeight(1)
-			p.updateChildSizes()
-		case key.Matches(keyMsg, *p.paneKeyMap.SwitchPane):
-			p.cycleFocusedPane(false)
-		case key.Matches(keyMsg, *p.paneKeyMap.SwitchPaneBack):
-			p.cycleFocusedPane(true)
-		case key.Matches(keyMsg, *p.paneKeyMap.ClosePane):
-			cmds = append(cmds, p.closeFocusedPane())
-		case key.Matches(keyMsg, *p.paneKeyMap.LeftPane):
-			p.focusPane(structure.LeftPane)
-		case key.Matches(keyMsg, *p.paneKeyMap.TopPane):
-			p.focusPane(structure.TopPane)
-		case key.Matches(keyMsg, *p.paneKeyMap.BottomPane):
-			p.focusPane(structure.BottomPane)
-		default:
-			handledKey = false
-		}
-		if handledKey {
-			cmds = append(cmds, tui.GetDummyCmd())
+		cmd := p.handleKeyEvent(keyMsg)
+		if cmd != nil {
+			cmds = append(cmds, cmd)
 		}
 	} else if updatePanes {
-		// Send remaining message types to cached panes.
-		cachedMsgs := p.cache.UpdateAll(msg)
-		cmds = append(cmds, cachedMsgs...)
+		// Send remaining message types to cached panes except focused one.
+		cmds = append(cmds, p.updateUnfocusedPanes(msg)...)
 	}
 
 	return tea.Batch(cmds...)
+}
+
+// handleSpecialMessages processes special message types like window size, navigation, etc.
+func (p *PaneManager) handleSpecialMessages(msg tea.Msg) (tea.Cmd, bool) {
+	switch msg := msg.(type) {
+	case tea.WindowSizeMsg:
+		p.width = msg.Width
+		p.height = msg.Height
+		p.updateLeftWidth(0)
+		p.updateTopRightHeight(0)
+		p.updateChildSizes()
+		return nil, true
+	case structure.NavigationMsg:
+		return p.setPane(msg), true
+	case table.RowDefaultActionMsg[*models.Command]:
+		return p.setBottomPane(msg.RowID, true), true
+	case table.RowSelectedActionMsg[*models.Command]:
+		if _, ok := p.panes[structure.BottomPane]; ok {
+			return p.setBottomPane(msg.RowID, false), true
+		}
+	case command.EditorCancelledMsg:
+		// The command editor was cancelled, so we need to close the bottom pane
+		// and focus the top pane.
+		return p.closeFocusedPane(), true
+	}
+
+	return nil, false
+}
+
+// updateUnfocusedPanes sends messages to all panes except the focused one
+func (p *PaneManager) updateUnfocusedPanes(msg tea.Msg) []tea.Cmd {
+	var cmds []tea.Cmd
+
+	for position := range p.panes {
+		if position == p.focused {
+			continue
+		}
+		if cmd := p.updateModel(position, msg); cmd != nil {
+			cmds = append(cmds, cmd)
+		}
+	}
+
+	return cmds
+}
+
+func (p *PaneManager) handleKeyEvent(keyMsg tea.KeyMsg) tea.Cmd {
+	// Handle close pane action separately
+	if key.Matches(keyMsg, *p.paneKeyMap.ClosePane) {
+		return p.closeFocusedPane()
+	}
+
+	// Handle pane resize operations
+	if cmd := p.handleResizeKeys(keyMsg); cmd != nil {
+		return cmd
+	}
+
+	// Handle pane navigation operations
+	return p.handleNavigationKeys(keyMsg)
+}
+
+// handleNavigationKeys handles key bindings for navigating between panes
+func (p *PaneManager) handleNavigationKeys(keyMsg tea.KeyMsg) tea.Cmd {
+	switch {
+	case key.Matches(keyMsg, *p.paneKeyMap.SwitchPane):
+		return p.handleSwitchPane(false)
+	case key.Matches(keyMsg, *p.paneKeyMap.SwitchPaneBack):
+		return p.handleSwitchPane(true)
+	case key.Matches(keyMsg, *p.paneKeyMap.LeftPane):
+		return p.handleFocusPane(structure.LeftPane)
+	case key.Matches(keyMsg, *p.paneKeyMap.TopPane):
+		return p.handleFocusPane(structure.TopPane)
+	case key.Matches(keyMsg, *p.paneKeyMap.BottomPane):
+		return p.handleFocusPane(structure.BottomPane)
+	default:
+		return nil
+	}
+}
+
+// handleResizeKeys handles key bindings for resizing panes
+func (p *PaneManager) handleResizeKeys(keyMsg tea.KeyMsg) tea.Cmd {
+	switch {
+	case key.Matches(keyMsg, *p.paneKeyMap.ShrinkPaneWidth):
+		return p.handleShrinkPaneWidth()
+	case key.Matches(keyMsg, *p.paneKeyMap.GrowPaneWidth):
+		return p.handleGrowPaneWidth()
+	case key.Matches(keyMsg, *p.paneKeyMap.ShrinkPaneHeight):
+		return p.handleShrinkPaneHeight()
+	case key.Matches(keyMsg, *p.paneKeyMap.GrowPaneHeight):
+		return p.handleGrowPaneHeight()
+	default:
+		return nil
+	}
+}
+
+func (p *PaneManager) handleShrinkPaneWidth() tea.Cmd {
+	p.updateLeftWidth(-1)
+	p.updateChildSizes()
+	return tui.GetDummyCmd()
+}
+
+func (p *PaneManager) handleGrowPaneWidth() tea.Cmd {
+	p.updateLeftWidth(1)
+	p.updateChildSizes()
+	return tui.GetDummyCmd()
+}
+
+func (p *PaneManager) handleShrinkPaneHeight() tea.Cmd {
+	p.updateTopRightHeight(-1)
+	p.updateChildSizes()
+	return tui.GetDummyCmd()
+}
+
+func (p *PaneManager) handleGrowPaneHeight() tea.Cmd {
+	p.updateTopRightHeight(1)
+	p.updateChildSizes()
+	return tui.GetDummyCmd()
+}
+
+func (p *PaneManager) handleSwitchPane(back bool) tea.Cmd {
+	p.cycleFocusedPane(back)
+	return tui.GetDummyCmd()
+}
+
+func (p *PaneManager) handleFocusPane(position structure.Position) tea.Cmd {
+	p.focusPane(position)
+	return tui.GetDummyCmd()
 }
 
 func (p *PaneManager) setBottomPane(rowID resource.ID, focusIfSameRowID bool) tea.Cmd {
@@ -368,9 +426,6 @@ func (p *PaneManager) setPane(msg structure.NavigationMsg) (cmd tea.Cmd) {
 	if msg.Position == structure.TopPane {
 		// A new top right pane replaces any bottom right pane as well.
 		delete(p.panes, structure.BottomPane)
-		// Track the models for the top right pane, so that the user can go back
-		// to previous
-		p.history = append(p.history, p.panes[structure.TopPane])
 	}
 	p.updateChildSizes()
 	if !msg.DisableFocus {
@@ -471,10 +526,6 @@ func (p *PaneManager) renderPane(position structure.Position) string {
 func (p *PaneManager) HelpBindings() (bindings []*key.Binding) {
 	if len(p.panes) == 1 {
 		return bindings
-	}
-	if p.focused == structure.TopPane {
-		// Only the top right pane has the ability to "go back"
-		bindings = append(bindings, p.paneKeyMap.Back)
 	}
 	if model, ok := p.FocusedModel().(structure.ModelHelpBindings); ok {
 		bindings = append(bindings, model.HelpBindings()...)
