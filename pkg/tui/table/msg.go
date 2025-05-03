@@ -15,4 +15,6 @@ type RowSelectedActionMsg[V resource.Identifiable] struct {
 	RowID resource.ID // The ID of the selected row
 }
 
-type ReloadMsg[V resource.Identifiable] struct{}
+type ReloadMsg[V resource.Identifiable] struct {
+	RowID resource.ID // The ID of the row to go to
+}

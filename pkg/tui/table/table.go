@@ -338,7 +338,7 @@ func (m *Model[V]) handleActionKey(msg tea.KeyMsg) tea.Cmd {
 			Kind:  m.previewKind,
 		})
 	case key.Matches(msg, *actions.Reload):
-		return tui.CmdHandler(ReloadMsg[V]{})
+		return tui.CmdHandler(ReloadMsg[V]{RowID: -1})
 	}
 	return nil
 }
@@ -717,6 +717,24 @@ func (m *Model[V]) setStart() {
 	// rows as possible are rendered)
 	maximum := max(0, min(m.currentRowIndex, len(m.rows)-m.rowAreaHeight()))
 	m.start = clamp(m.start, minimum, maximum)
+}
+
+// GotoTop makes the top row the current row.
+func (m *Model[V]) GotoID(id resource.ID) {
+	if id == m.currentRowID {
+		return
+	}
+	if _, ok := m.items[id]; ok {
+		m.currentRowID = id
+		m.currentRowIndex = 0
+		for i, r := range m.rows {
+			if r.GetID() == id {
+				m.currentRowIndex = i
+				break
+			}
+		}
+	}
+	m.setStart()
 }
 
 // GotoTop makes the top row the current row.
