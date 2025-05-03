@@ -8,6 +8,7 @@ import (
 	"github.com/charmbracelet/bubbles/key"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/fchastanet/shell-command-bookmarker/internal/models/command"
 	"github.com/fchastanet/shell-command-bookmarker/internal/models/keys"
 	"github.com/fchastanet/shell-command-bookmarker/internal/models/structure"
 	"github.com/fchastanet/shell-command-bookmarker/internal/models/styles"
@@ -152,6 +153,11 @@ func (p *PaneManager) Update(msg tea.Msg) tea.Cmd {
 			cmd := p.setBottomPane(msg.RowID, false)
 			cmds = append(cmds, cmd)
 		}
+		updatePanes = false
+	case command.EditorCancelledMsg:
+		// The command editor was cancelled, so we need to close the bottom pane
+		// and focus the top pane.
+		cmds = append(cmds, p.closeFocusedPane())
 		updatePanes = false
 	}
 
