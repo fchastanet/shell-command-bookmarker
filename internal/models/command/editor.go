@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log/slog"
 	"strings"
+	"time"
 
 	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/bubbles/textinput"
@@ -97,6 +98,24 @@ func (m *commandEditor) Init() tea.Cmd {
 	return nil
 }
 
+// formatLintStatus returns a styled string representing the lint status
+func (m *commandEditor) formatLintStatus() string {
+	switch m.command.LintStatus {
+	case dbmodels.LintStatusOK:
+		return m.styles.EditorStyle.StatusOK.Render("OK")
+	case dbmodels.LintStatusWarning:
+		return m.styles.EditorStyle.StatusWarning.Render("Warning")
+	case dbmodels.LintStatusError:
+		return m.styles.EditorStyle.StatusError.Render("Error")
+	case dbmodels.LintStatusShellcheckFailed:
+		return m.styles.EditorStyle.StatusError.Render("Shellcheck Failed")
+	case dbmodels.LintStatusNotAvailable:
+		return m.styles.EditorStyle.StatusDisabled.Render("Not Available")
+	default:
+		return m.styles.EditorStyle.StatusDisabled.Render("Not Available")
+	}
+}
+
 // Update handles updates to the command editor
 func (m *commandEditor) Update(msg tea.Msg) tea.Cmd {
 	var cmds []tea.Cmd
@@ -145,9 +164,73 @@ func (m *commandEditor) View() string {
 		content.WriteString(fmt.Sprintf("%s\n%s\n\n", styledLabel, m.inputs[i].View()))
 	}
 
-	// Add help text at the bottom
-	helpText := "\n" + m.styles.EditorStyle.HelpText.Render("↑/↓: Navigate • Enter: Save • Esc: Cancel")
+	// Add readonly information section
+	readonlyTitle := m.styles.EditorStyle.Label.Render("Readonly Information:")
+	content.WriteString(readonlyTitle + "\n\n")
 
+	// Format and add each readonly field with label and value
+	createLabel := m.styles.EditorStyle.ReadonlyLabel.Render("Created:")
+	createValue := m.styles.EditorStyle.ReadonlyValue.Render(
+		m.command.CreationDatetime.Format(time.DateTime))
+
+	modifyLabel := m.styles.EditorStyle.ReadonlyLabel.Render("Modified:")
+	modifyValue := m.styles.EditorStyle.ReadonlyValue.Render(
+		m.command.ModificationDatetime.Format(time.DateTime))
+
+	lintStatusLabel := m.styles.EditorStyle.ReadonlyLabel.Render("Lint Status:")
+	lintIssuesLabel := m.styles.EditorStyle.ReadonlyLabel.Render("Lint Issues:")
+
+	// Add the formatted readonly information
+	content.WriteString(fmt.Sprintf("%s %s\n", createLabel, createValue))
+	content.WriteString(fmt.Sprintf("%s %s\n", modifyLabel, modifyValue))
+	content.WriteString(fmt.Sprintf("%s %s\n", lintStatusLabel, m.formatLintStatus()))
+
+	// Parse and display lint issues
+	issues := m.command.GetLintIssues()
+	if len(issues) == 0 {
+		content.WriteString(fmt.Sprintf("%s %s\n\n", lintIssuesLabel,
+			m.styles.EditorStyle.ReadonlyValue.Render("None")))
+	} else {
+		content.WriteString(fmt.Sprintf("%s %s\n", lintIssuesLabel,
+			m.styles.EditorStyle.ReadonlyValue.Render(fmt.Sprintf("%d issues found:", len(issues)))))
+
+		// Display each lint issue
+		for i, issue := range issues {
+			// Format the issue number
+			num := m.styles.EditorStyle.ReadonlyLabel.Render(fmt.Sprintf("%d.", i+1))
+
+			// Extract and format the message
+			message := "Unknown issue"
+			if msg, ok := issue["message"].(string); ok {
+				message = msg
+			}
+
+			// Extract and format the level
+			level := "unknown"
+			if lvl, ok := issue["level"].(string); ok {
+				level = lvl
+			}
+
+			// Style based on level
+			var styledMessage string
+			switch level {
+			case "error":
+				styledMessage = m.styles.EditorStyle.StatusError.Render(message)
+			case "warning":
+				styledMessage = m.styles.EditorStyle.StatusWarning.Render(message)
+			case "info":
+				styledMessage = m.styles.EditorStyle.StatusOK.Render(message)
+			default:
+				styledMessage = m.styles.EditorStyle.ReadonlyValue.Render(message)
+			}
+
+			content.WriteString(fmt.Sprintf("   %s %s\n", num, styledMessage))
+		}
+		content.WriteString("\n")
+	}
+
+	// Add help text at the bottom
+	helpText := m.styles.EditorStyle.HelpText.Render("↑/↓: Navigate • Enter: Save • Esc: Cancel")
 	content.WriteString(helpText)
 
 	return content.String()

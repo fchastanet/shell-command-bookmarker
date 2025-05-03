@@ -194,18 +194,12 @@ func (s *HistoryService) processCmd(historyCmd processors.HistoryCommand) (proce
 		slog.Debug("Command already exists in database or is ignored", "command", historyCmd, "status", importStatus)
 		return importStatus, nil
 	}
-	cmd := &models.Command{
-		ID:                   0,
-		Title:                "",
-		Description:          "",
-		Script:               historyCmd.Command,
-		Elapsed:              historyCmd.Elapsed,
-		LintIssues:           "[]",
-		LintStatus:           models.LintStatusNotAvailable,
-		Status:               models.CommandStatusImported,
-		CreationDatetime:     historyCmd.Timestamp,
-		ModificationDatetime: time.Now(),
-	}
+	cmd := models.NewCommand(
+		historyCmd.Command,
+		historyCmd.Elapsed,
+		historyCmd.Timestamp,
+	)
+
 	if s.lintService.IsLintingAvailable() {
 		issues, err := s.lintService.LintScript(historyCmd.Command)
 		if err != nil && len(issues) == 0 {

@@ -82,9 +82,16 @@ type PromptStyle struct {
 
 // EditorStyle contains styling for the command editor component
 type EditorStyle struct {
-	Title          *lipgloss.Style
-	Label          *lipgloss.Style
-	HelpText       *lipgloss.Style
+	Title    *lipgloss.Style
+	Label    *lipgloss.Style
+	HelpText *lipgloss.Style
+	// Added styles for readonly information
+	ReadonlyLabel  *lipgloss.Style
+	ReadonlyValue  *lipgloss.Style
+	StatusOK       *lipgloss.Style
+	StatusWarning  *lipgloss.Style
+	StatusError    *lipgloss.Style
+	StatusDisabled *lipgloss.Style
 	ContentPadding int
 }
 
@@ -235,11 +242,23 @@ func (s *Styles) initComponentStyles(colorTheme *ColorTheme) {
 	titleStyle := bold.Foreground(colors.Black)
 	labelStyle := bold.Foreground(colors.DarkGrey)
 	helpTextStyle := regular.Foreground(colors.Grey)
+	readonlyLabelStyle := bold.Foreground(colors.LightGrey)
+	readonlyValueStyle := regular.Foreground(colors.LightGrey)
+	statusOKStyle := regular.Foreground(colors.Green)
+	statusWarningStyle := regular.Foreground(colors.Yellow)
+	statusErrorStyle := regular.Foreground(colors.Red)
+	statusDisabledStyle := regular.Foreground(colors.DarkGrey)
 	s.EditorStyle = &EditorStyle{
 		Title:          &titleStyle,
 		Label:          &labelStyle,
 		HelpText:       &helpTextStyle,
 		ContentPadding: PaddingSmall,
+		ReadonlyLabel:  &readonlyLabelStyle,
+		ReadonlyValue:  &readonlyValueStyle,
+		StatusOK:       &statusOKStyle,
+		StatusWarning:  &statusWarningStyle,
+		StatusError:    &statusErrorStyle,
+		StatusDisabled: &statusDisabledStyle,
 	}
 }
 
