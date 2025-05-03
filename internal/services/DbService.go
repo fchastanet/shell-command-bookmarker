@@ -4,10 +4,12 @@ import (
 	"database/sql"
 	"errors"
 	"log/slog"
+	"strings"
 	"time"
 
 	"github.com/fchastanet/shell-command-bookmarker/internal/services/models"
 	"github.com/fchastanet/shell-command-bookmarker/pkg/db"
+	"github.com/fchastanet/shell-command-bookmarker/pkg/resource"
 )
 
 type DBService struct {
@@ -41,7 +43,7 @@ func (s *DBService) GetDBAdapter() db.Adapter {
 
 func (s *DBService) SaveCommand(command *models.Command) error {
 	// Use Exec instead of Query for INSERT statements
-	_, err := s.dbAdapter.GetDB().Exec(
+	result, err := s.dbAdapter.GetDB().Exec(
 		`INSERT INTO command (
 			title, description, script, status,
 			lint_issues, lint_status, elapsed,
@@ -54,11 +56,17 @@ func (s *DBService) SaveCommand(command *models.Command) error {
 	if err != nil {
 		return err
 	}
+	lastInsertID, err := result.LastInsertId()
+	if err != nil {
+		slog.Error("Error retrieving last insert ID", "error", err)
+		return err
+	}
+	command.ID = lastInsertID
 	return nil
 }
 
 // GetCommandByID retrieves a command by its database ID
-func (s *DBService) GetCommandByID(id uint) (*models.Command, error) {
+func (s *DBService) GetCommandByID(id resource.ID) (*models.Command, error) {
 	slog.Debug("Retrieving command by id from database", "id", id)
 	// Use QueryRow for single row retrieval
 	row := s.dbAdapter.GetDB().QueryRow(
@@ -156,17 +164,33 @@ func (s *DBService) GetMaxCommandTimestamp() (time.Time, error) {
 	return maxTimestamp, nil
 }
 
-func (s *DBService) GetAllCommands() ([]*models.Command, error) {
+// GetCommands retrieves commands from the database, optionally filtered by status
+func (s *DBService) GetCommands(statuses ...models.CommandStatus) ([]*models.Command, error) {
 	var commands []*models.Command
 	var creationDateStr string
 	var modificationDateStr string
+	var query string
+	var args []interface{}
 
-	rows, err := s.dbAdapter.GetDB().Query(
-		`SELECT id, title, description, script, status,
-			lint_issues, lint_status, elapsed,
-			creation_datetime, modification_datetime
-			FROM command`,
-	)
+	// Base query
+	query = `SELECT id, title, description, script, status,
+		lint_issues, lint_status, elapsed,
+		creation_datetime, modification_datetime
+		FROM command`
+
+	// Add status filter if provided
+	if len(statuses) > 0 {
+		query += " WHERE status IN ("
+		placeholders := make([]string, len(statuses))
+		for i, status := range statuses {
+			placeholders[i] = "?"
+			args = append(args, string(status))
+		}
+		query += strings.Join(placeholders, ", ") + ")"
+	}
+
+	// Execute the query
+	rows, err := s.dbAdapter.GetDB().Query(query, args...)
 	if err != nil {
 		return nil, err
 	}

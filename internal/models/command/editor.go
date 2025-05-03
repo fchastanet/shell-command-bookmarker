@@ -17,6 +17,7 @@ import (
 	dbmodels "github.com/fchastanet/shell-command-bookmarker/internal/services/models"
 	"github.com/fchastanet/shell-command-bookmarker/pkg/resource"
 	"github.com/fchastanet/shell-command-bookmarker/pkg/tui"
+	"github.com/fchastanet/shell-command-bookmarker/pkg/tui/table"
 )
 
 // Error definitions
@@ -33,13 +34,13 @@ type EditorMaker struct {
 
 // Make creates a new command editor model based on the command ID
 func (mm *EditorMaker) Make(id resource.ID, width, height int) (structure.ChildModel, error) {
-	// Convert the resource ID to a command ID (uint)
-	commandID := uint(id)
+	// Convert the resource ID to a command ID
+	commandID := id
 
 	// Number of input fields
 	const numInputFields = 3 // Title, Description, Script
 
-	// Load the command from the database - Safely convert uint to int
+	// Load the command from the database
 	command, err := mm.App.DBService.GetCommandByID(commandID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load command %d: %w", commandID, err)
@@ -181,14 +182,21 @@ func (m *commandEditor) save() tea.Cmd {
 	if oldTitle != m.command.Title ||
 		oldDescription != m.command.Description ||
 		oldScript != m.command.Script {
-		// Update command in database
-		err := m.DBService.UpdateCommand(m.command)
+		// Update command in database using HistoryService
+		newCommand, err := m.HistoryService.UpdateCommand(m.command)
 		if err != nil {
 			slog.Error("Failed to save command", "id", m.command.ID, "error", err)
 			return tui.ReportError(err)
 		}
+		m.command = newCommand
 
-		return tui.ReportInfo("Command #%d saved successfully", m.command.ID)
+		// Trigger table reload to reflect changes
+		return tea.Batch(
+			tui.ReportInfo("Command #%d saved successfully", m.command.ID),
+			func() tea.Msg {
+				return table.ReloadMsg[*dbmodels.Command]{}
+			},
+		)
 	}
 
 	return tui.ReportInfo("No changes to save for command #%d", m.command.ID)
