@@ -149,7 +149,7 @@ func (m *commandsList) Update(msg tea.Msg) tea.Cmd {
 
 	switch msg := msg.(type) {
 	case table.ReloadMsg[*dbmodels.Command]:
-		return m.handleReload()
+		return m.handleReload(msg)
 	case tea.WindowSizeMsg:
 		return m.handleWindowSize(msg)
 	case tea.BlurMsg:
@@ -189,7 +189,7 @@ func (m *commandsList) handleFocus() tea.Cmd {
 	}
 }
 
-func (m *commandsList) handleReload() tea.Cmd {
+func (m *commandsList) handleReload(msg table.ReloadMsg[*dbmodels.Command]) tea.Cmd {
 	if m.reloading {
 		return nil
 	}
@@ -205,6 +205,12 @@ func (m *commandsList) handleReload() tea.Cmd {
 				return tui.ErrorMsg(fmt.Errorf("reloading state failed: %w", err))
 			}
 			m.Model.SetItems(rows...)
+			if msg.RowID != -1 {
+				m.Model.GotoID(msg.RowID)
+				return tui.InfoMsg(fmt.Sprintf(
+					"reloading finished, selected new item %d", msg.RowID,
+				))
+			}
 
 			return tui.InfoMsg("reloading finished")
 		},
