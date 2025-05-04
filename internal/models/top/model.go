@@ -126,7 +126,7 @@ func NewModel(
 	spinnerObj := spinner.New(spinner.WithSpinner(spinner.Line))
 	makers := makeMakers(appService, myStyles, &spinnerObj, keyMaps)
 
-	helpWidget := myStyles.HelpStyle.Main.Render("? help")
+	helpWidget := myStyles.HelpStyle.Main.Render("alt+? help")
 	versionWidget := myStyles.FooterStyle.Version.Render(version.Get())
 
 	// Create help and footer components

@@ -21,8 +21,8 @@ func GetGlobalKeyMap() *GlobalKeyMap {
 		key.WithHelp("esc/ctrl+c", "exit"),
 	)
 	help := key.NewBinding(
-		key.WithKeys("h", "?"),
-		key.WithHelp("h/?", "close help"),
+		key.WithKeys("h", "alt+?", "alt+,"),
+		key.WithHelp("h/alt+?", "close help"),
 	)
 	debug := key.NewBinding(
 		key.WithKeys("f10", "f12"),
