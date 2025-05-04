@@ -482,8 +482,10 @@ func (m *Model) updateHelpBindings() {
 			// For normal mode, organize bindings into logical groups
 			m.helpModel.AddBindingSet("Global", keys.KeyMapToSlice(*m.keyMaps.global))
 			m.helpModel.AddBindingSet("Pane Navigation", m.HelpBindings())
-			m.helpModel.AddBindingSet("Table Nav", keys.KeyMapToSlice(*m.keyMaps.tableNavigation))
-			m.helpModel.AddBindingSet("Table Actions", keys.KeyMapToSlice(*m.keyMaps.tableAction))
+			if m.FocusedPosition() == structure.TopPane {
+				m.helpModel.AddBindingSet("Table Nav", keys.KeyMapToSlice(*m.keyMaps.tableNavigation))
+				m.helpModel.AddBindingSet("Table Actions", keys.KeyMapToSlice(*m.keyMaps.tableAction))
+			}
 		}
 	}
 }

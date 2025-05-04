@@ -328,6 +328,10 @@ func (p *PaneManager) FocusedModel() structure.ChildModel {
 	return p.panes[p.focused].model
 }
 
+func (p *PaneManager) FocusedPosition() structure.Position {
+	return p.focused
+}
+
 // cycleFocusedPane makes the next pane the focused pane. If last is true then the
 // previous pane is made the focused pane.
 func (p *PaneManager) cycleFocusedPane(last bool) {
