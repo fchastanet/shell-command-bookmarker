@@ -25,39 +25,39 @@ func GetPaneNavigationKeyMap() *PaneNavigationKeyMap {
 	)
 	switchPaneBack := key.NewBinding(
 		key.WithKeys("shift+tab"),
-		key.WithHelp("shift+tab", "last pane"),
+		key.WithHelp("shift+tab", "previous pane"),
 	)
 	leftPane := key.NewBinding(
-		key.WithKeys("0"),
-		key.WithHelp("0", "left pane"),
+		key.WithKeys("alt+0", "alt+à"),
+		key.WithHelp("alt+0/alt+à", "left pane"),
 	)
 	topPane := key.NewBinding(
-		key.WithKeys("1"),
-		key.WithHelp("1", "top pane"),
+		key.WithKeys("alt+1", "alt+&"),
+		key.WithHelp("alt+1/alt+&", "top pane"),
 	)
 	bottomPane := key.NewBinding(
-		key.WithKeys("2"),
-		key.WithHelp("2", "bottom right pane"),
+		key.WithKeys("alt+2", "alt+é"),
+		key.WithHelp("alt+2/alt+é", "bottom right pane"),
 	)
 	closePane := key.NewBinding(
-		key.WithKeys("X"),
-		key.WithHelp("X", "close pane"),
+		key.WithKeys("alt+X", "alt+x"),
+		key.WithHelp("alt+X", "close pane"),
 	)
 	shrinkPaneHeight := key.NewBinding(
-		key.WithKeys("-"),
-		key.WithHelp("-", "reduce height"),
+		key.WithKeys("alt+up"),
+		key.WithHelp("alt+⬆", "reduce height"),
 	)
 	growPaneHeight := key.NewBinding(
-		key.WithKeys("+"),
-		key.WithHelp("+", "increase height"),
+		key.WithKeys("alt+down"),
+		key.WithHelp("alt+⬇", "increase height"),
 	)
 	shrinkPaneWidth := key.NewBinding(
-		key.WithKeys("<"),
-		key.WithHelp("<", "reduce width"),
+		key.WithKeys("alt+left"),
+		key.WithHelp("alt+⬅", "reduce width"),
 	)
 	growPaneWidth := key.NewBinding(
-		key.WithKeys(">"),
-		key.WithHelp(">", "increase width"),
+		key.WithKeys("alt+right"),
+		key.WithHelp("alt+⮕", "increase width"),
 	)
 
 	return &PaneNavigationKeyMap{

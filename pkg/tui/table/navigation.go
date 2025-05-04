@@ -27,23 +27,23 @@ func GetDefaultNavigation() *Navigation {
 	)
 	pageUp := key.NewBinding(
 		key.WithKeys("pgup"),
-		key.WithHelp("pgup", "page up"),
+		key.WithHelp("⇞", "page up"),
 	)
 	pageDown := key.NewBinding(
 		key.WithKeys("pgdown"),
-		key.WithHelp("pgdn", "page down"),
+		key.WithHelp("⇟", "page down"),
 	)
 	halfPageUp := key.NewBinding(
 		key.WithKeys("ctrl+pgup"),
-		key.WithHelp("ctrl+pgup", "½ page up"),
+		key.WithHelp("ctrl+⇞", "½ page up"),
 	)
 	halfPageDown := key.NewBinding(
 		key.WithKeys("ctrl+pgdown"),
-		key.WithHelp("ctrl+pgdown", "½ page down"),
+		key.WithHelp("ctrl+⇟", "½ page down"),
 	)
 	gotoTop := key.NewBinding(
 		key.WithKeys("home", "g"),
-		key.WithHelp("g/home", "go to start"),
+		key.WithHelp("g/↖", "go to start"),
 	)
 	gotoBottom := key.NewBinding(
 		key.WithKeys("end", "G"),

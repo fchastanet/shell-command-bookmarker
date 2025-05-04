@@ -463,9 +463,7 @@ func (m *Model) updateHelpBindings() {
 	case normalMode:
 		// For normal mode, organize bindings into logical groups
 		m.helpModel.AddBindingSet("Global", keys.KeyMapToSlice(*m.keyMaps.global))
-		if len(m.HelpBindings()) > 0 {
-			m.helpModel.AddBindingSet("Pane Actions", m.HelpBindings())
-		}
+		m.helpModel.AddBindingSet("Pane Navigation", m.HelpBindings())
 		m.helpModel.AddBindingSet("Table Nav", keys.KeyMapToSlice(*m.keyMaps.tableNavigation))
 		m.helpModel.AddBindingSet("Table Actions", keys.KeyMapToSlice(*m.keyMaps.tableAction))
 	}
@@ -488,9 +486,7 @@ func (m *Model) viewHeight() int {
 	}
 
 	// Subtract help height if visible
-	if m.helpModel.IsVisible() {
-		vh -= m.helpModel.Height()
-	}
+	vh -= m.helpModel.Height()
 
 	// Ensure we don't go below minimum height
 	return max(m.styles.PaneStyle.MinContentHeight, vh)

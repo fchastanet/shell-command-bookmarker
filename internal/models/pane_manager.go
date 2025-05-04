@@ -168,7 +168,7 @@ func (p *PaneManager) handleSpecialMessages(msg tea.Msg) (tea.Cmd, bool) {
 		p.width = msg.Width
 		p.height = msg.Height
 		p.updateLeftWidth(0)
-		p.updateTopRightHeight(0)
+		p.updateTopHeight(0)
 		p.updateChildSizes()
 		return nil, true
 	case structure.NavigationMsg:
@@ -266,13 +266,13 @@ func (p *PaneManager) handleGrowPaneWidth() tea.Cmd {
 }
 
 func (p *PaneManager) handleShrinkPaneHeight() tea.Cmd {
-	p.updateTopRightHeight(-1)
+	p.updateTopHeight(-1)
 	p.updateChildSizes()
 	return tui.GetDummyCmd()
 }
 
 func (p *PaneManager) handleGrowPaneHeight() tea.Cmd {
-	p.updateTopRightHeight(1)
+	p.updateTopHeight(1)
 	p.updateChildSizes()
 	return tui.GetDummyCmd()
 }
@@ -361,7 +361,7 @@ func (p *PaneManager) updateLeftWidth(delta int) {
 	)
 }
 
-func (p *PaneManager) updateTopRightHeight(delta int) {
+func (p *PaneManager) updateTopHeight(delta int) {
 	if _, ok := p.panes[structure.TopPane]; !ok {
 		// There is no horizontal split to adjust
 		return
@@ -376,7 +376,7 @@ func (p *PaneManager) updateTopRightHeight(delta int) {
 	p.topPaneHeight = clamp(
 		p.topPaneHeight+delta,
 		paneStyle.MinPaneHeight,
-		p.height-paneStyle.MinPaneWidth,
+		p.height-paneStyle.MinPaneHeight,
 	)
 }
 
@@ -524,13 +524,66 @@ func (p *PaneManager) renderPane(position structure.Position) string {
 }
 
 func (p *PaneManager) HelpBindings() (bindings []*key.Binding) {
-	if len(p.panes) == 1 {
-		return bindings
+	paneKeyMap := *p.paneKeyMap
+	panesCount := len(p.panes)
+
+	// Get pane presence status
+	bottomPanePresent := p.isPanePresent(structure.BottomPane)
+	topPanePresent := p.isPanePresent(structure.TopPane)
+	leftPanePresent := p.isPanePresent(structure.LeftPane)
+
+	// Add switch pane bindings if we have multiple panes
+	if panesCount > 1 {
+		bindings = append(
+			bindings,
+			paneKeyMap.SwitchPane,
+			paneKeyMap.SwitchPaneBack,
+		)
+
+		// Add pane-specific bindings
+		p.addPaneSpecificBindings(&bindings, bottomPanePresent, topPanePresent, leftPanePresent)
 	}
+
+	// Add height resize bindings if we have both top and bottom panes
+	if bottomPanePresent && topPanePresent {
+		bindings = append(bindings, p.paneKeyMap.ShrinkPaneHeight, p.paneKeyMap.GrowPaneHeight)
+	}
+
+	// Add width resize bindings if we have left pane
+	if leftPanePresent {
+		bindings = append(bindings, p.paneKeyMap.ShrinkPaneWidth, p.paneKeyMap.GrowPaneWidth)
+	}
+
+	// Add close pane binding if focus is not on top pane and we have other panes
+	if p.focused != structure.TopPane && (bottomPanePresent || leftPanePresent) {
+		bindings = append(bindings, p.paneKeyMap.ClosePane)
+	}
+
+	// Add model-specific bindings if the focused model has them
 	if model, ok := p.FocusedModel().(structure.ModelHelpBindings); ok {
 		bindings = append(bindings, model.HelpBindings()...)
 	}
+
 	return bindings
+}
+
+// isPanePresent checks if a pane is present at the given position
+func (p *PaneManager) isPanePresent(position structure.Position) bool {
+	_, present := p.panes[position]
+	return present
+}
+
+// addPaneSpecificBindings adds bindings for specific panes if they are present
+func (p *PaneManager) addPaneSpecificBindings(bindings *[]*key.Binding, bottomPanePresent, topPanePresent, leftPanePresent bool) {
+	if bottomPanePresent {
+		*bindings = append(*bindings, p.paneKeyMap.BottomPane)
+	}
+	if topPanePresent {
+		*bindings = append(*bindings, p.paneKeyMap.TopPane)
+	}
+	if leftPanePresent {
+		*bindings = append(*bindings, p.paneKeyMap.LeftPane)
+	}
 }
 
 func removeEmptyStrings(strings ...string) []string {
