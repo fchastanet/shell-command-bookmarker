@@ -16,5 +16,19 @@
   ],
   "gopls": {
     "buildFlags": ["-tags=sqlite_fts5,fts5"]
+  },
+  "github.copilot.chat.codeGeneration.useInstructionFiles": true,
+  "github.copilot.advanced": {
+    "instructionFiles": [".github/COPILOT.md"]
+  },
+  "github.copilot.chat.localeOverride": "en-US",
+  "github.copilot.enable": {
+    "*": true,
+    "plaintext": true,
+    "markdown": true,
+    "scminput": true,
+    "git-commit": true,
+    "inlineSuggest": true,
+    "autoCompletions": true
   }
 }
