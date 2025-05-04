@@ -145,7 +145,7 @@ func (s *LintService) GetLintResultingStatus(issues []ShellCheckIssue) models.Li
 		if issue.Level == "error" {
 			return models.LintStatusError
 		}
-		if issue.Level != "info" {
+		if issue.Level != "info" && issue.Level != "style" {
 			allInfo = false
 		}
 	}

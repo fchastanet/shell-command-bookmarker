@@ -276,7 +276,7 @@ func (s *HistoryService) createNewCommandFromImportedCommand(command *models.Com
 	}
 
 	// Lint the new command
-	s.lintCommand(command)
+	s.lintCommand(&newCmd)
 
 	// Save the new command
 	if err := s.dbService.SaveCommand(&newCmd); err != nil {
