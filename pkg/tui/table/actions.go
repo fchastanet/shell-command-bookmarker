@@ -43,8 +43,8 @@ func GetDefaultAction() *Action {
 		key.WithHelp("enter", "view resource"),
 	)
 	deleteKey := key.NewBinding(
-		key.WithKeys("delete", "d"),
-		key.WithHelp("delete/d", "delete row"),
+		key.WithKeys("delete"),
+		key.WithHelp("delete", "delete row"),
 	)
 
 	return &Action{
