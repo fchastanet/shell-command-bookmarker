@@ -44,6 +44,17 @@ func (e *ErrMakePageEmptyModel) Error() string {
 	return fmt.Sprintf("making page of kind %s with id %v: model is nil", e.Msg.Page.Kind, e.Msg.Page.ID)
 }
 
+type FocusedPaneChangedMsg struct {
+	From structure.Position
+	To   structure.Position
+}
+
+func GetFocusedPaneChangedCmd(from, to structure.Position) tea.Cmd {
+	return func() tea.Msg {
+		return FocusedPaneChangedMsg{From: from, To: to}
+	}
+}
+
 var (
 	ErrAlreadyAtFirstPage  = errors.New("already at first page")
 	ErrCannotCloseLastPane = errors.New("cannot close last pane")
@@ -278,13 +289,15 @@ func (p *PaneManager) handleGrowPaneHeight() tea.Cmd {
 }
 
 func (p *PaneManager) handleSwitchPane(back bool) tea.Cmd {
+	fromPos := p.focused
 	p.cycleFocusedPane(back)
-	return tui.GetDummyCmd()
+	return GetFocusedPaneChangedCmd(fromPos, p.focused)
 }
 
 func (p *PaneManager) handleFocusPane(position structure.Position) tea.Cmd {
+	fromPos := p.focused
 	p.focusPane(position)
-	return tui.GetDummyCmd()
+	return GetFocusedPaneChangedCmd(fromPos, p.focused)
 }
 
 func (p *PaneManager) setBottomPane(rowID resource.ID, focusIfSameRowID bool) tea.Cmd {
@@ -342,10 +355,11 @@ func (p *PaneManager) closeFocusedPane() tea.Cmd {
 	if len(p.panes) == 1 {
 		return tui.ReportError(ErrCannotCloseLastPane)
 	}
+	fromPos := p.focused
 	delete(p.panes, p.focused)
 	p.updateChildSizes()
 	p.cycleFocusedPane(false)
-	return nil
+	return GetFocusedPaneChangedCmd(fromPos, p.focused)
 }
 
 func (p *PaneManager) updateLeftWidth(delta int) {

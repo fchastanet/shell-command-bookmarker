@@ -47,9 +47,17 @@ func (m *Model) IsVisible() bool {
 // Height returns the height of the help component when rendered
 func (m *Model) Height() int {
 	if m.showHelp {
-		return m.styles.HelpStyle.Height
+		return m.maxBindingSetHeight() + m.styles.HelpStyle.BordersWidth
 	}
 	return 0
+}
+
+func (m *Model) maxBindingSetHeight() int {
+	maxHeight := 0
+	for _, set := range m.bindingSets {
+		maxHeight = max(maxHeight, len(set.Bindings)+1) // +1 for the headers
+	}
+	return maxHeight
 }
 
 // Width returns the width of the help component
@@ -86,10 +94,7 @@ func (m *Model) View() string {
 		return ""
 	}
 
-	// Subtract 2 to accommodate borders
-	rows := m.styles.HelpStyle.Height - m.styles.HelpStyle.BordersWidth
-
-	return m.viewBindingSets(rows)
+	return m.viewBindingSets(m.maxBindingSetHeight())
 }
 
 // viewBindingSets renders the help component with binding sets

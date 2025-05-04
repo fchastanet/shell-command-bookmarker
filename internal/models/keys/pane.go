@@ -27,10 +27,6 @@ func GetPaneNavigationKeyMap() *PaneNavigationKeyMap {
 		key.WithKeys("shift+tab"),
 		key.WithHelp("shift+tab", "previous pane"),
 	)
-	leftPane := key.NewBinding(
-		key.WithKeys("alt+0", "alt+à"),
-		key.WithHelp("alt+0/alt+à", "left pane"),
-	)
 	topPane := key.NewBinding(
 		key.WithKeys("alt+1", "alt+&"),
 		key.WithHelp("alt+1/alt+&", "top pane"),
@@ -39,9 +35,13 @@ func GetPaneNavigationKeyMap() *PaneNavigationKeyMap {
 		key.WithKeys("alt+2", "alt+é"),
 		key.WithHelp("alt+2/alt+é", "bottom right pane"),
 	)
+	leftPane := key.NewBinding(
+		key.WithKeys("alt+3", "alt+\""),
+		key.WithHelp("alt+3/alt+\"", "left pane"),
+	)
 	closePane := key.NewBinding(
 		key.WithKeys("alt+X", "alt+x"),
-		key.WithHelp("alt+X", "close pane"),
+		key.WithHelp("alt+x", "close pane"),
 	)
 	shrinkPaneHeight := key.NewBinding(
 		key.WithKeys("alt+up"),

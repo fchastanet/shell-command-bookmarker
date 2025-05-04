@@ -87,8 +87,8 @@ type EditorStyle struct {
 	StatusWarning  *lipgloss.Style
 	StatusError    *lipgloss.Style
 	StatusDisabled *lipgloss.Style
-	ContentPadding int
 	ScrollbarStyle *tui.ScrollbarStyle
+	ContentPadding int
 }
 
 type HeaderStyle struct {
