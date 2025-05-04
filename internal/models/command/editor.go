@@ -224,7 +224,7 @@ func (m *commandEditor) View() string {
 				styledMessage = m.styles.EditorStyle.ReadonlyValue.Render(message)
 			}
 
-			content.WriteString(fmt.Sprintf("   %s %s\n", num, styledMessage))
+			content.WriteString(fmt.Sprintf("   %s %s %s\n", num, level, styledMessage))
 		}
 		content.WriteString("\n")
 	}
