@@ -140,6 +140,7 @@ repos:
     rev: v8.19.0
     hooks:
       - id: cspell
+        stages: [pre-push, manual]
 
   - repo: https://github.com/golangci/golangci-lint
     rev: v2.1.5
@@ -162,12 +163,16 @@ repos:
         args: [-w]
       - id: go-revive-repo-mod
       - id: go-sec-repo-mod
+        stages: [pre-push, manual]
       - id: go-staticcheck-repo-mod
+        stages: [pre-push, manual]
       - id: go-critic
+        stages: [pre-push, manual]
 
   - repo: local
     hooks:
       - id: go-structs-betteralign
+        stages: [pre-push, manual]
         name: go-structs-betteralign
         entry: betteralign
         args:
@@ -181,6 +186,7 @@ repos:
         always_run: true
 
       - id: detect-dead-code
+        stages: [pre-push, manual]
         name: Detect Dead Code
         entry: .build/detect-dead-code.sh
         language: system
