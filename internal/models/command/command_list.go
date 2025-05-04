@@ -232,6 +232,7 @@ func (m *commandsList) Update(msg tea.Msg) tea.Cmd {
 func (m *commandsList) handleWindowSize(msg tea.WindowSizeMsg) tea.Cmd {
 	m.width = msg.Width
 	m.height = msg.Height
+	slog.Debug("handleWindowSize command_list", "height", m.height)
 	m.Model.SetWidth(m.width)
 	m.Model.SetHeight(m.height)
 	m.Model.SetColumns(m.getColumns(m.width))

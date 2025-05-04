@@ -2,6 +2,7 @@ package table
 
 import (
 	"fmt"
+	"log/slog"
 	"slices"
 	"strconv"
 	"strings"
@@ -225,6 +226,7 @@ func (m *Model[V]) rowAreaHeight() int {
 		// Accommodate height of filter widget
 		return max(0, height-m.styles.FilterHeight)
 	}
+	slog.Debug("table rowAreaHeight", "height", height)
 	return height
 }
 

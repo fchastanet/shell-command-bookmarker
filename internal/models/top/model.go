@@ -2,6 +2,7 @@ package top
 
 import (
 	"fmt"
+	"log/slog"
 	"strings"
 	"time"
 
@@ -197,6 +198,8 @@ func (m *Model) dispatchMessage(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.handleStatusMsg(msg)
 	case tea.WindowSizeMsg:
 		return m.handleWindowSize(msg)
+	case models.FocusedPaneChangedMsg:
+		return m.handleFocusPaneChangedMsg()
 	case cursor.BlinkMsg:
 		return m.handleBlink(msg)
 	case tui.MemoryStatsMsg:
@@ -210,6 +213,19 @@ func (m *Model) dispatchMessage(msg tea.Msg) (tea.Model, tea.Cmd) {
 	if cmd != nil {
 		return m, cmd
 	}
+	return m, nil
+}
+
+// handleFocusPaneChangedMsg handles the pane focus change message
+func (m *Model) handleFocusPaneChangedMsg() (tea.Model, tea.Cmd) {
+	// Update the help bindings when the focused pane changes
+	m.updateHelpBindings()
+	// Send message to panes to resize themselves to make room for the prompt above it.
+	slog.Debug("handleWindowSize", "viewHeight", m.viewHeight())
+	_ = m.PaneManager.Update(tea.WindowSizeMsg{
+		Height: m.viewHeight(),
+		Width:  m.viewWidth(),
+	})
 	return m, nil
 }
 
@@ -250,6 +266,7 @@ func (m *Model) handlePrompt(msg *tui.PromptMsg) (tea.Model, tea.Cmd) {
 	var blink tea.Cmd
 	m.prompt, blink = tui.NewPrompt(msg, m.styles.PromptStyle)
 	// Send out message to panes to resize themselves to make room for the prompt above it.
+	slog.Debug("handlePrompt", "viewHeight", m.viewHeight())
 	_ = m.PaneManager.Update(tea.WindowSizeMsg{
 		Height: m.viewHeight(),
 		Width:  m.viewWidth(),
@@ -299,6 +316,7 @@ func (m *Model) handleWindowSize(msg tea.WindowSizeMsg) (tea.Model, tea.Cmd) {
 	m.helpModel.SetWidth(m.width)
 	m.footerModel.SetWidth(m.width)
 	m.headerModel.SetWidth(m.width) // Set the header width
+	slog.Debug("handleWindowSize", "viewHeight", m.viewHeight())
 	return m, m.PaneManager.Update(tea.WindowSizeMsg{
 		Height: m.viewHeight(),
 		Width:  m.viewWidth(),
@@ -387,7 +405,9 @@ func (m *Model) manageKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case key.Matches(msg, *m.keyMaps.global.Help):
 		// '?' toggles help widget
 		m.helpModel.Toggle()
+		m.updateHelpBindings()
 		// Help widget takes up space so update panes' dimensions
+		slog.Debug("handleHelpToggle", "viewHeight", m.viewHeight())
 		m.PaneManager.Update(tea.WindowSizeMsg{
 			Height: m.viewHeight(),
 			Width:  m.viewWidth(),
@@ -437,8 +457,6 @@ func (m *Model) View() string {
 
 	// Add help if enabled
 	if m.helpModel.IsVisible() {
-		// Update help bindings before rendering
-		m.updateHelpBindings()
 		components = append(components, m.helpModel.View())
 	}
 
@@ -452,25 +470,27 @@ func (m *Model) View() string {
 func (m *Model) updateHelpBindings() {
 	// Clear previous binding sets
 	m.helpModel.ClearBindingSets()
-
-	switch m.mode {
-	case promptMode:
-		// For prompt mode, just use a single set
-		m.helpModel.AddBindingSet("Prompt Controls", m.prompt.HelpBindings())
-	case filterMode:
-		// For filter mode, just use a single set
-		m.helpModel.AddBindingSet("Filter Controls", keys.KeyMapToSlice(*m.keyMaps.filter))
-	case normalMode:
-		// For normal mode, organize bindings into logical groups
-		m.helpModel.AddBindingSet("Global", keys.KeyMapToSlice(*m.keyMaps.global))
-		m.helpModel.AddBindingSet("Pane Navigation", m.HelpBindings())
-		m.helpModel.AddBindingSet("Table Nav", keys.KeyMapToSlice(*m.keyMaps.tableNavigation))
-		m.helpModel.AddBindingSet("Table Actions", keys.KeyMapToSlice(*m.keyMaps.tableAction))
+	if m.helpModel.IsVisible() {
+		switch m.mode {
+		case promptMode:
+			// For prompt mode, just use a single set
+			m.helpModel.AddBindingSet("Prompt Controls", m.prompt.HelpBindings())
+		case filterMode:
+			// For filter mode, just use a single set
+			m.helpModel.AddBindingSet("Filter Controls", keys.KeyMapToSlice(*m.keyMaps.filter))
+		case normalMode:
+			// For normal mode, organize bindings into logical groups
+			m.helpModel.AddBindingSet("Global", keys.KeyMapToSlice(*m.keyMaps.global))
+			m.helpModel.AddBindingSet("Pane Navigation", m.HelpBindings())
+			m.helpModel.AddBindingSet("Table Nav", keys.KeyMapToSlice(*m.keyMaps.tableNavigation))
+			m.helpModel.AddBindingSet("Table Actions", keys.KeyMapToSlice(*m.keyMaps.tableAction))
+		}
 	}
 }
 
 // contentHeight returns the height available to the panes
 func (m *Model) viewHeight() int {
+	slog.Debug("viewHeight", "height", m.height)
 	// Start with full height
 	vh := m.height
 
@@ -486,7 +506,11 @@ func (m *Model) viewHeight() int {
 	}
 
 	// Subtract help height if visible
-	vh -= m.helpModel.Height()
+	helpHeight := m.helpModel.Height()
+	slog.Debug("viewHeight", "helpHeightIncludingBorders", helpHeight)
+	vh -= helpHeight
+
+	slog.Debug("viewHeight", "vh", vh)
 
 	// Ensure we don't go below minimum height
 	return max(m.styles.PaneStyle.MinContentHeight, vh)
