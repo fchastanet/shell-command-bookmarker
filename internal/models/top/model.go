@@ -203,13 +203,12 @@ func (m *Model) dispatchMessage(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.handleMemoryStats(msg)
 		return m, tui.PerformanceMonitorTick(performanceMonitorInterval)
 	}
-	_, cmd := m.sendMessageToPaneManager(msg)
-	if cmd != nil {
-		return m, cmd
-	}
-
 	if keyMsg, ok := msg.(tea.KeyMsg); ok {
 		return m.handleKeyMsg(keyMsg)
+	}
+	cmd := m.PaneManager.Update(msg)
+	if cmd != nil {
+		return m, cmd
 	}
 	return m, nil
 }
@@ -231,12 +230,6 @@ func (m *Model) handlePerformanceMessages(msg tea.Msg) tea.Cmd {
 		}
 	}
 	return nil
-}
-
-// sendMessageToPaneManager handles any message types not explicitly handled in dispatchMessage
-func (m *Model) sendMessageToPaneManager(msg tea.Msg) (tea.Model, tea.Cmd) {
-	// Send remaining msg types to pane manager to route accordingly.
-	return m, m.PaneManager.Update(msg)
 }
 
 // handleSpinnerTick processes spinner tick messages
@@ -262,15 +255,6 @@ func (m *Model) handlePrompt(msg *tui.PromptMsg) (tea.Model, tea.Cmd) {
 		Width:  m.viewWidth(),
 	})
 	return m, blink
-}
-
-// handleKeyMsg processes key messages
-func (m *Model) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
-	_, teaCmd := m.manageKeyInMode(msg)
-	if teaCmd != nil {
-		return m, teaCmd
-	}
-	return m.manageKey(msg)
 }
 
 // handleStatusMsg processes status messages
@@ -339,7 +323,8 @@ func (m *Model) handleMemoryStats(msg tui.MemoryStatsMsg) {
 	m.footerModel.SetInfo(statsInfo)
 }
 
-func (m *Model) manageKeyInMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+// handleKeyMsg processes key messages
+func (m *Model) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
 
 	switch m.mode {
@@ -380,7 +365,12 @@ func (m *Model) manageKeyInMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return m, cmd
 		}
 	case normalMode:
+		cmd := m.PaneManager.Update(msg)
+		if cmd != nil {
+			return m, cmd
+		}
 		// In normal mode, we let manageKey handle the key message.
+		return m.manageKey(msg)
 	}
 
 	return m, nil
@@ -393,7 +383,7 @@ func (m *Model) manageKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case key.Matches(msg, *m.keyMaps.global.Quit):
 		// ctrl-c quits the app, but not before prompting the user for
 		// confirmation.
-		return m, tui.YesNoPrompt("Quit Shell Command Bookmarker?", QuitWithClearScreen())
+		return m, tui.YesNoPrompt("Quit Shell Command Bookmarker?", true, QuitWithClearScreen())
 	case key.Matches(msg, *m.keyMaps.global.Help):
 		// '?' toggles help widget
 		m.helpModel.Toggle()
