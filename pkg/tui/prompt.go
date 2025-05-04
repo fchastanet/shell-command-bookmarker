@@ -39,9 +39,13 @@ type PromptStyle struct {
 // YesNoPrompt sends a message to enable the prompt widget, specifically
 // asking the user for a yes/no answer. If yes is given then the action is
 // invoked.
-func YesNoPrompt(prompt string, action tea.Cmd) tea.Cmd {
+func YesNoPrompt(prompt string, quit bool, action tea.Cmd) tea.Cmd {
 	cancel := key.NewBinding(key.WithKeys("n", "N"))
-	yes := key.NewBinding(key.WithKeys("y", "Y", "ctrl+c"), key.WithHelp("y/ctrl+c", "confirm"))
+	yes := key.NewBinding(key.WithKeys("y", "Y"), key.WithHelp("y", "confirm"))
+	if quit {
+		yes = key.NewBinding(key.WithKeys("y", "Y", "ctrl+c"), key.WithHelp("y/ctrl+c", "confirm and quit"))
+	}
+
 	return CmdHandler(PromptMsg{
 		Prompt:         prompt + " (y/N): ",
 		InitialValue:   "",

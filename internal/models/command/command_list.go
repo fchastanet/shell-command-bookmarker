@@ -297,7 +297,7 @@ func (m *commandsList) handleDeleteRow(msg table.RowDeleteActionMsg[*dbmodels.Co
 	confirmMessage := fmt.Sprintf("Delete command #%d: %s?", cmd.GetID(), cmd.Title)
 
 	// Pass our wrapper function as the action to YesNoPrompt
-	return tui.YesNoPrompt(confirmMessage, func() tea.Msg {
+	return tui.YesNoPrompt(confirmMessage, false, func() tea.Msg {
 		nextRowID := m.Model.GetNextRowIDRelativeToCurrentRow()
 		// Mark the command as deleted in the database
 		originalStatus := cmd.Status
