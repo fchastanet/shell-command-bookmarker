@@ -5,6 +5,12 @@ import (
 	"strings"
 )
 
+type ScrollbarStyle struct {
+	Thumb string
+	Track string
+	Width int
+}
+
 type ScrollbarStyleInterface interface {
 	GetScrollbarThumb() string
 	GetScrollbarTrack() string
@@ -28,4 +34,24 @@ func Scrollbar(
 			strings.Repeat(style.GetScrollbarTrack()+"\n", max(0, height-thumbOffset-thumbHeight)),
 		"\n",
 	)
+}
+
+func GetDefaultScrollbarStyle() *ScrollbarStyle {
+	return &ScrollbarStyle{
+		Thumb: "▌",
+		Track: " ",
+		Width: 1,
+	}
+}
+
+func (s *ScrollbarStyle) GetScrollbarThumb() string {
+	return s.Thumb
+}
+
+func (s *ScrollbarStyle) GetScrollbarTrack() string {
+	return s.Track
+}
+
+func (s *ScrollbarStyle) GetScrollbarWidth() int {
+	return s.Width
 }

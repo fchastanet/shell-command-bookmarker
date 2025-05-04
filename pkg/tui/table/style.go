@@ -2,6 +2,7 @@ package table
 
 import (
 	"github.com/charmbracelet/lipgloss"
+	"github.com/fchastanet/shell-command-bookmarker/pkg/tui"
 	"github.com/fchastanet/shell-command-bookmarker/pkg/tui/colors"
 )
 
@@ -21,7 +22,7 @@ type Style struct {
 	// Style for the table cell
 	Cell *lipgloss.Style
 	// ScrollbarStyle is the style for the scrollbar.
-	ScrollbarStyle *ScrollbarStyle
+	ScrollbarStyle *tui.ScrollbarStyle
 
 	Row                   *lipgloss.Style
 	CurrentRow            *lipgloss.Style
@@ -34,13 +35,7 @@ type Style struct {
 	FilterHeight int
 }
 
-type ScrollbarStyle struct {
-	Thumb string
-	Track string
-	Width int
-}
-
-func GetDefaultStyle() *Style {
+func GetDefaultStyle(scrollbarStyle *tui.ScrollbarStyle) *Style {
 	regular := lipgloss.NewStyle()
 
 	CurrentBackground := colors.Grey
@@ -78,26 +73,10 @@ func GetDefaultStyle() *Style {
 		CurrentAndSelectedRow: &currentAndSelectedRow,
 		HeaderHeight:          HeaderHeight,
 		FilterHeight:          FilterHeight,
-		ScrollbarStyle: &ScrollbarStyle{
-			Thumb: "█",
-			Track: "░",
-			Width: 1,
-		},
+		ScrollbarStyle:        scrollbarStyle,
 	}
 }
 
 func (s *Style) GetTableBorderStyle() *lipgloss.Style {
 	return s.Border
-}
-
-func (s *Style) GetScrollbarThumb() string {
-	return s.ScrollbarStyle.Thumb
-}
-
-func (s *Style) GetScrollbarTrack() string {
-	return s.ScrollbarStyle.Track
-}
-
-func (s *Style) GetScrollbarWidth() int {
-	return s.ScrollbarStyle.Width
 }

@@ -10,14 +10,15 @@ import (
 )
 
 type Styles struct {
-	TableStyle  *table.Style
-	PaneStyle   *PaneStyle
-	HelpStyle   *HelpStyle
-	FooterStyle *FooterStyle
-	HeaderStyle *HeaderStyle
-	WindowStyle *WindowStyle
-	PromptStyle *tui.PromptStyle
-	EditorStyle *EditorStyle
+	TableStyle     *table.Style
+	PaneStyle      *PaneStyle
+	HelpStyle      *HelpStyle
+	FooterStyle    *FooterStyle
+	HeaderStyle    *HeaderStyle
+	WindowStyle    *WindowStyle
+	PromptStyle    *tui.PromptStyle
+	EditorStyle    *EditorStyle
+	ScrollbarStyle *tui.ScrollbarStyle
 	// ColorTheme is the color theme used in the application.
 	ColorTheme *ColorTheme
 }
@@ -87,6 +88,7 @@ type EditorStyle struct {
 	StatusError    *lipgloss.Style
 	StatusDisabled *lipgloss.Style
 	ContentPadding int
+	ScrollbarStyle *tui.ScrollbarStyle
 }
 
 type HeaderStyle struct {
@@ -96,15 +98,16 @@ type HeaderStyle struct {
 
 func NewStyles() *Styles {
 	s := &Styles{
-		TableStyle:  nil,
-		PaneStyle:   nil,
-		HelpStyle:   nil,
-		FooterStyle: nil,
-		HeaderStyle: nil,
-		WindowStyle: nil,
-		PromptStyle: nil,
-		EditorStyle: nil,
-		ColorTheme:  nil,
+		TableStyle:     nil,
+		PaneStyle:      nil,
+		HelpStyle:      nil,
+		FooterStyle:    nil,
+		HeaderStyle:    nil,
+		WindowStyle:    nil,
+		PromptStyle:    nil,
+		EditorStyle:    nil,
+		ScrollbarStyle: nil,
+		ColorTheme:     nil,
 	}
 
 	// Initialize color theme
@@ -112,6 +115,9 @@ func NewStyles() *Styles {
 
 	// Initialize styles using the color theme
 	s.ColorTheme = colorTheme
+
+	s.ScrollbarStyle = tui.GetDefaultScrollbarStyle()
+
 	s.initBaseStyles(colorTheme)
 	s.initComponentStyles(colorTheme)
 
@@ -230,7 +236,7 @@ func (s *Styles) initComponentStyles(colorTheme *ColorTheme) {
 	}
 
 	// Initialize table style
-	s.TableStyle = table.GetDefaultStyle()
+	s.TableStyle = table.GetDefaultStyle(s.ScrollbarStyle)
 
 	// Initialize editor style
 	titleStyle := bold.Foreground(colors.Black)
@@ -242,6 +248,7 @@ func (s *Styles) initComponentStyles(colorTheme *ColorTheme) {
 	statusWarningStyle := regular.Foreground(colors.Yellow)
 	statusErrorStyle := regular.Foreground(colors.Red)
 	statusDisabledStyle := regular.Foreground(colors.DarkGrey)
+
 	s.EditorStyle = &EditorStyle{
 		Title:          &titleStyle,
 		Label:          &labelStyle,
@@ -253,6 +260,7 @@ func (s *Styles) initComponentStyles(colorTheme *ColorTheme) {
 		StatusWarning:  &statusWarningStyle,
 		StatusError:    &statusErrorStyle,
 		StatusDisabled: &statusDisabledStyle,
+		ScrollbarStyle: s.ScrollbarStyle,
 	}
 }
 
@@ -290,4 +298,16 @@ func (s *Styles) checkDimension() {
 	if s.PaneStyle.MinPaneWidth > s.PaneStyle.DefaultLeftPaneWidth {
 		panic("default left pane width must not be lower than the overall minimum width")
 	}
+}
+
+func (s *EditorStyle) GetScrollbarThumb() string {
+	return s.ScrollbarStyle.Thumb
+}
+
+func (s *EditorStyle) GetScrollbarTrack() string {
+	return s.ScrollbarStyle.Track
+}
+
+func (s *EditorStyle) GetScrollbarWidth() int {
+	return s.ScrollbarStyle.Width
 }

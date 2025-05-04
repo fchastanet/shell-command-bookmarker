@@ -11,6 +11,7 @@ import (
 	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 	"github.com/fchastanet/shell-command-bookmarker/internal/models/keys"
 	"github.com/fchastanet/shell-command-bookmarker/internal/models/structure"
 	"github.com/fchastanet/shell-command-bookmarker/internal/models/styles"
@@ -19,6 +20,7 @@ import (
 	"github.com/fchastanet/shell-command-bookmarker/pkg/resource"
 	"github.com/fchastanet/shell-command-bookmarker/pkg/tui"
 	"github.com/fchastanet/shell-command-bookmarker/pkg/tui/table"
+	"github.com/fchastanet/shell-command-bookmarker/pkg/utils"
 )
 
 // Error definitions
@@ -53,27 +55,31 @@ func (mm *EditorMaker) Make(id resource.ID, width, height int) (structure.ChildM
 
 	// Create the editor model
 	return &commandEditor{
-		AppService:   mm.App,
-		styles:       mm.Styles,
-		command:      command,
-		width:        width,
-		height:       height,
-		inputs:       make([]textinput.Model, numInputFields),
-		focused:      0,
-		EditorKeyMap: mm.EditorKeyMap,
+		AppService:    mm.App,
+		styles:        mm.Styles,
+		command:       command,
+		width:         width,
+		height:        height,
+		inputs:        make([]textinput.Model, numInputFields),
+		focused:       -1,
+		EditorKeyMap:  mm.EditorKeyMap,
+		pagePosition:  0,
+		contentHeight: 0,
 	}, nil
 }
 
 // commandEditor is the model for editing a command
 type commandEditor struct {
 	*services.AppService
-	styles       *styles.Styles
-	command      *dbmodels.Command
-	EditorKeyMap *keys.EditorKeyMap
-	inputs       []textinput.Model
-	width        int
-	height       int
-	focused      int
+	styles        *styles.Styles
+	command       *dbmodels.Command
+	EditorKeyMap  *keys.EditorKeyMap
+	inputs        []textinput.Model
+	width         int
+	height        int
+	focused       int
+	pagePosition  int
+	contentHeight int
 }
 
 // Init initializes the command editor
@@ -129,6 +135,10 @@ func (m *commandEditor) Update(msg tea.Msg) tea.Cmd {
 			m.prevField()
 		case key.Matches(msg, *m.EditorKeyMap.NextField):
 			m.nextField()
+		case key.Matches(msg, *m.EditorKeyMap.PreviousPage):
+			m.prevPage()
+		case key.Matches(msg, *m.EditorKeyMap.NextPage):
+			m.nextPage()
 		case key.Matches(msg, *m.EditorKeyMap.Save):
 			return m.save()
 		case key.Matches(msg, *m.EditorKeyMap.Cancel):
@@ -138,22 +148,62 @@ func (m *commandEditor) Update(msg tea.Msg) tea.Cmd {
 	}
 
 	// Update the active input
-	var cmd tea.Cmd
-	m.inputs[m.focused], cmd = m.inputs[m.focused].Update(msg)
-	cmds = append(cmds, cmd)
+	if m.focused >= 0 {
+		var cmd tea.Cmd
+		m.inputs[m.focused], cmd = m.inputs[m.focused].Update(msg)
+		cmds = append(cmds, cmd)
+	}
 
 	return tea.Batch(cmds...)
 }
 
 // View renders the command editor
 func (m *commandEditor) View() string {
+	var content strings.Builder
+
+	// Add common elements first
+	m.addCommonElements(&content)
+
+	// Add readonly information section
+	m.addReadonlySection(&content)
+
+	// strip the first lines of content to fit the screen
+	contentStr := content.String()
+	visibleContent := utils.RemoveFirstLines(contentStr, m.pagePosition)
+
+	// Create the content area with scrollbar
+	contentArea := lipgloss.NewStyle().
+		Width(m.width - m.styles.ScrollbarStyle.Width).
+		Render(visibleContent + "\n")
+
+	// Generate scrollbar
+	scrollbar := m.generateScrollbar(contentStr, visibleContent)
+
+	contentScroll := lipgloss.NewStyle().
+		Height(m.height).
+		MaxHeight(m.height).
+		Render(lipgloss.JoinHorizontal(lipgloss.Top, contentArea, scrollbar))
+
+	return contentScroll
+}
+
+// addCommonElements adds the title, help text, and input fields to the content
+func (m *commandEditor) addCommonElements(content *strings.Builder) {
 	title := m.styles.EditorStyle.Title.Render("Command Editor")
+
+	// Add help text at the top
+	helpTextStyle := *m.styles.EditorStyle.HelpText
+	if m.focused == -1 {
+		helpTextStyle = helpTextStyle.Bold(true).Foreground(lipgloss.Color("255"))
+	}
+	helpText := helpTextStyle.Render("↑/↓: Fields • ⇞/⇟: Scroll • Enter: Save • Esc: Cancel")
+	content.WriteString(helpText)
+
+	// Add the title
+	content.WriteString(title + "\n\n")
 
 	// Labels for our fields
 	labels := []string{"Title:", "Description:", "Script:"}
-
-	var content strings.Builder
-	content.WriteString(title + "\n\n")
 
 	// Render each field with its label
 	for i, label := range labels {
@@ -161,9 +211,12 @@ func (m *commandEditor) View() string {
 		styledLabel := m.styles.EditorStyle.Label.Render(label)
 
 		// Render the input field
-		content.WriteString(fmt.Sprintf("%s\n%s\n\n", styledLabel, m.inputs[i].View()))
+		fmt.Fprintf(content, "%s\n%s\n\n", styledLabel, m.inputs[i].View())
 	}
+}
 
+// addReadonlySection adds the readonly information section to the content
+func (m *commandEditor) addReadonlySection(content *strings.Builder) {
 	// Add readonly information section
 	readonlyTitle := m.styles.EditorStyle.Label.Render("Readonly Information:")
 	content.WriteString(readonlyTitle + "\n\n")
@@ -181,73 +234,123 @@ func (m *commandEditor) View() string {
 	lintIssuesLabel := m.styles.EditorStyle.ReadonlyLabel.Render("Lint Issues:")
 
 	// Add the formatted readonly information
-	content.WriteString(fmt.Sprintf("%s %s\n", createLabel, createValue))
-	content.WriteString(fmt.Sprintf("%s %s\n", modifyLabel, modifyValue))
-	content.WriteString(fmt.Sprintf("%s %s\n", lintStatusLabel, m.formatLintStatus()))
+	fmt.Fprintf(content, "%s %s\n", createLabel, createValue)
+	fmt.Fprintf(content, "%s %s\n", modifyLabel, modifyValue)
+	fmt.Fprintf(content, "%s %s\n", lintStatusLabel, m.formatLintStatus())
 
+	m.addLintIssues(content, lintIssuesLabel)
+}
+
+// addLintIssues adds the lint issues section to the content
+func (m *commandEditor) addLintIssues(content *strings.Builder, lintIssuesLabel string) {
 	// Parse and display lint issues
 	issues := m.command.GetLintIssues()
 	if len(issues) == 0 {
-		content.WriteString(fmt.Sprintf("%s %s\n\n", lintIssuesLabel,
-			m.styles.EditorStyle.ReadonlyValue.Render("None")))
-	} else {
-		content.WriteString(fmt.Sprintf("%s %s\n", lintIssuesLabel,
-			m.styles.EditorStyle.ReadonlyValue.Render(fmt.Sprintf("%d issues found:", len(issues)))))
-
-		// Display each lint issue
-		for i, issue := range issues {
-			// Format the issue number
-			num := m.styles.EditorStyle.ReadonlyLabel.Render(fmt.Sprintf("%d.", i+1))
-
-			// Extract and format the message
-			message := "Unknown issue"
-			if msg, ok := issue["message"].(string); ok {
-				message = msg
-			}
-
-			// Extract and format the level
-			level := "unknown"
-			if lvl, ok := issue["level"].(string); ok {
-				level = lvl
-			}
-
-			// Style based on level
-			var styledMessage string
-			switch level {
-			case "error":
-				styledMessage = m.styles.EditorStyle.StatusError.Render(message)
-			case "warning":
-				styledMessage = m.styles.EditorStyle.StatusWarning.Render(message)
-			case "info":
-				styledMessage = m.styles.EditorStyle.StatusOK.Render(message)
-			default:
-				styledMessage = m.styles.EditorStyle.ReadonlyValue.Render(message)
-			}
-
-			content.WriteString(fmt.Sprintf("   %s %s %s\n", num, level, styledMessage))
-		}
-		content.WriteString("\n")
+		fmt.Fprintf(content, "%s %s\n\n", lintIssuesLabel,
+			m.styles.EditorStyle.ReadonlyValue.Render("None"))
+		return
 	}
 
-	// Add help text at the bottom
-	helpText := m.styles.EditorStyle.HelpText.Render("↑/↓: Navigate • Enter: Save • Esc: Cancel")
-	content.WriteString(helpText)
+	fmt.Fprintf(content, "%s %s\n", lintIssuesLabel,
+		m.styles.EditorStyle.ReadonlyValue.Render(fmt.Sprintf("%d issues found:", len(issues))))
 
-	return content.String()
+	// Display each lint issue
+	for i, issue := range issues {
+		// Format the issue number
+		num := m.styles.EditorStyle.ReadonlyLabel.Render(fmt.Sprintf("%d.", i+1))
+
+		// Extract and format the message
+		message := "Unknown issue"
+		if msg, ok := issue["message"].(string); ok {
+			message = msg
+		}
+
+		// Extract and format the level
+		level := "unknown"
+		if lvl, ok := issue["level"].(string); ok {
+			level = lvl
+		}
+
+		// Style based on level
+		styledMessage := m.getStyledMessage(level, message)
+		fmt.Fprintf(content, "   %s %s %s\n", num, level, styledMessage)
+	}
+	content.WriteString("\n")
+}
+
+// getStyledMessage returns styled message based on issue level
+func (m *commandEditor) getStyledMessage(level, message string) string {
+	switch level {
+	case "error":
+		return m.styles.EditorStyle.StatusError.Render(message)
+	case "warning":
+		return m.styles.EditorStyle.StatusWarning.Render(message)
+	case "info":
+		return m.styles.EditorStyle.StatusOK.Render(message)
+	default:
+		return m.styles.EditorStyle.ReadonlyValue.Render(message)
+	}
+}
+
+// generateScrollbar creates the scrollbar for the editor
+func (m *commandEditor) generateScrollbar(contentStr, visibleContent string) string {
+	// Generate scrollbar
+	const minEditorHeight = 15 // Minimum height for the editor to ensure usability
+	availableHeight := max(minEditorHeight, m.height)
+	m.contentHeight = lipgloss.Height(contentStr)
+	visibleContentHeight := lipgloss.Height(visibleContent)
+	return tui.Scrollbar(
+		m.styles.EditorStyle.ScrollbarStyle,
+		availableHeight,
+		m.contentHeight,
+		min(availableHeight, visibleContentHeight),
+		m.pagePosition,
+	)
 }
 
 // nextField focuses the next field
 func (m *commandEditor) nextField() {
-	m.inputs[m.focused].Blur()
-	m.focused = (m.focused + 1) % len(m.inputs)
-	m.inputs[m.focused].Focus()
+	if m.focused >= 0 {
+		m.inputs[m.focused].Blur()
+	}
+	if m.focused == len(m.inputs)-1 {
+		m.focused = -1
+	} else {
+		m.focused = (m.focused + 1) % len(m.inputs)
+		m.inputs[m.focused].Focus()
+	}
 }
 
 // prevField focuses the previous field
 func (m *commandEditor) prevField() {
-	m.inputs[m.focused].Blur()
-	m.focused = (m.focused - 1 + len(m.inputs)) % len(m.inputs)
-	m.inputs[m.focused].Focus()
+	if m.focused >= 0 {
+		m.inputs[m.focused].Blur()
+	}
+	switch m.focused {
+	case -1:
+		m.focused = len(m.inputs) - 1
+	case 0:
+		m.focused = -1
+	default:
+		m.focused = (m.focused - 1) % len(m.inputs)
+	}
+	if m.focused >= 0 {
+		m.inputs[m.focused].Focus()
+	}
+}
+
+// nextPage scrolls to the next page
+func (m *commandEditor) nextPage() {
+	slog.Debug("nextPage", "pagePosition", m.pagePosition, "height", m.height, "contentHeight", m.contentHeight)
+	m.pagePosition = min(m.pagePosition+m.height, m.contentHeight-m.height)
+	slog.Debug("nextPage", "newPagePosition", m.pagePosition)
+}
+
+// prevPage scrolls to the previous page
+func (m *commandEditor) prevPage() {
+	slog.Debug("prevPage", "pagePosition", m.pagePosition, "height", m.height, "contentHeight", m.contentHeight)
+	m.pagePosition = max(m.pagePosition-m.height, 0)
+	slog.Debug("prevPage", "newPagePosition", m.pagePosition)
 }
 
 // save saves the current command

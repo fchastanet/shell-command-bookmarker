@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/fchastanet/shell-command-bookmarker/pkg/resource"
+	"github.com/fchastanet/shell-command-bookmarker/pkg/tui"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/exp/maps"
@@ -31,7 +32,7 @@ func (r *testResource) GetID() resource.ID { return r.ID }
 // testing. The rows are sorted from lowest int to highest int.
 func setupTest() Model[*testResource] {
 	renderer := func(_ *testResource) RenderedRow { return nil }
-	tbl := New(GetDefaultStyle(), nil, renderer, 0, 0,
+	tbl := New(GetDefaultStyle(tui.GetDefaultScrollbarStyle()), nil, renderer, 0, 0,
 		WithSortFunc(func(i, j *testResource) int {
 			if i.n < j.n {
 				return -1

@@ -436,7 +436,7 @@ func (m *Model[V]) View() string {
 	components = append(components, m.headersView())
 	// Generate scrollbar
 	scrollbar := tui.Scrollbar(
-		m.styles,
+		m.styles.ScrollbarStyle,
 		m.rowAreaHeight(), len(m.rows), m.visibleRows(), m.start)
 	// Get all the visible rows
 	rows := make([]string, 0, m.visibleRows())
