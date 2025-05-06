@@ -13,21 +13,21 @@ type EditorKeyMap struct {
 
 // HelpBindings returns the key bindings for this model
 func GetDefaultEditorKeyMap() *EditorKeyMap {
-	upKey := key.NewBinding(
-		key.WithKeys("up"),
-		key.WithHelp("↑", "up"),
+	previousField := key.NewBinding(
+		key.WithKeys("shift+tab"),
+		key.WithHelp("Shift+⭾", "previous field"),
 	)
-	downKey := key.NewBinding(
-		key.WithKeys("down"),
-		key.WithHelp("↓", "down"),
+	nextField := key.NewBinding(
+		key.WithKeys("tab"),
+		key.WithHelp("⭾", "next field"),
 	)
 	saveKey := key.NewBinding(
-		key.WithKeys("enter"),
-		key.WithHelp("enter", "save"),
+		key.WithKeys("ctrl+s"),
+		key.WithHelp("Ctrl+s", "save"),
 	)
 	cancelKey := key.NewBinding(
 		key.WithKeys("esc"),
-		key.WithHelp("esc", "cancel"),
+		key.WithHelp("␛", "cancel"),
 	)
 	previousPage := key.NewBinding(
 		key.WithKeys("pgup"),
@@ -39,8 +39,8 @@ func GetDefaultEditorKeyMap() *EditorKeyMap {
 	)
 
 	return &EditorKeyMap{
-		PreviousField: &upKey,
-		NextField:     &downKey,
+		PreviousField: &previousField,
+		NextField:     &nextField,
 		Save:          &saveKey,
 		Cancel:        &cancelKey,
 		PreviousPage:  &previousPage,

@@ -1,3 +1,4 @@
+---
 version: "2"
 run:
   # Number of operating system threads (`GOMAXPROCS`) that can execute golangci-lint simultaneously.
@@ -139,7 +140,7 @@ linters:
       qualified-name: true
       # Comma-separated list of predeclared identifiers to not report on.
       # Default: []
-      #ignore:
+      # ignore:
     sloglint:
       # Enforce not mixing key-value pairs and attributes.
       # https://github.com/go-simpler/sloglint?tab=readme-ov-file#no-mixed-arguments

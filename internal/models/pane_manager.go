@@ -44,14 +44,9 @@ func (e *ErrMakePageEmptyModel) Error() string {
 	return fmt.Sprintf("making page of kind %s with id %v: model is nil", e.Msg.Page.Kind, e.Msg.Page.ID)
 }
 
-type FocusedPaneChangedMsg struct {
-	From structure.Position
-	To   structure.Position
-}
-
 func GetFocusedPaneChangedCmd(from, to structure.Position) tea.Cmd {
 	return func() tea.Msg {
-		return FocusedPaneChangedMsg{From: from, To: to}
+		return structure.FocusedPaneChangedMsg{From: from, To: to}
 	}
 }
 
@@ -233,7 +228,7 @@ func (p *PaneManager) handleKeyEvent(keyMsg tea.KeyMsg) tea.Cmd {
 // handleNavigationKeys handles key bindings for navigating between panes
 func (p *PaneManager) handleNavigationKeys(keyMsg tea.KeyMsg) tea.Cmd {
 	switch {
-	case key.Matches(keyMsg, *p.paneKeyMap.SwitchPane):
+	case key.Matches(keyMsg, *p.paneKeyMap.SwitchBottomPane):
 		return p.handleSwitchPane(false)
 	case key.Matches(keyMsg, *p.paneKeyMap.SwitchPaneBack):
 		return p.handleSwitchPane(true)
@@ -309,7 +304,7 @@ func (p *PaneManager) setBottomPane(rowID resource.ID, focusIfSameRowID bool) te
 		if focusIfSameRowID {
 			p.focusPane(structure.BottomPane)
 		}
-		return nil
+		return GetFocusedPaneChangedCmd(structure.TopPane, p.focused)
 	}
 	return p.setPane(
 		structure.NavigationMsg{
@@ -413,12 +408,13 @@ func (p *PaneManager) updateModel(position structure.Position, msg tea.Msg) tea.
 
 func (p *PaneManager) setPane(msg structure.NavigationMsg) (cmd tea.Cmd) {
 	var cmds []tea.Cmd
+	oldPos := p.focused
 	if pane, ok := p.panes[msg.Position]; ok && pane.page == msg.Page {
 		// Pane is already showing requested page, so just bring it into focus.
 		if !msg.DisableFocus {
 			p.focusPane(msg.Position)
 		}
-		return nil
+		return GetFocusedPaneChangedCmd(oldPos, p.focused)
 	}
 	model := p.cache.Get(msg.Page)
 	if model == nil {
@@ -449,6 +445,7 @@ func (p *PaneManager) setPane(msg structure.NavigationMsg) (cmd tea.Cmd) {
 	if !msg.DisableFocus {
 		p.focusPane(msg.Position)
 	}
+	cmds = append(cmds, GetFocusedPaneChangedCmd(oldPos, p.focused))
 	return tea.Batch(cmds...)
 }
 
@@ -542,42 +539,19 @@ func (p *PaneManager) renderPane(position structure.Position) string {
 }
 
 func (p *PaneManager) HelpBindings() (bindings []*key.Binding) {
-	paneKeyMap := *p.paneKeyMap
 	panesCount := len(p.panes)
 
-	// Get pane presence status
 	bottomPanePresent := p.isPanePresent(structure.BottomPane)
 	topPanePresent := p.isPanePresent(structure.TopPane)
 	leftPanePresent := p.isPanePresent(structure.LeftPane)
 
-	// Add switch pane bindings if we have multiple panes
 	if panesCount > 1 {
-		bindings = append(
-			bindings,
-			paneKeyMap.SwitchPane,
-			paneKeyMap.SwitchPaneBack,
-		)
-
-		// Add pane-specific bindings
 		p.addPaneSpecificBindings(&bindings, bottomPanePresent, topPanePresent, leftPanePresent)
 	}
 
-	// Add height resize bindings if we have both top and bottom panes
-	if bottomPanePresent && topPanePresent {
-		bindings = append(bindings, p.paneKeyMap.ShrinkPaneHeight, p.paneKeyMap.GrowPaneHeight)
-	}
+	p.addResizingBindings(&bindings, bottomPanePresent, topPanePresent, leftPanePresent)
+	p.addNavigationBindings(&bindings, bottomPanePresent, topPanePresent)
 
-	// Add width resize bindings if we have left pane
-	if leftPanePresent {
-		bindings = append(bindings, p.paneKeyMap.ShrinkPaneWidth, p.paneKeyMap.GrowPaneWidth)
-	}
-
-	// Add close pane binding if focus is not on top pane and we have other panes
-	if p.focused != structure.TopPane && (bottomPanePresent || leftPanePresent) {
-		bindings = append(bindings, p.paneKeyMap.ClosePane)
-	}
-
-	// Add model-specific bindings if the focused model has them
 	if model, ok := p.FocusedModel().(structure.ModelHelpBindings); ok {
 		bindings = append(bindings, model.HelpBindings()...)
 	}
@@ -585,13 +559,28 @@ func (p *PaneManager) HelpBindings() (bindings []*key.Binding) {
 	return bindings
 }
 
-// isPanePresent checks if a pane is present at the given position
-func (p *PaneManager) isPanePresent(position structure.Position) bool {
-	_, present := p.panes[position]
-	return present
+func (p *PaneManager) addResizingBindings(bindings *[]*key.Binding, bottomPanePresent, topPanePresent, leftPanePresent bool) {
+	if bottomPanePresent && topPanePresent {
+		*bindings = append(*bindings, p.paneKeyMap.ShrinkPaneHeight, p.paneKeyMap.GrowPaneHeight)
+	}
+
+	if leftPanePresent {
+		*bindings = append(*bindings, p.paneKeyMap.ShrinkPaneWidth, p.paneKeyMap.GrowPaneWidth)
+	}
 }
 
-// addPaneSpecificBindings adds bindings for specific panes if they are present
+func (p *PaneManager) addNavigationBindings(bindings *[]*key.Binding, bottomPanePresent, topPanePresent bool) {
+	if p.focused != structure.TopPane && (bottomPanePresent || p.isPanePresent(structure.LeftPane)) {
+		*bindings = append(*bindings, p.paneKeyMap.ClosePane)
+	}
+
+	if p.focused == structure.TopPane && bottomPanePresent {
+		*bindings = append(*bindings, p.paneKeyMap.SwitchBottomPane)
+	} else if p.focused != structure.TopPane && topPanePresent {
+		*bindings = append(*bindings, p.paneKeyMap.SwitchPaneBack)
+	}
+}
+
 func (p *PaneManager) addPaneSpecificBindings(bindings *[]*key.Binding, bottomPanePresent, topPanePresent, leftPanePresent bool) {
 	if bottomPanePresent {
 		*bindings = append(*bindings, p.paneKeyMap.BottomPane)
@@ -602,6 +591,12 @@ func (p *PaneManager) addPaneSpecificBindings(bindings *[]*key.Binding, bottomPa
 	if leftPanePresent {
 		*bindings = append(*bindings, p.paneKeyMap.LeftPane)
 	}
+}
+
+// isPanePresent checks if a pane is present at the given position
+func (p *PaneManager) isPanePresent(position structure.Position) bool {
+	_, present := p.panes[position]
+	return present
 }
 
 func removeEmptyStrings(strings ...string) []string {

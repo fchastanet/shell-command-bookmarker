@@ -41,3 +41,8 @@ func WithPosition(position Position) NavigateOption {
 		msg.Position = position
 	}
 }
+
+type FocusedPaneChangedMsg struct {
+	From Position
+	To   Position
+}

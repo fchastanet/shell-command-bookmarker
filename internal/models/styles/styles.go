@@ -77,9 +77,10 @@ type HelpStyle struct {
 
 // EditorStyle contains styling for the command editor component
 type EditorStyle struct {
-	Title    *lipgloss.Style
-	Label    *lipgloss.Style
-	HelpText *lipgloss.Style
+	Title        *lipgloss.Style
+	Label        *lipgloss.Style
+	LabelFocused *lipgloss.Style
+	HelpText     *lipgloss.Style
 	// Added styles for readonly information
 	ReadonlyLabel  *lipgloss.Style
 	ReadonlyValue  *lipgloss.Style
@@ -241,6 +242,7 @@ func (s *Styles) initComponentStyles(colorTheme *ColorTheme) {
 	// Initialize editor style
 	titleStyle := bold.Foreground(colors.Black)
 	labelStyle := bold.Foreground(colors.DarkGrey)
+	labelStyleFocused := bold.Foreground(colors.Blue)
 	helpTextStyle := regular.Foreground(colors.Grey)
 	readonlyLabelStyle := bold.Foreground(colors.LightGrey)
 	readonlyValueStyle := regular.Foreground(colors.LightGrey)
@@ -252,6 +254,7 @@ func (s *Styles) initComponentStyles(colorTheme *ColorTheme) {
 	s.EditorStyle = &EditorStyle{
 		Title:          &titleStyle,
 		Label:          &labelStyle,
+		LabelFocused:   &labelStyleFocused,
 		HelpText:       &helpTextStyle,
 		ContentPadding: PaddingSmall,
 		ReadonlyLabel:  &readonlyLabelStyle,

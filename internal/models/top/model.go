@@ -198,8 +198,8 @@ func (m *Model) dispatchMessage(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.handleStatusMsg(msg)
 	case tea.WindowSizeMsg:
 		return m.handleWindowSize(msg)
-	case models.FocusedPaneChangedMsg:
-		return m.handleFocusPaneChangedMsg()
+	case structure.FocusedPaneChangedMsg:
+		return m.handleFocusPaneChangedMsg(msg)
 	case cursor.BlinkMsg:
 		return m.handleBlink(msg)
 	case tui.MemoryStatsMsg:
@@ -217,7 +217,7 @@ func (m *Model) dispatchMessage(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 // handleFocusPaneChangedMsg handles the pane focus change message
-func (m *Model) handleFocusPaneChangedMsg() (tea.Model, tea.Cmd) {
+func (m *Model) handleFocusPaneChangedMsg(msg tea.Msg) (tea.Model, tea.Cmd) {
 	// Update the help bindings when the focused pane changes
 	m.updateHelpBindings()
 	// Send message to panes to resize themselves to make room for the prompt above it.
@@ -226,6 +226,7 @@ func (m *Model) handleFocusPaneChangedMsg() (tea.Model, tea.Cmd) {
 		Height: m.viewHeight(),
 		Width:  m.viewWidth(),
 	})
+	m.PaneManager.Update(msg)
 	return m, nil
 }
 

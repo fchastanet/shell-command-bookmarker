@@ -13,11 +13,11 @@ type FilterKeyMap struct {
 func GetFilterKeyMap() *FilterKeyMap {
 	blur := key.NewBinding(
 		key.WithKeys("enter"),
-		key.WithHelp("enter", "exit filter"),
+		key.WithHelp("⏎", "exit filter"),
 	)
 	closeKey := key.NewBinding(
 		key.WithKeys("esc"),
-		key.WithHelp("esc", "clear filter"),
+		key.WithHelp("␛", "clear filter"),
 	)
 	return &FilterKeyMap{
 		Blur:  &blur,

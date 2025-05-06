@@ -21,7 +21,10 @@
   "github.copilot.advanced": {
     "instructionFiles": [".github/COPILOT.md"]
   },
-  "github.copilot.chat.localeOverride": "en-US",
+  "github.copilot.chat.localeOverride": "en",
+  "github.copilot.chat.commitMessageGeneration.instructions": [
+    {"file": ".github/COPILOT.md"}
+  ],
   "github.copilot.enable": {
     "*": true,
     "plaintext": true,

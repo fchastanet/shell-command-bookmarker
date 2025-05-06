@@ -24,7 +24,7 @@ type ListMaker struct {
 }
 
 const (
-	idColumnPercentWidth         = 3
+	idColumnPercentWidth         = 6
 	titleColumnPercentWidth      = 19
 	scriptColumnPercentWidth     = 65
 	statusColumnPercentWidth     = 7

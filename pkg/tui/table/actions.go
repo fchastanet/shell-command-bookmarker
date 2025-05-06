@@ -20,15 +20,15 @@ func GetDefaultAction() *Action {
 	)
 	selectAll := key.NewBinding(
 		key.WithKeys("ctrl+a"),
-		key.WithHelp("ctrl+a", "select all"),
+		key.WithHelp("Ctrl+a", "select all"),
 	)
 	selectClear := key.NewBinding(
 		key.WithKeys(`ctrl+\`),
-		key.WithHelp(`ctrl+\`, "clear selection"),
+		key.WithHelp(`Ctrl+\`, "clear selection"),
 	)
 	selectRange := key.NewBinding(
 		key.WithKeys(`ctrl+@`),
-		key.WithHelp(`ctrl+<space>`, "select range"),
+		key.WithHelp(`Ctrl+<space>`, "select range"),
 	)
 	filter := key.NewBinding(
 		key.WithKeys("/"),
@@ -36,15 +36,15 @@ func GetDefaultAction() *Action {
 	)
 	reload := key.NewBinding(
 		key.WithKeys("ctrl+r", "f5"),
-		key.WithHelp("f5/ctrl+r", "reload"),
+		key.WithHelp("F5/Ctrl+r", "reload"),
 	)
 	enter := key.NewBinding(
 		key.WithKeys("enter"),
-		key.WithHelp("enter", "view resource"),
+		key.WithHelp("⏎", "view resource"),
 	)
 	deleteKey := key.NewBinding(
 		key.WithKeys("delete"),
-		key.WithHelp("delete", "delete row"),
+		key.WithHelp("\x7f", "delete row"),
 	)
 
 	return &Action{
