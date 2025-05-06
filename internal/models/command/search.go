@@ -74,7 +74,7 @@ func (m *search) View() string {
 	return m.model.View()
 }
 
-func (m *search) HelpBindings() []*key.Binding {
+func (*search) HelpBindings() []*key.Binding {
 	var bindings []*key.Binding
 	return bindings
 }

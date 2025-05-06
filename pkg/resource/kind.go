@@ -12,4 +12,4 @@ type DefaultKind struct {
 }
 
 func (k DefaultKind) Key() string { return k.key }
-func (k DefaultKind) IsKind()     {}
+func (DefaultKind) IsKind()       {}

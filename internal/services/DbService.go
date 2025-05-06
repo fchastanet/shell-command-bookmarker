@@ -101,7 +101,7 @@ func (s *DBService) GetCommandByScript(script string) (*models.Command, error) {
 	return s.getCommandFromRow(row)
 }
 
-func (s *DBService) getCommandFromRow(row *sql.Row) (*models.Command, error) {
+func (*DBService) getCommandFromRow(row *sql.Row) (*models.Command, error) {
 	var command models.Command
 	var creationDateStr string
 	var modificationDateStr string

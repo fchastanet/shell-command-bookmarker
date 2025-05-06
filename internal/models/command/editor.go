@@ -105,7 +105,7 @@ func (w *InputWrapper) Update(msg tea.Msg) (Input, tea.Cmd) {
 	return w, cmd
 }
 
-func (w *InputWrapper) SetHeight(_ int) {
+func (*InputWrapper) SetHeight(_ int) {
 	// do nothing
 }
 
@@ -126,7 +126,7 @@ func (w *EditLineWrapper) Update(msg tea.Msg) (Input, tea.Cmd) {
 }
 
 // Blur implements the Input interface
-func (w *EditLineWrapper) Blur() {
+func (*EditLineWrapper) Blur() {
 }
 
 // Focus implements the Input interface

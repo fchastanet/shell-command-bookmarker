@@ -7,7 +7,7 @@ type KindType struct {
 func (k KindType) Key() string {
 	return k.key
 }
-func (k KindType) IsKind() {}
+func (KindType) IsKind() {}
 
 //nolint:gochecknoglobals // no way to use enum for this part
 var (
