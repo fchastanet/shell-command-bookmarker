@@ -108,7 +108,7 @@ func (mm *ListMaker) Make(_ resource.ID, width, height int) (structure.ChildMode
 	return m, nil
 }
 
-func (mm *ListMaker) renderRow(
+func (*ListMaker) renderRow(
 	cmd *dbmodels.Command,
 	commandsListModel *commandsList,
 ) table.RenderedRow {
@@ -199,7 +199,7 @@ func (m *commandsList) getColumns(width int) []table.Column {
 	}
 }
 
-func (m *commandsList) Init() tea.Cmd {
+func (*commandsList) Init() tea.Cmd {
 	return func() tea.Msg {
 		return tea.FocusMsg{}
 	}

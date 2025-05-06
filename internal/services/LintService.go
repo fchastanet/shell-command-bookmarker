@@ -127,7 +127,7 @@ func (s *LintService) IsLintingAvailable() bool {
 	return s.shellCheckPath != ""
 }
 
-func (s *LintService) FormatLintIssuesAsJSON(issues []ShellCheckIssue) string {
+func (*LintService) FormatLintIssuesAsJSON(issues []ShellCheckIssue) string {
 	str, err := json.Marshal(issues)
 	if err != nil {
 		slog.Error("Error formatting lint issues as JSON", "error", err)
@@ -136,7 +136,7 @@ func (s *LintService) FormatLintIssuesAsJSON(issues []ShellCheckIssue) string {
 	return string(str)
 }
 
-func (s *LintService) GetLintResultingStatus(issues []ShellCheckIssue) models.LintStatus {
+func (*LintService) GetLintResultingStatus(issues []ShellCheckIssue) models.LintStatus {
 	if len(issues) == 0 {
 		return models.LintStatusOK
 	}

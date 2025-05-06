@@ -22,7 +22,7 @@ func New(myStyles *styles.Styles, title string) Model {
 }
 
 // Height returns the height of the header component when rendered
-func (m *Model) Height() int {
+func (*Model) Height() int {
 	return styles.HeightHeader
 }
 

@@ -9,7 +9,7 @@ import (
 
 type DefaultCommandExecutor struct{}
 
-func (c *DefaultCommandExecutor) ExecuteCommandWithStdin(cmd string, args []string, stdin string) (
+func (*DefaultCommandExecutor) ExecuteCommandWithStdin(cmd string, args []string, stdin string) (
 	output string, errOutput string, err error,
 ) {
 	command := exec.Command(cmd, args...)

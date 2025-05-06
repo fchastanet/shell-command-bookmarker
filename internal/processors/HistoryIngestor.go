@@ -227,7 +227,7 @@ func (*HistoryIngestor) handleCommand(
 // processHistoryLine handles the logic for a single line from the history file.
 // It updates the currentCommand being built and returns true if a command is completed.
 // The currentCommand pointer (**cmd) allows modification of the caller's currentCommand variable.
-func (h *HistoryIngestor) processHistoryLine(
+func (*HistoryIngestor) processHistoryLine(
 	line string, commandBuilder *strings.Builder, cmd **HistoryCommand,
 ) {
 	currentCommand := *cmd // Dereference to work with the actual *HistoryCommand

@@ -6,6 +6,6 @@ import (
 
 type DefaultLookupExecutor struct{}
 
-func (c *DefaultLookupExecutor) LookPath(path string) (string, error) {
+func (*DefaultLookupExecutor) LookPath(path string) (string, error) {
 	return exec.LookPath(path)
 }

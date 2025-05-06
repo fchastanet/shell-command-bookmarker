@@ -262,7 +262,7 @@ func TestParseBashHistory(t *testing.T) {
 
 type callbackError struct{}
 
-func (c *callbackError) Error() string {
+func (*callbackError) Error() string {
 	return "callback error"
 }
 

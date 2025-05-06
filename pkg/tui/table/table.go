@@ -292,7 +292,7 @@ func (m *Model[V]) handleFilterMsg(msg tea.Msg) (*Model[V], tea.Cmd) {
 		m.filter.Blur()
 		m.filter.SetValue("")
 		// Un-filter table items
-		m.setRows(maps.Values(m.items)...)
+		m.filterRows(maps.Values(m.items)...)
 		return m, nil
 
 	case tui.FilterKeyMsg:
@@ -301,7 +301,7 @@ func (m *Model[V]) handleFilterMsg(msg tea.Msg) (*Model[V], tea.Cmd) {
 		var cmd tea.Cmd
 		m.filter, cmd = m.filter.Update(msgKey)
 		// Filter table items
-		m.setRows(maps.Values(m.items)...)
+		m.filterRows(maps.Values(m.items)...)
 		return m, cmd
 	}
 	return m, nil
@@ -315,7 +315,7 @@ func (m *Model[V]) handleKeyMsg(msg tea.KeyMsg) (*Model[V], tea.Cmd) {
 	}
 
 	// Group selection keys
-	if cmd := m.handleSelectionKey(msg); cmd {
+	if m.handleSelectionKey(msg) {
 		return m, nil
 	}
 
@@ -607,7 +607,7 @@ func (m *Model[V]) AddItems(items ...V) {
 		// (Re-)render item's row.
 		m.rendered[item.GetID()] = m.rowRenderer(item)
 	}
-	m.setRows(maps.Values(m.items)...)
+	m.filterRows(maps.Values(m.items)...)
 }
 
 func (m *Model[V]) removeItem(item V) {
@@ -633,8 +633,8 @@ func (m *Model[V]) removeItem(item V) {
 	}
 }
 
-// setRows processes and filters items for display
-func (m *Model[V]) setRows(items ...V) {
+// filterRows processes and filters items for display
+func (m *Model[V]) filterRows(items ...V) {
 	// Process items with filtering
 	m.processFilteredItems(items)
 
