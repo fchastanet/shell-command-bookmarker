@@ -142,13 +142,13 @@ repos:
           )
 
   - repo: https://github.com/streetsidesoftware/cspell-cli
-    rev: v8.19.0
+    rev: v8.19.1
     hooks:
       - id: cspell
         stages: [pre-push, manual]
 
   - repo: https://github.com/golangci/golangci-lint
-    rev: v2.1.5
+    rev: v2.1.6
     hooks:
       - id: golangci-lint-config-verify
       - id: golangci-lint-full
