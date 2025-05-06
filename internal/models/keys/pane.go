@@ -5,7 +5,7 @@ import (
 )
 
 type PaneNavigationKeyMap struct {
-	SwitchPane       *key.Binding
+	SwitchBottomPane *key.Binding
 	SwitchPaneBack   *key.Binding
 	LeftPane         *key.Binding
 	TopPane          *key.Binding
@@ -19,49 +19,49 @@ type PaneNavigationKeyMap struct {
 
 // Navigation returns key bindings for navigation.
 func GetPaneNavigationKeyMap() *PaneNavigationKeyMap {
-	switchPane := key.NewBinding(
-		key.WithKeys("tab"),
-		key.WithHelp("tab", "next pane"),
+	switchBottomPane := key.NewBinding(
+		key.WithKeys("enter", "tab"),
+		key.WithHelp("⏎/⭾", "bottom pane"),
 	)
 	switchPaneBack := key.NewBinding(
-		key.WithKeys("shift+tab"),
-		key.WithHelp("shift+tab", "previous pane"),
+		key.WithKeys("esc", "shift+tab"),
+		key.WithHelp("␛/Shift-⭾", "back to top pane"),
 	)
 	topPane := key.NewBinding(
 		key.WithKeys("alt+1", "alt+&"),
-		key.WithHelp("alt+1/alt+&", "top pane"),
+		key.WithHelp("Alt+1/Alt+&", "top pane"),
 	)
 	bottomPane := key.NewBinding(
 		key.WithKeys("alt+2", "alt+é"),
-		key.WithHelp("alt+2/alt+é", "bottom right pane"),
+		key.WithHelp("Alt+2/Alt+é", "bottom right pane"),
 	)
 	leftPane := key.NewBinding(
 		key.WithKeys("alt+3", "alt+\""),
-		key.WithHelp("alt+3/alt+\"", "left pane"),
+		key.WithHelp("Alt+3/Alt+\"", "left pane"),
 	)
 	closePane := key.NewBinding(
 		key.WithKeys("alt+X", "alt+x"),
-		key.WithHelp("alt+x", "close pane"),
+		key.WithHelp("Alt+x", "close pane"),
 	)
 	shrinkPaneHeight := key.NewBinding(
 		key.WithKeys("alt+up"),
-		key.WithHelp("alt+⬆", "reduce height"),
+		key.WithHelp("Alt+⬆", "reduce height"),
 	)
 	growPaneHeight := key.NewBinding(
 		key.WithKeys("alt+down"),
-		key.WithHelp("alt+⬇", "increase height"),
+		key.WithHelp("Alt+⬇", "increase height"),
 	)
 	shrinkPaneWidth := key.NewBinding(
 		key.WithKeys("alt+left"),
-		key.WithHelp("alt+⬅", "reduce width"),
+		key.WithHelp("Alt+⬅", "reduce width"),
 	)
 	growPaneWidth := key.NewBinding(
 		key.WithKeys("alt+right"),
-		key.WithHelp("alt+⮕", "increase width"),
+		key.WithHelp("Alt+⮕", "increase width"),
 	)
 
 	return &PaneNavigationKeyMap{
-		SwitchPane:       &switchPane,
+		SwitchBottomPane: &switchBottomPane,
 		SwitchPaneBack:   &switchPaneBack,
 		LeftPane:         &leftPane,
 		TopPane:          &topPane,

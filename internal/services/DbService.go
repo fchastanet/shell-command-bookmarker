@@ -243,11 +243,10 @@ func (s *DBService) GetCommands(statuses ...models.CommandStatus) ([]*models.Com
 func (s *DBService) UpdateCommand(command *models.Command) error {
 	slog.Debug("Updating command in database", "command", command)
 	// Use Exec for UPDATE statements
-	_, err := s.dbAdapter.GetDB().Exec(
-		`UPDATE command
+	_, err := s.dbAdapter.GetDB().Exec(`UPDATE command
 		SET title = ?, description = ?, script = ?,
-		    status = ?, lint_issues = ?, lint_status = ?,
-		    elapsed = ?, modification_datetime = ?
+		status = ?, lint_issues = ?, lint_status = ?,
+		elapsed = ?, modification_datetime = ?
 		WHERE id = ?`,
 		command.Title, command.Description, command.Script,
 		string(command.Status), command.LintIssues, string(command.LintStatus),

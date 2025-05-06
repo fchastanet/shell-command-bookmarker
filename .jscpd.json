@@ -1,5 +1,6 @@
 {
   "threshold": 0,
+  "minLines": 15,
   "reporters": ["html", "markdown"],
   "ignore": [
     "**/node_modules/**",

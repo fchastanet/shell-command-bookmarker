@@ -2,11 +2,9 @@
   "Verbose": false,
   "Debug": false,
   "IgnoreDefaults": false,
-  "SpacesAftertabs": false,
+  "SpacesAfterTabs": false,
   "NoColor": false,
-  "Exclude": [
-    "/testsData/"
-  ],
+  "Exclude": ["/testsData/"],
   "AllowedContentTypes": [],
   "PassedFiles": [],
   "Disable": {

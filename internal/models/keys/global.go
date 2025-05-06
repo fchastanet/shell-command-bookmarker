@@ -14,15 +14,15 @@ type GlobalKeyMap struct {
 func GetGlobalKeyMap() *GlobalKeyMap {
 	search := key.NewBinding(
 		key.WithKeys("ctrl+f", "f3"),
-		key.WithHelp("ctrl+f/F3", "search"),
+		key.WithHelp("Ctrl+f/F3", "search"),
 	)
 	quit := key.NewBinding(
 		key.WithKeys("esc", "ctrl+c"),
-		key.WithHelp("esc/ctrl+c", "exit"),
+		key.WithHelp("␛/Ctrl+c", "exit"),
 	)
 	help := key.NewBinding(
-		key.WithKeys("h", "alt+?", "alt+,"),
-		key.WithHelp("h/alt+?", "close help"),
+		key.WithKeys("h", "H", "alt+?", "alt+,"),
+		key.WithHelp("H/Alt+?", "close help"),
 	)
 	debug := key.NewBinding(
 		key.WithKeys("f10", "f12"),

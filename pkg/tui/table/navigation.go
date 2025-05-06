@@ -18,12 +18,12 @@ type Navigation struct {
 // GetNavigation returns key bindings for navigation.
 func GetDefaultNavigation() *Navigation {
 	lineUp := key.NewBinding(
-		key.WithKeys("up", "k"),
-		key.WithHelp("↑/k", "up"),
+		key.WithKeys("up"),
+		key.WithHelp("↑", "up"),
 	)
 	lineDown := key.NewBinding(
-		key.WithKeys("down", "j"),
-		key.WithHelp("↓/j", "down"),
+		key.WithKeys("down"),
+		key.WithHelp("↓", "down"),
 	)
 	pageUp := key.NewBinding(
 		key.WithKeys("pgup"),
@@ -35,19 +35,19 @@ func GetDefaultNavigation() *Navigation {
 	)
 	halfPageUp := key.NewBinding(
 		key.WithKeys("ctrl+pgup"),
-		key.WithHelp("ctrl+⇞", "½ page up"),
+		key.WithHelp("Ctrl+⇞", "½ page up"),
 	)
 	halfPageDown := key.NewBinding(
 		key.WithKeys("ctrl+pgdown"),
-		key.WithHelp("ctrl+⇟", "½ page down"),
+		key.WithHelp("Ctrl+⇟", "½ page down"),
 	)
 	gotoTop := key.NewBinding(
-		key.WithKeys("home", "g"),
-		key.WithHelp("g/↖", "go to start"),
+		key.WithKeys("home"),
+		key.WithHelp("↖", "go to start"),
 	)
 	gotoBottom := key.NewBinding(
-		key.WithKeys("end", "G"),
-		key.WithHelp("G/end", "go to end"),
+		key.WithKeys("end"),
+		key.WithHelp("End", "go to end"),
 	)
 
 	return &Navigation{

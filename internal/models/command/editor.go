@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/charmbracelet/bubbles/key"
+	"github.com/charmbracelet/bubbles/textarea"
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
@@ -60,7 +61,7 @@ func (mm *EditorMaker) Make(id resource.ID, width, height int) (structure.ChildM
 		command:       command,
 		width:         width,
 		height:        height,
-		inputs:        make([]textinput.Model, numInputFields),
+		inputs:        make([]Input, numInputFields),
 		focused:       -1,
 		EditorKeyMap:  mm.EditorKeyMap,
 		pagePosition:  0,
@@ -74,7 +75,7 @@ type commandEditor struct {
 	styles        *styles.Styles
 	command       *dbmodels.Command
 	EditorKeyMap  *keys.EditorKeyMap
-	inputs        []textinput.Model
+	inputs        []Input
 	width         int
 	height        int
 	focused       int
@@ -82,24 +83,85 @@ type commandEditor struct {
 	contentHeight int
 }
 
+type Input interface {
+	Update(msg tea.Msg) (Input, tea.Cmd)
+	Blur()
+	Focus() tea.Cmd
+	Value() string
+	View() string
+	SetWidth(width int)
+	SetHeight(height int)
+}
+
+// InputWrapper wraps textinput.Model to implement the Input interface
+type InputWrapper struct {
+	*textinput.Model
+}
+
+// Update implements the Input interface
+func (w *InputWrapper) Update(msg tea.Msg) (Input, tea.Cmd) {
+	newModel, cmd := w.Model.Update(msg)
+	w.Model = &newModel
+	return w, cmd
+}
+
+func (w *InputWrapper) SetHeight(_ int) {
+	// do nothing
+}
+
+func (w *InputWrapper) SetWidth(width int) {
+	w.Width = width
+}
+
+// EditLineWrapper wraps textarea.Model to implement the Input interface
+type EditLineWrapper struct {
+	*textarea.Model
+}
+
+// Update implements the Input interface
+func (w *EditLineWrapper) Update(msg tea.Msg) (Input, tea.Cmd) {
+	newModel, cmd := w.Model.Update(msg)
+	w.Model = &newModel
+	return w, cmd
+}
+
+// Blur implements the Input interface
+func (w *EditLineWrapper) Blur() {
+}
+
+// Focus implements the Input interface
+func (w *EditLineWrapper) Focus() tea.Cmd {
+	return w.Model.Focus()
+}
+
+// SetValue implements the Input interface
+func (w *EditLineWrapper) SetValue(value string) {
+	w.Model.SetValue(value)
+}
+
 // Init initializes the command editor
 func (m *commandEditor) Init() tea.Cmd {
 	// Initialize the text inputs
-	titleInput := textinput.New()
+	textInput := textinput.New()
+	textInput.CharLimit = 50
+	titleInput := InputWrapper{&textInput}
 	titleInput.Placeholder = "Enter title"
 	titleInput.SetValue(m.command.Title)
 	titleInput.Focus()
 
-	descriptionInput := textinput.New()
+	textInput2 := textarea.New()
+	textInput2.CharLimit = 200
+	descriptionInput := EditLineWrapper{&textInput2}
 	descriptionInput.Placeholder = "Enter description"
 	descriptionInput.SetValue(m.command.Description)
 	descriptionInput.CharLimit = 200
 
-	scriptInput := textinput.New()
+	scriptTextArea := textarea.New()
+	scriptInput := EditLineWrapper{&scriptTextArea}
 	scriptInput.Placeholder = "Enter script"
 	scriptInput.SetValue(m.command.Script)
 
-	m.inputs = []textinput.Model{titleInput, descriptionInput, scriptInput}
+	m.inputs = []Input{&titleInput, &descriptionInput, &scriptInput}
 
 	return nil
 }
@@ -125,29 +187,25 @@ func (m *commandEditor) formatLintStatus() string {
 // Update handles updates to the command editor
 func (m *commandEditor) Update(msg tea.Msg) tea.Cmd {
 	var cmds []tea.Cmd
+
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
-		m.width = msg.Width
-		m.height = msg.Height
+		m.handleWindowSizeMsg(msg)
+	case structure.FocusedPaneChangedMsg:
+		cmds = append(cmds, m.handleFocusedPaneChangedMsg())
 	case tea.KeyMsg:
-		switch {
-		case key.Matches(msg, *m.EditorKeyMap.PreviousField):
-			m.prevField()
-		case key.Matches(msg, *m.EditorKeyMap.NextField):
-			m.nextField()
-		case key.Matches(msg, *m.EditorKeyMap.PreviousPage):
-			m.prevPage()
-		case key.Matches(msg, *m.EditorKeyMap.NextPage):
-			m.nextPage()
-		case key.Matches(msg, *m.EditorKeyMap.Save):
-			return m.save()
-		case key.Matches(msg, *m.EditorKeyMap.Cancel):
-			// Return without saving
-			return m.cancel()
+		cmd := m.handleKeyMsg(msg)
+		if cmd != nil {
+			cmds = append(cmds, cmd)
+			return tea.Batch(cmds...)
+		}
+		if msg.Alt {
+			// avoid alt key combinations to be eaten by inputs
+			return nil
 		}
 	}
 
-	// Update the active input
+	// Update the active input field
 	if m.focused >= 0 {
 		var cmd tea.Cmd
 		m.inputs[m.focused], cmd = m.inputs[m.focused].Update(msg)
@@ -157,8 +215,43 @@ func (m *commandEditor) Update(msg tea.Msg) tea.Cmd {
 	return tea.Batch(cmds...)
 }
 
+func (m *commandEditor) handleWindowSizeMsg(msg tea.WindowSizeMsg) {
+	m.width = msg.Width
+	m.height = msg.Height
+	for _, input := range m.inputs {
+		input.SetWidth(m.width)
+	}
+}
+
+func (m *commandEditor) handleFocusedPaneChangedMsg() tea.Cmd {
+	m.focused = -1
+	return tui.GetDummyCmd()
+}
+
+func (m *commandEditor) handleKeyMsg(msg tea.KeyMsg) tea.Cmd {
+	var cmds []tea.Cmd
+
+	switch {
+	case key.Matches(msg, *m.EditorKeyMap.PreviousField):
+		cmds = append(cmds, m.prevField())
+	case key.Matches(msg, *m.EditorKeyMap.NextField):
+		cmds = append(cmds, m.nextField())
+	case key.Matches(msg, *m.EditorKeyMap.PreviousPage):
+		m.prevPage()
+	case key.Matches(msg, *m.EditorKeyMap.NextPage):
+		m.nextPage()
+	case key.Matches(msg, *m.EditorKeyMap.Save):
+		return m.save()
+	case key.Matches(msg, *m.EditorKeyMap.Cancel):
+		return m.cancel()
+	}
+
+	return tea.Batch(cmds...)
+}
+
 // View renders the command editor
 func (m *commandEditor) View() string {
+	slog.Debug("commandEditor.View", "focused", m.focused)
 	var content strings.Builder
 
 	// Add common elements first
@@ -196,7 +289,7 @@ func (m *commandEditor) addCommonElements(content *strings.Builder) {
 	if m.focused == -1 {
 		helpTextStyle = helpTextStyle.Bold(true).Foreground(lipgloss.Color("255"))
 	}
-	helpText := helpTextStyle.Render("↑/↓: Fields • ⇞/⇟: Scroll • Enter: Save • Esc: Cancel")
+	helpText := helpTextStyle.Render("↑/↓: Fields • ⇞/⇟: Scroll • Ctrl+S: Save • Esc: Cancel")
 	content.WriteString(helpText)
 
 	// Add the title
@@ -207,8 +300,12 @@ func (m *commandEditor) addCommonElements(content *strings.Builder) {
 
 	// Render each field with its label
 	for i, label := range labels {
+		labelStyle := m.styles.EditorStyle.Label
+		if m.focused == i {
+			labelStyle = m.styles.EditorStyle.LabelFocused
+		}
 		// Style the label
-		styledLabel := m.styles.EditorStyle.Label.Render(label)
+		styledLabel := labelStyle.Render(label)
 
 		// Render the input field
 		fmt.Fprintf(content, "%s\n%s\n\n", styledLabel, m.inputs[i].View())
@@ -309,34 +406,38 @@ func (m *commandEditor) generateScrollbar(contentStr, visibleContent string) str
 }
 
 // nextField focuses the next field
-func (m *commandEditor) nextField() {
+func (m *commandEditor) nextField() tea.Cmd {
 	if m.focused >= 0 {
 		m.inputs[m.focused].Blur()
 	}
 	if m.focused == len(m.inputs)-1 {
 		m.focused = -1
-	} else {
-		m.focused = (m.focused + 1) % len(m.inputs)
-		m.inputs[m.focused].Focus()
+		return nil
 	}
+
+	m.focused = (m.focused + 1) % len(m.inputs)
+
+	return m.inputs[m.focused].Focus()
 }
 
 // prevField focuses the previous field
-func (m *commandEditor) prevField() {
+func (m *commandEditor) prevField() tea.Cmd {
 	if m.focused >= 0 {
 		m.inputs[m.focused].Blur()
 	}
 	switch m.focused {
 	case -1:
 		m.focused = len(m.inputs) - 1
+		return nil
 	case 0:
 		m.focused = -1
 	default:
 		m.focused = (m.focused - 1) % len(m.inputs)
 	}
 	if m.focused >= 0 {
-		m.inputs[m.focused].Focus()
+		return m.inputs[m.focused].Focus()
 	}
+	return tui.GetDummyCmd()
 }
 
 // nextPage scrolls to the next page
