@@ -289,7 +289,7 @@ func (m *commandEditor) addCommonElements(content *strings.Builder) {
 	if m.focused == -1 {
 		helpTextStyle = helpTextStyle.Bold(true).Foreground(lipgloss.Color("255"))
 	}
-	helpText := helpTextStyle.Render("↑/↓: Fields • ⇞/⇟: Scroll • Ctrl+S: Save • Esc: Cancel")
+	helpText := helpTextStyle.Render("⭾/Shift-⭾: Fields • ⇞/⇟: Scroll • Ctrl+S: Save • Esc: Cancel")
 	content.WriteString(helpText)
 
 	// Add the title
