@@ -691,10 +691,26 @@ func (m *Model[V]) sortAndLocateCurrentRow() {
 }
 
 // matchFilter returns true if the item with the given ID matches the filter
-// value.
+// value using fuzzy matching.
 func (m *Model[V]) matchFilter(item V) bool {
+	filterValue := m.filter.Value()
+	if filterValue == "" {
+		return true
+	}
+
 	for _, col := range m.rendered[item.GetID()] {
-		if strings.Contains(col, m.filter.Value()) {
+		// Try exact match first (fastest)
+		if strings.Contains(strings.ToLower(col), strings.ToLower(filterValue)) {
+			return true
+		}
+
+		// Try fuzzy subsequence matching if exact match fails
+		if FuzzyMatchSubsequence(col, filterValue) {
+			return true
+		}
+
+		// Try advanced scoring if needed
+		if FuzzyMatchScore(col, filterValue) > ScoreThreshold {
 			return true
 		}
 	}

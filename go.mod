@@ -6,6 +6,7 @@ require (
 	github.com/alecthomas/kong v1.10.0
 	github.com/charmbracelet/bubbletea v1.3.4
 	github.com/davecgh/go-spew v1.1.1
+	github.com/lithammer/fuzzysearch v1.1.8
 	golang.org/x/exp v0.0.0-20250408133849-7e4ce0ab07d0
 )
 

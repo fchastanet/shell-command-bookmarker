@@ -70,6 +70,7 @@ linters:
             - github.com/alecthomas/kong
             - github.com/mattn/go-sqlite3
             - github.com/davecgh/go-spew/spew
+            - github.com/lithammer/fuzzysearch/fuzzy
             - golang.org/x/exp/maps
           deny:
             - pkg: github.com/stretchr/testify
@@ -93,6 +94,7 @@ linters:
             - github.com/alecthomas/kong
             - github.com/mattn/go-sqlite3
             - github.com/davecgh/go-spew/spew
+            - github.com/lithammer/fuzzysearch/fuzzy
             - golang.org/x/exp/maps
           deny:
             - pkg: github.com/fchastanet/shell-command-bookmarker/internal
@@ -109,6 +111,7 @@ linters:
             - github.com/fchastanet
             - github.com/stretchr/testify
             - golang.org/x/exp/maps
+            - github.com/lithammer/fuzzysearch/fuzzy
     errcheck:
       # To disable the errcheck built-in exclude list.
       # See `-excludeonly` option in https://github.com/kisielk/errcheck#excluding-functions for details.
