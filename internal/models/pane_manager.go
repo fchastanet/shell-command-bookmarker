@@ -133,42 +133,6 @@ func (p *PaneManager) Init() tea.Cmd {
 }
 
 func (p *PaneManager) Update(msg tea.Msg) tea.Cmd {
-	var cmds []tea.Cmd
-	updatePanes := true
-
-	// Handle special messages
-	if cmd, handled := p.handleSpecialMessages(msg); handled {
-		if cmd != nil {
-			cmds = append(cmds, cmd)
-		}
-		updatePanes = false
-	}
-
-	if updatePanes {
-		// Send keys to focused pane
-		cmd := p.updateModel(p.focused, msg)
-		if cmd != nil {
-			cmds = append(cmds, cmd)
-			return tea.Batch(cmds...)
-		}
-	}
-
-	if keyMsg, ok := msg.(tea.KeyMsg); ok {
-		// Handle key events for the pane manager
-		cmd := p.handleKeyEvent(keyMsg)
-		if cmd != nil {
-			cmds = append(cmds, cmd)
-		}
-	} else if updatePanes {
-		// Send remaining message types to cached panes except focused one.
-		cmds = append(cmds, p.updateUnfocusedPanes(msg)...)
-	}
-
-	return tea.Batch(cmds...)
-}
-
-// handleSpecialMessages processes special message types like window size, navigation, etc.
-func (p *PaneManager) handleSpecialMessages(msg tea.Msg) (tea.Cmd, bool) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		p.width = msg.Width
@@ -176,53 +140,70 @@ func (p *PaneManager) handleSpecialMessages(msg tea.Msg) (tea.Cmd, bool) {
 		p.updateLeftWidth(0)
 		p.updateTopHeight(0)
 		p.updateChildSizes()
-		return nil, true
+		return nil
 	case structure.NavigationMsg:
-		return p.setPane(msg), true
+		return tea.Batch(
+			p.setPane(msg),
+			p.updateModel(p.focused, msg),
+		)
 	case table.RowDefaultActionMsg[*models.Command]:
-		return p.setBottomPane(msg.RowID, true), true
+		return tea.Batch(
+			p.setBottomPane(msg.RowID, true),
+			p.updateModel(p.focused, msg),
+		)
 	case table.RowSelectedActionMsg[*models.Command]:
 		if _, ok := p.panes[structure.BottomPane]; ok {
-			return p.setBottomPane(msg.RowID, false), true
+			return tea.Batch(
+				p.setBottomPane(msg.RowID, false),
+				p.updateModel(p.focused, msg),
+			)
 		}
 	case command.EditorCancelledMsg:
 		// The command editor was cancelled, so we need to close the bottom pane
 		// and focus the top pane.
-		return p.closeFocusedPane(), true
+		return tea.Batch(
+			p.closeFocusedPane(),
+			p.updateModel(p.focused, msg),
+		)
+	case tea.KeyMsg:
+		// Handle close pane action separately
+		if key.Matches(msg, *p.paneKeyMap.ClosePane) {
+			return p.closeFocusedPane()
+		}
+
+		// Handle pane resize operations
+		if cmd := p.handleResizeKeys(msg); cmd != nil {
+			return cmd
+		}
+
+		// Handle pane navigation operations
+		if cmd := p.handleNavigationKeys(msg); cmd != nil {
+			return cmd
+		}
+		// Handle key events in the focused pane
+		if pane, ok := p.panes[p.focused]; ok {
+			if cmd := pane.model.Update(msg); cmd != nil {
+				return cmd
+			}
+		}
+		return nil
 	}
 
-	return nil, false
+	// Send remaining message types to all panes.
+	return tea.Batch(p.updateAllPanes(msg)...)
 }
 
-// updateUnfocusedPanes sends messages to all panes except the focused one
-func (p *PaneManager) updateUnfocusedPanes(msg tea.Msg) []tea.Cmd {
+// updateAllPanes sends messages to all panes
+func (p *PaneManager) updateAllPanes(msg tea.Msg) []tea.Cmd {
 	var cmds []tea.Cmd
 
 	for position := range p.panes {
-		if position == p.focused {
-			continue
-		}
 		if cmd := p.updateModel(position, msg); cmd != nil {
 			cmds = append(cmds, cmd)
 		}
 	}
 
 	return cmds
-}
-
-func (p *PaneManager) handleKeyEvent(keyMsg tea.KeyMsg) tea.Cmd {
-	// Handle close pane action separately
-	if key.Matches(keyMsg, *p.paneKeyMap.ClosePane) {
-		return p.closeFocusedPane()
-	}
-
-	// Handle pane resize operations
-	if cmd := p.handleResizeKeys(keyMsg); cmd != nil {
-		return cmd
-	}
-
-	// Handle pane navigation operations
-	return p.handleNavigationKeys(keyMsg)
 }
 
 // handleNavigationKeys handles key bindings for navigating between panes

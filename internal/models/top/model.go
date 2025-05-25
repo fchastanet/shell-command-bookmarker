@@ -165,58 +165,53 @@ func (m *Model) Init() tea.Cmd {
 	))
 }
 
+//nolint:cyclop // not really complex
 func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	// Use enhanced logging for better debugging
 	m.appService.LoggerService.EnhancedLogTeaMsg(msg)
 
-	cmd, propagationMsg := m.handleMessages(msg)
-	if propagationMsg == nil || !propagationMsg.ShouldPropagate() {
-		return m, cmd
-	}
-	cmd2 := m.propagateMessage(propagationMsg)
-	return m, tea.Batch(cmd, cmd2)
-}
-
-//nolint:cyclop // not really complex
-func (m *Model) handleMessages(msg tea.Msg) (tea.Cmd, tui.PropagationMsgInterface) {
 	switch typedMsg := msg.(type) {
 	case tui.PerformanceMonitorStartMsg:
-		return m.handlePerformanceStart()
+		return m, m.handlePerformanceStart()
 	case tui.PerformanceMonitorStopMsg:
-		return m.handlePerformanceStop()
+		return m, m.handlePerformanceStop()
 	case QuitClearScreenMsg:
 		m.quitting = true
-		return tea.Quit, nil
+		return m, tea.Quit
 	case spinner.TickMsg:
-		return m.handleSpinnerTick(typedMsg)
+		return m, m.handleSpinnerTick(typedMsg)
 	case tui.PromptMsg:
-		return m.handlePrompt(&typedMsg)
+		cmd := m.handlePrompt(&typedMsg)
+		m.PaneManager.Update(tea.WindowSizeMsg{
+			Height: m.viewHeight(),
+			Width:  m.viewWidth(),
+		})
+		return m, cmd
 	case tui.ErrorMsg:
-		return m.handleError(typedMsg)
+		return m, m.handleError(typedMsg)
 	case tui.InfoMsg:
-		return m.handleInfo(typedMsg)
+		return m, m.handleInfo(typedMsg)
 	case MessageClearTickMsg:
-		return m.handleMessageClearTick()
+		return m, m.handleMessageClearTick()
 	case tea.WindowSizeMsg:
-		return m.handleWindowSize(typedMsg)
+		cmd := m.handleWindowSize(typedMsg)
+		m.PaneManager.Update(tea.WindowSizeMsg{
+			Height: m.viewHeight(),
+			Width:  m.viewWidth(),
+		})
+		return m, cmd
 	case tea.KeyMsg:
-		return m.handleKeyMsg(typedMsg)
+		return m, m.handleKeyMsg(typedMsg)
 	case structure.FocusedPaneChangedMsg:
-		return m.handleFocusPaneChangedMsg(typedMsg)
+		return m, m.handleFocusPaneChangedMsg(typedMsg)
 	case cursor.BlinkMsg:
-		return m.handleBlink(typedMsg)
+		return m, m.handleBlink(typedMsg)
 	case tui.MemoryStatsMsg:
-		return m.handleMemoryStats(typedMsg)
+		return m, m.handleMemoryStats(typedMsg)
 	}
 
-	return nil, nil
-}
-
-// dispatchMessage routes messages to their appropriate handlers
-//
-
-func (m *Model) propagateMessage(msg tui.PropagationMsgInterface) tea.Cmd {
-	return m.PaneManager.Update(msg.GetMsg())
+	cmd := m.PaneManager.Update(msg)
+	return m, cmd
 }
 
 // scheduleClearMessage creates a tick command that triggers after the specified duration
@@ -227,117 +222,90 @@ func scheduleClearMessage(d time.Duration) tea.Cmd {
 }
 
 // handleMemoryStats processes and displays memory statistics
-func (m *Model) handleMemoryStats(msg tui.MemoryStatsMsg) (tea.Cmd, tui.PropagationMsgInterface) {
+func (m *Model) handleMemoryStats(msg tui.MemoryStatsMsg) tea.Cmd {
 	statsInfo := fmt.Sprintf("Memory: %d MB in use | %d MB total | %d MB sys | GC runs: %d",
 		msg.Alloc/bytesInMegabyte, msg.TotalAlloc/bytesInMegabyte, msg.Sys/bytesInMegabyte, msg.NumGC)
 
 	m.footerModel.SetInfo(statsInfo)
-	return tui.PerformanceMonitorTick(performanceMonitorInterval), nil
+	return tui.PerformanceMonitorTick(performanceMonitorInterval)
 }
 
-// handleKeyMsg processes key messages
-func (m *Model) handleKeyMsg(msg tea.KeyMsg) (tea.Cmd, tui.PropagationMsgInterface) {
-	var cmd tea.Cmd
-
+//nolint:cyclop // not really complex
+func (m *Model) handleKeyMsg(msg tea.KeyMsg) tea.Cmd {
 	switch m.mode {
 	case promptMode:
 		closePrompt, cmd := m.prompt.HandleKey(msg)
+		var cmd2 tea.Cmd
 		if closePrompt {
 			// Send message to panes to resize themselves to expand back
 			// into space occupied by prompt.
 			m.mode = normalMode
-			return cmd, &tui.PropagationMsg{
-				Msg: tea.WindowSizeMsg{
-					Height: m.viewHeight(),
-					Width:  m.viewWidth(),
-				},
-				PropagationFilter: tui.PropagationToAllChildren,
-			}
+			cmd2 = m.PaneManager.Update(tea.WindowSizeMsg{
+				Height: m.viewHeight(),
+				Width:  m.viewWidth(),
+			})
 		}
-		return cmd, nil
+		return tea.Batch(cmd, cmd2)
 	case filterMode:
 		switch {
 		case key.Matches(msg, *m.keyMaps.filter.Blur):
 			// Switch back to normal mode, and send message to current model
 			// to blur the filter widget
 			m.mode = normalMode
-			cmd = m.FocusedModel().Update(tui.FilterBlurMsg{})
-			return cmd, &tui.PropagationMsg{
-				Msg:               tui.FilterBlurMsg{},
-				PropagationFilter: tui.PropagationToAllChildren,
-			}
+			return m.PaneManager.Update(tui.FilterBlurMsg{})
 		case key.Matches(msg, *m.keyMaps.filter.Close):
 			// Switch back to normal mode, and send message to current model
 			// to close the filter widget
 			m.mode = normalMode
 			closeMsg := tui.FilterCloseMsg{}
-			cmd = m.FocusedModel().Update(closeMsg)
-			if cmd == nil {
-				return nil, &tui.PropagationMsg{
-					Msg:               FilterClosedMsg{},
-					PropagationFilter: tui.PropagationToAllChildren,
-				}
-			}
-			return cmd, nil
+			return m.PaneManager.Update(closeMsg)
 		default:
 			// Wrap key message in a filter key message and send to current
 			// model.
-			return nil, &tui.PropagationMsg{
-				Msg:               tui.FilterKeyMsg(msg),
-				PropagationFilter: tui.PropagationToFocusedChildren,
-			}
+			return m.FocusedModel().Update(tui.FilterKeyMsg(msg))
 		}
 	case normalMode:
-		// In normal mode, we let manageKey handle the key message.
-		return m.manageKey(msg)
-	}
-
-	return nil, nil
-}
-
-func (m *Model) manageKey(msg tea.KeyMsg) (tea.Cmd, tui.PropagationMsgInterface) {
-	var cmd tea.Cmd
-
-	switch {
-	case key.Matches(msg, *m.keyMaps.global.Quit):
-		// ctrl-c quits the app, but not before prompting the user for
-		// confirmation.
-		return tui.YesNoPrompt(
-			"Quit Shell Command Bookmarker?",
-			true,
-			QuitWithClearScreen(),
-		), nil
-	case key.Matches(msg, *m.keyMaps.global.Help):
-		// '?' toggles help widget
-		m.helpModel.Toggle()
-		m.updateHelpBindings()
-		// Help widget takes up space so update panes' dimensions
-		slog.Debug("handleHelpToggle", "viewHeight", m.viewHeight())
-		return nil, &tui.PropagationMsg{
-			PropagationFilter: tui.PropagationToAllChildren,
-			Msg: tea.WindowSizeMsg{
+		switch {
+		case key.Matches(msg, *m.keyMaps.global.Quit):
+			// ctrl-c quits the app, but not before prompting the user for
+			// confirmation.
+			return tui.YesNoPrompt(
+				"Quit Shell Command Bookmarker?",
+				true,
+				QuitWithClearScreen(),
+			)
+		case key.Matches(msg, *m.keyMaps.global.Help):
+			// '?' toggles help widget
+			m.helpModel.Toggle()
+			m.updateHelpBindings()
+			// Help widget takes up space so update panes' dimensions
+			slog.Debug("handleHelpToggle", "viewHeight", m.viewHeight())
+			m.PaneManager.Update(tea.WindowSizeMsg{
 				Height: m.viewHeight(),
 				Width:  m.viewWidth(),
-			},
+			})
+			return nil
+		case key.Matches(msg, *m.keyMaps.tableAction.Filter):
+			// '/' enables filter mode if the current model indicates it
+			// supports it, which it does so by sending back a non-nil command.
+			cmd := m.FocusedModel().Update(tui.FilterFocusReqMsg{})
+			if cmd != nil {
+				m.mode = filterMode
+			}
+			return cmd
+		case key.Matches(msg, *m.keyMaps.global.Debug):
+			// ctrl+d shows memory stats for debugging performance
+			if m.perfMonitorActive {
+				return tui.StopPerformanceMonitor()
+			}
+			return tui.StartPerformanceMonitor(performanceMonitorInterval)
+		case key.Matches(msg, *m.keyMaps.global.Search):
+			return models.NavigateTo(structure.SearchKind, structure.WithPosition(structure.LeftPane))
 		}
-	case key.Matches(msg, *m.keyMaps.tableAction.Filter):
-		// '/' enables filter mode if the current model indicates it
-		// supports it, which it does so by sending back a non-nil command.
-		if cmd = m.FocusedModel().Update(tui.FilterFocusReqMsg{}); cmd != nil {
-			m.mode = filterMode
-		}
-		return cmd, nil
-	case key.Matches(msg, *m.keyMaps.global.Debug):
-		// ctrl+d shows memory stats for debugging performance
-		if m.perfMonitorActive {
-			return tui.StopPerformanceMonitor(), nil
-		}
-		return tui.StartPerformanceMonitor(performanceMonitorInterval), nil
-	case key.Matches(msg, *m.keyMaps.global.Search):
-		return models.NavigateTo(structure.SearchKind, structure.WithPosition(structure.LeftPane)), nil
-	default:
 	}
-	return nil, nil
+
+	// no key matches, check on children models
+	return m.PaneManager.FocusedModel().Update(msg)
 }
 
 func (m *Model) View() string {
