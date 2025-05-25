@@ -16,8 +16,8 @@ func GetFilterKeyMap() *FilterKeyMap {
 		key.WithHelp("⏎", "exit filter"),
 	)
 	closeKey := key.NewBinding(
-		key.WithKeys("esc"),
-		key.WithHelp("␛", "clear filter"),
+		key.WithKeys("esc", "ctrl+c"),
+		key.WithHelp("␛/Ctrl+c", "clear filter"),
 	)
 	return &FilterKeyMap{
 		Blur:  &blur,
