@@ -29,7 +29,7 @@ type Command struct {
 	LintIssues           string
 	LintStatus           LintStatus
 	lintIssuesParsed     []map[string]any
-	ID                   int64
+	ID                   resource.ID
 	Elapsed              int
 }
 
@@ -92,7 +92,7 @@ func (c *Command) GetLintIssues() []map[string]any {
 }
 
 func (c *Command) GetID() resource.ID {
-	return resource.ID(c.ID)
+	return c.ID
 }
 
 func CommandSorter(i, j *Command) int {

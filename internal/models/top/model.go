@@ -125,7 +125,6 @@ func NewModel(
 	}
 
 	spinnerObj := spinner.New(spinner.WithSpinner(spinner.Line))
-	makers := makeMakers(appService, myStyles, &spinnerObj, keyMaps)
 
 	helpWidget := myStyles.HelpStyle.Main.Render("alt+? help")
 	versionWidget := myStyles.FooterStyle.Version.Render(version.Get())
@@ -139,7 +138,6 @@ func NewModel(
 
 	m := Model{
 		PaneManager: models.NewPaneManager(
-			makers,
 			myStyles,
 			keyMaps.global,
 			keyMaps.pane,
@@ -160,6 +158,8 @@ func NewModel(
 		perfMonitorActive: false,
 		quitting:          false,
 	}
+	makers := NewMakerFactory(m.PaneManager, appService, myStyles, &spinnerObj, keyMaps)
+	m.SetMakerFactory(makers)
 	return m
 }
 

@@ -19,6 +19,15 @@ import (
 
 const HalfPageMultiplier = 2
 
+type EditorInterface interface {
+	EditionInProgress() bool
+}
+
+type EditorsCacheInterface interface {
+	// Get retrieves a model from the cache.
+	Get(resource.ID) EditorInterface
+}
+
 // Model defines a state for the table widget.
 type Model[V resource.Identifiable] struct {
 	borderColor lipgloss.TerminalColor
@@ -29,6 +38,7 @@ type Model[V resource.Identifiable] struct {
 	actionKeyMap     *Action
 	rowRenderer      RowRenderer[V]
 	rendered         map[resource.ID]RenderedRow
+	editorsCache     EditorsCacheInterface
 
 	// items are the unfiltered set of items available to the table.
 	items    map[resource.ID]V
@@ -84,6 +94,7 @@ type BulkInsertMsg[T any] []T
 
 // New creates a new model for the table widget.
 func New[V resource.Identifiable](
+	editorsCache EditorsCacheInterface,
 	tableStyles *Style,
 	cols []Column, fn RowRenderer[V],
 	width, height int, opts ...Option[V],
@@ -94,6 +105,7 @@ func New[V resource.Identifiable](
 	m := Model[V]{
 		focused:          false,
 		styles:           tableStyles,
+		editorsCache:     editorsCache,
 		navigationKeyMap: nil,
 		actionKeyMap:     nil,
 		cols:             make([]Column, len(cols)),
@@ -808,6 +820,41 @@ func (m *Model[V]) headersView() string {
 		Render(lipgloss.JoinHorizontal(lipgloss.Left, s...))
 }
 
+func (m *Model[V]) renderCells(
+	row V, current, selected bool, rowsEdited bool,
+) []string {
+	cells := m.rendered[row.GetID()]
+	styledCells := make([]string, len(m.cols))
+	for i, col := range m.cols {
+		content := cells[col.Key]
+		if i == 0 && rowsEdited {
+			content += "*"
+		}
+
+		// Truncate content if it is wider than column
+		truncated := col.TruncationFunc(content, col.Width, "…")
+		// Ensure content is all on one line.
+		style := lipgloss.NewStyle().
+			Width(col.Width).
+			MaxWidth(col.Width).
+			Inline(true)
+		if col.RightAlign {
+			style.AlignHorizontal(lipgloss.Right)
+		}
+		if current || selected {
+			truncated = utils.RemoveAnsiCodes(truncated)
+		}
+		// For normal rows, just apply the regular styling
+		inlined := style.Render(truncated)
+		// Apply block-styling to content
+		boxed := lipgloss.NewStyle().
+			PaddingRight(1 + m.styles.Cell.GetPaddingLeft()).
+			Render(inlined)
+		styledCells[i] = boxed
+	}
+	return styledCells
+}
+
 func (m *Model[V]) renderRow(rowIdx int) string {
 	row := m.rows[rowIdx]
 
@@ -819,53 +866,28 @@ func (m *Model[V]) renderRow(rowIdx int) string {
 		selected = true
 	}
 	current = rowIdx == m.currentRowIndex
-	rowStyle := m.styles.Cell
+	rowStyle := *m.styles.Cell
 
 	switch {
 	case current && selected:
-		rowStyle = m.styles.CurrentAndSelectedRow
+		rowStyle = *m.styles.CurrentAndSelectedRow
 	case current:
-		rowStyle = m.styles.CurrentRow
+		rowStyle = *m.styles.CurrentRow
 	case selected:
-		rowStyle = m.styles.SelectedRow
+		rowStyle = *m.styles.SelectedRow
 	}
 
-	cells := m.rendered[row.GetID()]
-	styledCells := make([]string, len(m.cols))
-	for i, col := range m.cols {
-		content := cells[col.Key]
-		// Truncate content if it is wider than column
-		truncated := col.TruncationFunc(content, col.Width, "…")
-		// Ensure content is all on one line.
-		style := lipgloss.NewStyle().
-			Width(col.Width).
-			MaxWidth(col.Width).
-			Inline(true)
-		if col.RightAlign {
-			style = style.AlignHorizontal(lipgloss.Right)
-		}
-
-		if current || selected {
-			// For highlighted rows, ignore any styling in the cell content
-			// and just apply the row's background/foreground colors
-			style.
-				Background(rowStyle.GetBackground()).
-				Foreground(rowStyle.GetForeground())
-
-			truncated = utils.RemoveAnsiCodes(truncated)
-		}
-		// For normal rows, just apply the regular styling
-		inlined := style.Render(truncated)
-		// Apply block-styling to content
-		boxed := lipgloss.NewStyle().
-			PaddingRight(1 + m.styles.Cell.GetPaddingLeft()).
-			Render(inlined)
-		styledCells[i] = boxed
+	rowsEdited := false
+	editor := m.editorsCache.Get(row.GetID())
+	if editor != nil && editor.EditionInProgress() {
+		rowStyle = rowStyle.Italic(true)
+		rowsEdited = true
 	}
+	renderedCells := m.renderCells(row, current, selected, rowsEdited)
 
 	// Join cells together to form a row, ensuring it doesn't exceed maximum
 	// table width
-	renderedRow := lipgloss.JoinHorizontal(lipgloss.Left, styledCells...)
+	renderedRow := lipgloss.JoinHorizontal(lipgloss.Left, renderedCells...)
 	// Apply row style
 	renderedRow = rowStyle.
 		MaxWidth(m.width).

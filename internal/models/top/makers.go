@@ -9,6 +9,7 @@ import (
 	"github.com/fchastanet/shell-command-bookmarker/internal/models/styles"
 	"github.com/fchastanet/shell-command-bookmarker/internal/services"
 	"github.com/fchastanet/shell-command-bookmarker/pkg/resource"
+	"github.com/fchastanet/shell-command-bookmarker/pkg/tui/table"
 )
 
 // Maker makes new models
@@ -16,34 +17,35 @@ type Maker interface {
 	Make(id resource.ID, width, height int) (structure.ChildModel, error)
 }
 
-// makeMakers makes model makers for making models
-func makeMakers(
+// NewMakerFactory makes model makers for making models
+func NewMakerFactory(
+	editorsCache table.EditorsCacheInterface,
 	app *services.AppService,
 	myStyles *styles.Styles,
 	spinnerObj *spinner.Model,
 	keyMaps *KeyMaps,
 ) func(kind resource.Kind) models.Maker {
-	makers := make(map[string]models.Maker)
-	makers["commandList"] = &command.ListMaker{
+	makers := make(map[resource.Kind]models.Maker)
+	makers[structure.CommandListKind] = &command.ListMaker{
 		App:              app,
+		EditorsCache:     editorsCache,
 		Styles:           myStyles,
 		Spinner:          spinnerObj,
 		NavigationKeyMap: keyMaps.tableNavigation,
 		ActionKeyMap:     keyMaps.tableAction,
 	}
-	makers["search"] = &command.SearchMaker{
+	makers[structure.SearchKind] = &command.SearchMaker{
 		App:     app,
 		Styles:  myStyles,
 		Spinner: spinnerObj,
 	}
-	makers["commandEditor"] = &command.EditorMaker{
+	makers[structure.CommandEditorKind] = &command.EditorMaker{
 		App:          app,
 		Styles:       myStyles,
 		EditorKeyMap: keyMaps.editor,
 	}
 	return func(kind resource.Kind) models.Maker {
-		key := kind.Key()
-		maker, ok := makers[key]
+		maker, ok := makers[kind]
 		if !ok {
 			return nil
 		}

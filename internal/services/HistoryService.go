@@ -10,6 +10,7 @@ import (
 
 	"github.com/fchastanet/shell-command-bookmarker/internal/processors"
 	"github.com/fchastanet/shell-command-bookmarker/internal/services/models"
+	"github.com/fchastanet/shell-command-bookmarker/pkg/resource"
 )
 
 const (
@@ -250,32 +251,6 @@ func (s *HistoryService) UpdateCommand(command *models.Command) (newCommand *mod
 	return command, nil
 }
 
-func (s *HistoryService) createNewCommandFromImportedCommand(command *models.Command) (*models.Command, error) {
-	// Step 2: Create a new command with SAVED status
-	newCmd := models.Command{
-		ID:                   0, // New ID will be generated
-		Title:                command.Title,
-		Description:          command.Description,
-		Script:               command.Script,
-		Status:               models.CommandStatusSaved,
-		LintIssues:           command.LintIssues,
-		LintStatus:           command.LintStatus,
-		Elapsed:              command.Elapsed,
-		CreationDatetime:     command.CreationDatetime,
-		ModificationDatetime: time.Now(),
-	}
-
-	// Lint the new command
-	s.lintCommand(&newCmd)
-
-	// Save the new command
-	if err := s.dbService.SaveCommand(&newCmd); err != nil {
-		slog.Error("Error saving new command", "error", err)
-		return nil, err
-	}
-	return &newCmd, nil
-}
-
 func (s *HistoryService) lintCommand(command *models.Command) {
 	if command.Status != models.CommandStatusSaved {
 		slog.Warn("Command is not in a state that can be linted", "id", command.ID, "status", command.Status)
@@ -298,7 +273,7 @@ func (s *HistoryService) lintCommand(command *models.Command) {
 	)
 }
 
-func (s *HistoryService) duplicateCommandAsObsolete(commandID int64) error {
+func (s *HistoryService) duplicateCommandAsObsolete(commandID resource.ID) error {
 	// Save the new command
 	newID, err := s.dbService.DuplicateCommand(commandID, models.CommandStatusObsolete)
 	if err != nil {

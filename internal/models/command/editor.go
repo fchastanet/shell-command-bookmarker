@@ -459,6 +459,12 @@ func (m *commandEditor) prevPage() {
 	slog.Debug("prevPage", "newPagePosition", m.pagePosition)
 }
 
+func (m *commandEditor) EditionInProgress() bool {
+	return m.command.Title != m.inputs[0].Value() ||
+		m.command.Description != m.inputs[1].Value() ||
+		m.command.Script != m.inputs[2].Value()
+}
+
 // save saves the current command
 func (m *commandEditor) save() tea.Cmd {
 	// Update the command with values from the input fields
@@ -488,7 +494,7 @@ func (m *commandEditor) save() tea.Cmd {
 		))
 
 		return tui.CmdHandler(table.ReloadMsg[*dbmodels.Command]{
-			RowID:   resource.ID(m.command.ID),
+			RowID:   m.command.ID,
 			InfoMsg: &infoMsg,
 		})
 	}

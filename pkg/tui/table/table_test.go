@@ -27,12 +27,23 @@ type testResource struct {
 
 func (r *testResource) GetID() resource.ID { return r.ID }
 
-// setupTest sets up a table test with several rows. Each row is keyed with an
+type Cache struct{}
+
+func (v *Cache) Get(resource.ID) EditorInterface {
+	// This is a stub for the test, as we don't need to actually cache editors
+	// in this test.
+	return nil
+}
+
+// setupTest sets up a table test with several rows. Each row is, keyed with an
 // int, and the row item is an int corresponding to the key, for ease of
 // testing. The rows are sorted from lowest int to highest int.
 func setupTest() Model[*testResource] {
 	renderer := func(_ *testResource) RenderedRow { return nil }
-	tbl := New(GetDefaultStyle(tui.GetDefaultScrollbarStyle()), nil, renderer, 0, 0,
+	editorCache := &Cache{}
+	tbl := New(
+		editorCache,
+		GetDefaultStyle(tui.GetDefaultScrollbarStyle()), nil, renderer, 0, 0,
 		WithSortFunc(func(i, j *testResource) int {
 			if i.n < j.n {
 				return -1
