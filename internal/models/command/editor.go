@@ -126,7 +126,8 @@ func (w *EditLineWrapper) Update(msg tea.Msg) (Input, tea.Cmd) {
 }
 
 // Blur implements the Input interface
-func (*EditLineWrapper) Blur() {
+func (w *EditLineWrapper) Blur() {
+	w.Model.Blur()
 }
 
 // Focus implements the Input interface
@@ -224,6 +225,10 @@ func (m *commandEditor) handleWindowSizeMsg(msg tea.WindowSizeMsg) {
 }
 
 func (m *commandEditor) handleFocusedPaneChangedMsg() tea.Cmd {
+	if m.focused >= 0 && m.inputs[m.focused] != nil {
+		m.inputs[m.focused].Blur()
+	}
+
 	m.focused = -1
 	return tui.GetDummyCmd()
 }
