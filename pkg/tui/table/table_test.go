@@ -29,7 +29,7 @@ func (r *testResource) GetID() resource.ID { return r.ID }
 
 type Cache struct{}
 
-func (v *Cache) Get(resource.ID) EditorInterface {
+func (*Cache) Get(resource.ID) EditorInterface {
 	// This is a stub for the test, as we don't need to actually cache editors
 	// in this test.
 	return nil

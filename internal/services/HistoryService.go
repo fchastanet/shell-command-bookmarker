@@ -231,9 +231,8 @@ func (s *HistoryService) UpdateCommand(command *models.Command) (newCommand *mod
 
 	// If it's an IMPORTED command being updated, we need to handle duplication
 	if command.Status == models.CommandStatusImported {
-		// Step 1: Mark the original command as obsolete
 		if err := s.duplicateCommandAsObsolete(command.ID); err != nil {
-			slog.Error("Failed to mark original command as obsolete", "id", command.ID, "error", err)
+			slog.Error("Failed to duplicate original command as obsolete", "id", command.ID, "error", err)
 			return nil, err
 		}
 	}

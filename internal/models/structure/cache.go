@@ -20,12 +20,16 @@ func NewCache() *Cache {
 	}
 }
 
+func (c *Cache) getPageCacheKey(page Page) string {
+	return page.Kind.Key() + strconv.FormatInt(int64(page.ID), 10)
+}
+
 func (c *Cache) Get(page Page) ChildModel {
-	return c.cache[page.Kind.Key()+strconv.FormatInt(int64(page.ID), 10)]
+	return c.cache[c.getPageCacheKey(page)]
 }
 
 func (c *Cache) Put(page Page, model ChildModel) {
-	c.cache[page.Kind.Key()+strconv.FormatInt(int64(page.ID), 10)] = model
+	c.cache[c.getPageCacheKey(page)] = model
 }
 
 func (c *Cache) UpdateAll(msg tea.Msg) []tea.Cmd {
@@ -39,5 +43,5 @@ func (c *Cache) UpdateAll(msg tea.Msg) []tea.Cmd {
 }
 
 func (c *Cache) Update(key Page, msg tea.Msg) tea.Cmd {
-	return c.cache[key.Kind.Key()+strconv.FormatInt(int64(key.ID), 10)].Update(msg)
+	return c.cache[c.getPageCacheKey(key)].Update(msg)
 }

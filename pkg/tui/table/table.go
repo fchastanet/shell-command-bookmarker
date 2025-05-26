@@ -829,7 +829,7 @@ func (m *Model[V]) renderCells(
 			MaxWidth(col.Width).
 			Inline(true)
 		if col.RightAlign {
-			style.AlignHorizontal(lipgloss.Right)
+			style = style.AlignHorizontal(lipgloss.Right)
 		}
 		if current || selected {
 			truncated = utils.RemoveAnsiCodes(truncated)
