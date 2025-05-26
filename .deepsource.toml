@@ -15,9 +15,9 @@ enabled = true
 name = "go"
 enabled = true
   [analyzers.meta]
-  import_root = "github.com/fchastanet/bash-tools-command-bookmarker"
+  import_root = "github.com/fchastanet/shell-command-bookmarker"
   import_paths = [
-    "github.com/fchastanet/bash-tools-command-bookmarker/lib"
+    "github.com/fchastanet/shell-command-bookmarker/lib"
   ]
 
 [[analyzers]]

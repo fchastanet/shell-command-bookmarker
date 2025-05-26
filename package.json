@@ -1,6 +1,6 @@
 {
   "version": "6.0.0",
-  "name": "bash-tools-command-bookmarker-linters",
+  "name": "shell-command-bookmarker-linters",
   "cspell": "cspell.yaml",
   "devDependencies": {
     "eslint-config-prettier": "^10.1.2",

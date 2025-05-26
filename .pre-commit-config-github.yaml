@@ -168,7 +168,7 @@ repos:
         args: [-w]
       - id: go-revive-repo-mod
       - id: go-sec-repo-mod
-        stages: [pre-push, manual]
+        stages: [manual]
       - id: go-staticcheck-repo-mod
         stages: [pre-push, manual]
       - id: go-critic

@@ -126,7 +126,8 @@ func (w *EditLineWrapper) Update(msg tea.Msg) (Input, tea.Cmd) {
 }
 
 // Blur implements the Input interface
-func (*EditLineWrapper) Blur() {
+func (w *EditLineWrapper) Blur() {
+	w.Model.Blur()
 }
 
 // Focus implements the Input interface
@@ -224,6 +225,10 @@ func (m *commandEditor) handleWindowSizeMsg(msg tea.WindowSizeMsg) {
 }
 
 func (m *commandEditor) handleFocusedPaneChangedMsg() tea.Cmd {
+	if m.focused >= 0 && m.inputs[m.focused] != nil {
+		m.inputs[m.focused].Blur()
+	}
+
 	m.focused = -1
 	return tui.GetDummyCmd()
 }
@@ -289,7 +294,7 @@ func (m *commandEditor) addCommonElements(content *strings.Builder) {
 	if m.focused == -1 {
 		helpTextStyle = helpTextStyle.Bold(true).Foreground(lipgloss.Color("255"))
 	}
-	helpText := helpTextStyle.Render("↑/↓: Fields • ⇞/⇟: Scroll • Ctrl+S: Save • Esc: Cancel")
+	helpText := helpTextStyle.Render("⭾/Shift-⭾: Fields • ⇞/⇟: Scroll • Ctrl+S: Save • Esc: Cancel")
 	content.WriteString(helpText)
 
 	// Add the title
@@ -454,6 +459,12 @@ func (m *commandEditor) prevPage() {
 	slog.Debug("prevPage", "newPagePosition", m.pagePosition)
 }
 
+func (m *commandEditor) EditionInProgress() bool {
+	return m.command.Title != m.inputs[0].Value() ||
+		m.command.Description != m.inputs[1].Value() ||
+		m.command.Script != m.inputs[2].Value()
+}
+
 // save saves the current command
 func (m *commandEditor) save() tea.Cmd {
 	// Update the command with values from the input fields
@@ -483,7 +494,7 @@ func (m *commandEditor) save() tea.Cmd {
 		))
 
 		return tui.CmdHandler(table.ReloadMsg[*dbmodels.Command]{
-			RowID:   resource.ID(m.command.ID),
+			RowID:   m.command.ID,
 			InfoMsg: &infoMsg,
 		})
 	}

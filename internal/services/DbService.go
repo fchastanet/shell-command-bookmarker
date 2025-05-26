@@ -61,8 +61,35 @@ func (s *DBService) SaveCommand(command *models.Command) error {
 		slog.Error("Error retrieving last insert ID", "error", err)
 		return err
 	}
-	command.ID = lastInsertID
+	command.ID = resource.ID(lastInsertID)
 	return nil
+}
+
+func (s *DBService) DuplicateCommand(commandID resource.ID, status models.CommandStatus) (resource.ID, error) {
+	// Use Exec instead of Query for INSERT statements
+	result, err := s.dbAdapter.GetDB().Exec(
+		`INSERT INTO command (
+			title, description, script, status,
+			lint_issues, lint_status, elapsed,
+			creation_datetime, modification_datetime
+		) SELECT
+			title, description, script, ?,
+			lint_issues, lint_status, elapsed,
+			creation_datetime, ?
+		FROM command WHERE id = ?`,
+		status,
+		time.Now(),
+		commandID,
+	)
+	if err != nil {
+		return -1, err
+	}
+	lastInsertID, err := result.LastInsertId()
+	if err != nil {
+		slog.Error("Error retrieving last insert ID", "error", err)
+		return -1, err
+	}
+	return resource.ID(lastInsertID), nil
 }
 
 // GetCommandByID retrieves a command by its database ID

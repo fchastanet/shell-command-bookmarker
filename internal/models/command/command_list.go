@@ -19,6 +19,7 @@ type ListMaker struct {
 	App              *services.AppService
 	NavigationKeyMap *table.Navigation
 	ActionKeyMap     *table.Action
+	EditorsCache     table.EditorsCacheInterface
 	Styles           *styles.Styles
 	Spinner          *spinner.Model
 }
@@ -29,6 +30,8 @@ const (
 	scriptColumnPercentWidth     = 65
 	statusColumnPercentWidth     = 7
 	lintStatusColumnPercentWidth = 6
+
+	indexColumnStatus = 3
 
 	percent    = 100
 	sidesCount = 2
@@ -79,6 +82,7 @@ func (mm *ListMaker) Make(_ resource.ID, width, height int) (structure.ChildMode
 	m := &commandsList{
 		AppService:       mm.App,
 		Model:            nil,
+		editorsCache:     mm.EditorsCache,
 		reloading:        false,
 		spinner:          mm.Spinner,
 		width:            width,
@@ -93,10 +97,19 @@ func (mm *ListMaker) Make(_ resource.ID, width, height int) (structure.ChildMode
 	renderer := func(cmd *dbmodels.Command) table.RenderedRow {
 		return mm.renderRow(cmd, m)
 	}
+	cellRenderer := func(_ *dbmodels.Command, cellContent string, colIndex int, rowsEdited bool) string {
+		if rowsEdited && colIndex == indexColumnStatus {
+			cellContent = m.styles.TableStyle.CellEdited.Render("Edited")
+		}
+		return cellContent
+	}
 	tbl := table.New(
+		mm.EditorsCache,
 		mm.Styles.TableStyle,
 		m.getColumns(0),
 		renderer,
+		cellRenderer,
+		matchFilter,
 		width,
 		height,
 		table.WithSortFunc(dbmodels.CommandSorter),
@@ -166,8 +179,9 @@ func formatLintStatus(
 type commandsList struct {
 	Model *table.Model[*dbmodels.Command]
 	*services.AppService
-	styles  *styles.Styles
-	spinner *spinner.Model
+	styles       *styles.Styles
+	spinner      *spinner.Model
+	editorsCache table.EditorsCacheInterface
 
 	idColumn         *table.Column
 	titleColumn      *table.Column

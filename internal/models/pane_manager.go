@@ -102,13 +102,12 @@ type pane struct {
 // NewPaneManager constructs the pane manager with at least the explorer, which
 // occupies the left pane.
 func NewPaneManager(
-	makerFactory func(kind resource.Kind) Maker,
 	myStyles *styles.Styles,
 	globalKeyMap *keys.GlobalKeyMap,
 	paneKeyMap *keys.PaneNavigationKeyMap,
 ) *PaneManager {
 	p := &PaneManager{
-		makerFactory:  makerFactory,
+		makerFactory:  nil,
 		styles:        myStyles,
 		cache:         structure.NewCache(),
 		panes:         make(map[structure.Position]pane),
@@ -122,6 +121,10 @@ func NewPaneManager(
 		height:  0,
 	}
 	return p
+}
+
+func (p *PaneManager) SetMakerFactory(makerFactory func(kind resource.Kind) Maker) {
+	p.makerFactory = makerFactory
 }
 
 func (p *PaneManager) Init() tea.Cmd {
@@ -404,6 +407,19 @@ func (p *PaneManager) updateChildSizes() {
 
 func (p *PaneManager) updateModel(position structure.Position, msg tea.Msg) tea.Cmd {
 	return p.panes[position].model.Update(msg)
+}
+
+func (p *PaneManager) Get(rsc resource.ID) table.EditorInterface {
+	r := structure.Page{
+		Kind: structure.CommandEditorKind,
+		ID:   rsc,
+	}
+	cacheData := p.cache.Get(r)
+	if editor, ok := cacheData.(table.EditorInterface); ok {
+		return editor
+	}
+
+	return nil
 }
 
 func (p *PaneManager) setPane(msg structure.NavigationMsg) (cmd tea.Cmd) {

@@ -19,6 +19,15 @@ import (
 
 const HalfPageMultiplier = 2
 
+type EditorInterface interface {
+	EditionInProgress() bool
+}
+
+type EditorsCacheInterface interface {
+	// Get retrieves a model from the cache.
+	Get(resource.ID) EditorInterface
+}
+
 // Model defines a state for the table widget.
 type Model[V resource.Identifiable] struct {
 	borderColor lipgloss.TerminalColor
@@ -28,11 +37,14 @@ type Model[V resource.Identifiable] struct {
 	navigationKeyMap *Navigation
 	actionKeyMap     *Action
 	rowRenderer      RowRenderer[V]
+	cellRenderer     DynamicCellRenderer[V]
 	rendered         map[resource.ID]RenderedRow
+	editorsCache     EditorsCacheInterface
 
 	// items are the unfiltered set of items available to the table.
-	items    map[resource.ID]V
-	sortFunc SortFunc[V]
+	items               map[resource.ID]V
+	sortFunc            SortFunc[V]
+	matchFilterCallback func(filterValue string, item V) bool
 
 	selected map[resource.ID]V
 
@@ -74,6 +86,8 @@ type ColumnKey string
 
 type RowRenderer[V any] func(V) RenderedRow
 
+type DynamicCellRenderer[V any] func(row V, cellContent string, colIndex int, rowsEdited bool) string
+
 // RenderedRow provides the rendered string for each column in a row.
 type RenderedRow map[ColumnKey]string
 
@@ -84,35 +98,42 @@ type BulkInsertMsg[T any] []T
 
 // New creates a new model for the table widget.
 func New[V resource.Identifiable](
+	editorsCache EditorsCacheInterface,
 	tableStyles *Style,
-	cols []Column, fn RowRenderer[V],
+	cols []Column,
+	rowRenderer RowRenderer[V],
+	cellRenderer DynamicCellRenderer[V],
+	matchFilterCallback func(filterValue string, item V) bool,
 	width, height int, opts ...Option[V],
 ) Model[V] {
 	filter := textinput.New()
 	filter.Prompt = "Filter: "
 
 	m := Model[V]{
-		focused:          false,
-		styles:           tableStyles,
-		navigationKeyMap: nil,
-		actionKeyMap:     nil,
-		cols:             make([]Column, len(cols)),
-		rows:             []V{},
-		rowRenderer:      fn,
-		items:            make(map[resource.ID]V),
-		rendered:         make(map[resource.ID]RenderedRow),
-		selected:         make(map[resource.ID]V),
-		selectable:       true,
-		filter:           filter,
-		border:           lipgloss.NormalBorder(),
-		borderColor:      lipgloss.NoColor{},
-		currentRowIndex:  -1,
-		currentRowID:     resource.ID(0),
-		sortFunc:         nil,
-		start:            0,
-		width:            width,
-		height:           height,
-		previewKind:      resource.DefaultKind{},
+		focused:             false,
+		styles:              tableStyles,
+		editorsCache:        editorsCache,
+		navigationKeyMap:    nil,
+		actionKeyMap:        nil,
+		cols:                make([]Column, len(cols)),
+		rows:                []V{},
+		rowRenderer:         rowRenderer,
+		cellRenderer:        cellRenderer,
+		matchFilterCallback: matchFilterCallback,
+		items:               make(map[resource.ID]V),
+		rendered:            make(map[resource.ID]RenderedRow),
+		selected:            make(map[resource.ID]V),
+		selectable:          true,
+		filter:              filter,
+		border:              lipgloss.NormalBorder(),
+		borderColor:         lipgloss.NoColor{},
+		currentRowIndex:     -1,
+		currentRowID:        resource.ID(0),
+		sortFunc:            nil,
+		start:               0,
+		width:               width,
+		height:              height,
+		previewKind:         resource.DefaultKind{},
 	}
 	for _, fn := range opts {
 		fn(&m)
@@ -691,14 +712,14 @@ func (m *Model[V]) sortAndLocateCurrentRow() {
 }
 
 // matchFilter returns true if the item with the given ID matches the filter
-// value.
+// value using fuzzy matching.
 func (m *Model[V]) matchFilter(item V) bool {
-	for _, col := range m.rendered[item.GetID()] {
-		if strings.Contains(col, m.filter.Value()) {
-			return true
-		}
+	filterValue := m.filter.Value()
+	if filterValue == "" {
+		return true
 	}
-	return false
+
+	return m.matchFilterCallback(filterValue, item)
 }
 
 // MoveUp moves the current row up by any number of rows.
@@ -792,6 +813,38 @@ func (m *Model[V]) headersView() string {
 		Render(lipgloss.JoinHorizontal(lipgloss.Left, s...))
 }
 
+func (m *Model[V]) renderCells(
+	row V, current, selected bool, rowsEdited bool,
+) []string {
+	cells := m.rendered[row.GetID()]
+	styledCells := make([]string, len(m.cols))
+	for i, col := range m.cols {
+		content := m.cellRenderer(row, cells[col.Key], i, rowsEdited)
+
+		// Truncate content if it is wider than column
+		truncated := col.TruncationFunc(content, col.Width, "…")
+		// Ensure content is all on one line.
+		style := lipgloss.NewStyle().
+			Width(col.Width).
+			MaxWidth(col.Width).
+			Inline(true)
+		if col.RightAlign {
+			style = style.AlignHorizontal(lipgloss.Right)
+		}
+		if current || selected {
+			truncated = utils.RemoveAnsiCodes(truncated)
+		}
+		// For normal rows, just apply the regular styling
+		inlined := style.Render(truncated)
+		// Apply block-styling to content
+		boxed := lipgloss.NewStyle().
+			PaddingRight(1 + m.styles.Cell.GetPaddingLeft()).
+			Render(inlined)
+		styledCells[i] = boxed
+	}
+	return styledCells
+}
+
 func (m *Model[V]) renderRow(rowIdx int) string {
 	row := m.rows[rowIdx]
 
@@ -803,53 +856,28 @@ func (m *Model[V]) renderRow(rowIdx int) string {
 		selected = true
 	}
 	current = rowIdx == m.currentRowIndex
-	rowStyle := m.styles.Cell
+	rowStyle := *m.styles.Cell
 
 	switch {
 	case current && selected:
-		rowStyle = m.styles.CurrentAndSelectedRow
+		rowStyle = *m.styles.CurrentAndSelectedRow
 	case current:
-		rowStyle = m.styles.CurrentRow
+		rowStyle = *m.styles.CurrentRow
 	case selected:
-		rowStyle = m.styles.SelectedRow
+		rowStyle = *m.styles.SelectedRow
 	}
 
-	cells := m.rendered[row.GetID()]
-	styledCells := make([]string, len(m.cols))
-	for i, col := range m.cols {
-		content := cells[col.Key]
-		// Truncate content if it is wider than column
-		truncated := col.TruncationFunc(content, col.Width, "…")
-		// Ensure content is all on one line.
-		style := lipgloss.NewStyle().
-			Width(col.Width).
-			MaxWidth(col.Width).
-			Inline(true)
-		if col.RightAlign {
-			style = style.AlignHorizontal(lipgloss.Right)
-		}
-
-		if current || selected {
-			// For highlighted rows, ignore any styling in the cell content
-			// and just apply the row's background/foreground colors
-			style.
-				Background(rowStyle.GetBackground()).
-				Foreground(rowStyle.GetForeground())
-
-			truncated = utils.RemoveAnsiCodes(truncated)
-		}
-		// For normal rows, just apply the regular styling
-		inlined := style.Render(truncated)
-		// Apply block-styling to content
-		boxed := lipgloss.NewStyle().
-			PaddingRight(1 + m.styles.Cell.GetPaddingLeft()).
-			Render(inlined)
-		styledCells[i] = boxed
+	rowsEdited := false
+	editor := m.editorsCache.Get(row.GetID())
+	if editor != nil && editor.EditionInProgress() {
+		rowStyle = rowStyle.Italic(true)
+		rowsEdited = true
 	}
+	renderedCells := m.renderCells(row, current, selected, rowsEdited)
 
 	// Join cells together to form a row, ensuring it doesn't exceed maximum
 	// table width
-	renderedRow := lipgloss.JoinHorizontal(lipgloss.Left, styledCells...)
+	renderedRow := lipgloss.JoinHorizontal(lipgloss.Left, renderedCells...)
 	// Apply row style
 	renderedRow = rowStyle.
 		MaxWidth(m.width).
