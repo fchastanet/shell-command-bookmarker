@@ -2,10 +2,12 @@ package services
 
 import (
 	"errors"
+	"fmt"
 	"log/slog"
 	"os"
 	"path/filepath"
 	"regexp"
+	"strings"
 	"time"
 
 	"github.com/fchastanet/shell-command-bookmarker/internal/processors"
@@ -201,23 +203,7 @@ func (s *HistoryService) processCmd(historyCmd processors.HistoryCommand) (proce
 		historyCmd.Timestamp,
 	)
 
-	if s.lintService.IsLintingAvailable() {
-		issues, err := s.lintService.LintScript(historyCmd.Command)
-		if err != nil && len(issues) == 0 {
-			slog.Error("Error linting command", "command", historyCmd, "error", err)
-			cmd.LintStatus = models.LintStatusShellcheckFailed
-			cmd.LintIssues = "[]"
-		} else {
-			cmd.LintStatus = s.lintService.GetLintResultingStatus(issues)
-			cmd.LintIssues = s.lintService.FormatLintIssuesAsJSON(issues)
-		}
-		if cmd.LintStatus == models.LintStatusWarning {
-			slog.Warn("Linting issues found", "command", historyCmd, "issues", issues)
-		}
-		if cmd.LintStatus == models.LintStatusError {
-			slog.Error("Linting errors found", "command", historyCmd, "issues", issues)
-		}
-	}
+	s.lintService.LintCommand(cmd)
 	if err := s.dbService.SaveCommand(cmd); err != nil {
 		slog.Error("Error saving command to database", "command", cmd, "error", err)
 		return processors.CommandImportedStatusError, err
@@ -256,20 +242,7 @@ func (s *HistoryService) lintCommand(command *models.Command) {
 		return
 	}
 
-	issues, err := s.lintService.LintScript(command.Script)
-	if err != nil && len(issues) == 0 {
-		slog.Error("Error linting command", "command", command, "error", err)
-		command.LintStatus = models.LintStatusShellcheckFailed
-		command.LintIssues = "[]"
-	} else {
-		command.LintStatus = s.lintService.GetLintResultingStatus(issues)
-		command.LintIssues = s.lintService.FormatLintIssuesAsJSON(issues)
-	}
-	slog.Info("Command linted successfully",
-		"command", command,
-		"lintStatus", command.LintStatus,
-		"lintIssues", command.LintIssues,
-	)
+	s.lintService.LintCommand(command)
 }
 
 func (s *HistoryService) duplicateCommandAsObsolete(commandID resource.ID) error {
@@ -290,4 +263,29 @@ func matchOneOfRegexp(line string, regexps []*regexp.Regexp) bool {
 		}
 	}
 	return false
+}
+
+func (s *HistoryService) ComposeCommand(commands []*models.Command) (*models.Command, error) {
+	if len(commands) < 1 {
+		return nil, &ComposeInsufficientCommandsProvidedError{nil}
+	}
+	newCommand := models.NewCommand(
+		s.generateComposeCommandScript(commands),
+		0,
+		time.Now(),
+	)
+	s.lintService.LintCommand(newCommand)
+
+	err := s.dbService.SaveCommand(newCommand)
+	return newCommand, err
+}
+
+func (s *HistoryService) generateComposeCommandScript(commands []*models.Command) string {
+	var script strings.Builder
+	script.WriteString("#!/usr/bin/env bash\n")
+	script.WriteString("set -e -o pipefail -o errexit\n")
+	for _, cmd := range commands {
+		script.WriteString(fmt.Sprintf("echo '%s'\n", cmd.Script))
+	}
+	return script.String()
 }

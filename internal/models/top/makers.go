@@ -27,12 +27,13 @@ func NewMakerFactory(
 ) func(kind resource.Kind) models.Maker {
 	makers := make(map[resource.Kind]models.Maker)
 	makers[structure.CommandListKind] = &command.ListMaker{
-		App:              app,
-		EditorsCache:     editorsCache,
-		Styles:           myStyles,
-		Spinner:          spinnerObj,
-		NavigationKeyMap: keyMaps.tableNavigation,
-		ActionKeyMap:     keyMaps.tableAction,
+		App:                     app,
+		EditorsCache:            editorsCache,
+		Styles:                  myStyles,
+		Spinner:                 spinnerObj,
+		TableCustomActionKeyMap: keyMaps.tableCustomAction,
+		NavigationKeyMap:        keyMaps.tableNavigation,
+		ActionKeyMap:            keyMaps.tableAction,
 	}
 	makers[structure.SearchKind] = &command.SearchMaker{
 		App:     app,

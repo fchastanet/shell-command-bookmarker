@@ -16,6 +16,8 @@ When generating commit messages:
 
 - First line should be a concise summary (50-72 characters)
 - Add a blank line after the title
+- Next paragraph should be a summary of all relevant changes (100-200
+  characters)
 - Use bullet points for detailed changes
 - Group related changes together
 - Mention file names when appropriate

@@ -1,6 +1,7 @@
 package services
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"log/slog"
@@ -44,6 +45,22 @@ type LintService struct {
 }
 
 type LintServiceOption func(*LintService)
+
+func getLogMappingForLintStatus(lintStatus models.LintStatus) slog.Level {
+	switch lintStatus {
+	case models.LintStatusWarning:
+		return slog.LevelWarn
+	case models.LintStatusError:
+		return slog.LevelError
+	case models.LintStatusNotAvailable:
+		return slog.LevelError
+	case models.LintStatusOK:
+		return slog.LevelInfo
+	case models.LintStatusShellcheckFailed:
+		return slog.LevelError
+	}
+	return slog.LevelInfo
+}
 
 // NewLintService creates a new LintService instance.
 // It checks for the presence of the shellcheck command during initialization.
@@ -125,6 +142,30 @@ func (s *LintService) LintScript(scriptContent string) ([]ShellCheckIssue, error
 // IsLintingAvailable checks if the shellcheck tool is available.
 func (s *LintService) IsLintingAvailable() bool {
 	return s.shellCheckPath != ""
+}
+
+func (s *LintService) LintCommand(cmd *models.Command) []ShellCheckIssue {
+	if !s.IsLintingAvailable() {
+		cmd.LintStatus = models.LintStatusNotAvailable
+		return nil
+	}
+	issues, err := s.LintScript(cmd.Script)
+	if err != nil && len(issues) == 0 {
+		slog.Error("Error linting command", "command", cmd, "error", err)
+		cmd.LintStatus = models.LintStatusShellcheckFailed
+		cmd.LintIssues = "[]"
+	} else {
+		cmd.LintStatus = s.GetLintResultingStatus(issues)
+		cmd.LintIssues = s.FormatLintIssuesAsJSON(issues)
+	}
+	slog.Log(context.Background(),
+		getLogMappingForLintStatus(cmd.LintStatus),
+		"Command linted",
+		"command", cmd,
+		"lintStatus", cmd.LintStatus,
+		"lintIssues", cmd.LintIssues,
+	)
+	return issues
 }
 
 func (*LintService) FormatLintIssuesAsJSON(issues []ShellCheckIssue) string {

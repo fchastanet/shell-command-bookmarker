@@ -4,8 +4,10 @@ import (
 	"fmt"
 	"log/slog"
 
+	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/bubbles/spinner"
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/fchastanet/shell-command-bookmarker/internal/models/keys"
 	"github.com/fchastanet/shell-command-bookmarker/internal/models/structure"
 	"github.com/fchastanet/shell-command-bookmarker/internal/models/styles"
 	"github.com/fchastanet/shell-command-bookmarker/internal/services"
@@ -16,12 +18,13 @@ import (
 )
 
 type ListMaker struct {
-	App              *services.AppService
-	NavigationKeyMap *table.Navigation
-	ActionKeyMap     *table.Action
-	EditorsCache     table.EditorsCacheInterface
-	Styles           *styles.Styles
-	Spinner          *spinner.Model
+	App                     *services.AppService
+	TableCustomActionKeyMap *keys.TableCustomActionKeyMap
+	NavigationKeyMap        *table.Navigation
+	ActionKeyMap            *table.Action
+	EditorsCache            table.EditorsCacheInterface
+	Styles                  *styles.Styles
+	Spinner                 *spinner.Model
 }
 
 const (
@@ -80,19 +83,20 @@ func (mm *ListMaker) Make(_ resource.ID, width, height int) (structure.ChildMode
 	}
 
 	m := &commandsList{
-		AppService:       mm.App,
-		Model:            nil,
-		editorsCache:     mm.EditorsCache,
-		reloading:        false,
-		spinner:          mm.Spinner,
-		width:            width,
-		height:           height,
-		styles:           mm.Styles,
-		idColumn:         &idColumn,
-		titleColumn:      &titleColumn,
-		scriptColumn:     &scriptColumn,
-		statusColumn:     &statusColumn,
-		lintStatusColumn: &lintStatusColumn,
+		AppService:              mm.App,
+		Model:                   nil,
+		editorsCache:            mm.EditorsCache,
+		tableCustomActionKeyMap: mm.TableCustomActionKeyMap,
+		reloading:               false,
+		spinner:                 mm.Spinner,
+		width:                   width,
+		height:                  height,
+		styles:                  mm.Styles,
+		idColumn:                &idColumn,
+		titleColumn:             &titleColumn,
+		scriptColumn:            &scriptColumn,
+		statusColumn:            &statusColumn,
+		lintStatusColumn:        &lintStatusColumn,
 	}
 	renderer := func(cmd *dbmodels.Command) table.RenderedRow {
 		return mm.renderRow(cmd, m)
@@ -179,9 +183,10 @@ func formatLintStatus(
 type commandsList struct {
 	Model *table.Model[*dbmodels.Command]
 	*services.AppService
-	styles       *styles.Styles
-	spinner      *spinner.Model
-	editorsCache table.EditorsCacheInterface
+	styles                  *styles.Styles
+	spinner                 *spinner.Model
+	editorsCache            table.EditorsCacheInterface
+	tableCustomActionKeyMap *keys.TableCustomActionKeyMap
 
 	idColumn         *table.Column
 	titleColumn      *table.Column
@@ -231,6 +236,12 @@ func (m *commandsList) Update(msg tea.Msg) tea.Cmd {
 		m.Model.Blur()
 	case tea.FocusMsg:
 		return m.handleFocus()
+	case tea.KeyMsg:
+		cmd, forward := m.handleKeyMsg(msg)
+		if !forward {
+			return cmd
+		}
+		cmds = append(cmds, cmd)
 	case table.RowDeleteActionMsg[*dbmodels.Command]:
 		return m.handleDeleteRow(msg)
 	}
@@ -334,6 +345,40 @@ func (m *commandsList) handleDeleteRow(msg table.RowDeleteActionMsg[*dbmodels.Co
 			InfoMsg: &infoMsg,
 		}
 	})
+}
+
+func (m *commandsList) handleKeyMsg(msg tea.KeyMsg) (cmd tea.Cmd, forward bool) {
+	if key.Matches(msg, *m.tableCustomActionKeyMap.ComposeCommand) {
+		return m.handleComposeCommand(), false
+	}
+	return nil, true
+}
+
+func (m *commandsList) handleComposeCommand() tea.Cmd {
+	rows := m.Model.SelectedOrCurrent()
+	newCmd, err := m.HistoryService.ComposeCommand(rows)
+	if err != nil {
+		return func() tea.Msg {
+			return tui.ErrorMsg(fmt.Errorf("failed to compose command: %w", err))
+		}
+	}
+	m.Model.DeselectAll()
+	// Return a message that will trigger the reload
+	infoMsg := tui.InfoMsg(fmt.Sprintf(
+		"New Command #%d created from %d selected commands", newCmd.GetID(), len(rows),
+	))
+	return tea.Batch(
+		func() tea.Msg {
+			return table.ReloadMsg[*dbmodels.Command]{
+				RowID:   newCmd.ID,
+				InfoMsg: &infoMsg,
+			}
+		},
+		tui.CmdHandler(table.RowSelectedActionMsg[*dbmodels.Command]{
+			Row:   newCmd,
+			RowID: newCmd.ID,
+		}),
+	)
 }
 
 func (m *commandsList) View() string {

@@ -69,12 +69,13 @@ const (
 type MessageClearTickMsg struct{}
 
 type KeyMaps struct {
-	filter          *keys.FilterKeyMap
-	global          *keys.GlobalKeyMap
-	pane            *keys.PaneNavigationKeyMap
-	tableNavigation *table.Navigation
-	tableAction     *table.Action
-	editor          *keys.EditorKeyMap
+	filter            *keys.FilterKeyMap
+	global            *keys.GlobalKeyMap
+	pane              *keys.PaneNavigationKeyMap
+	tableNavigation   *table.Navigation
+	tableAction       *table.Action
+	tableCustomAction *keys.TableCustomActionKeyMap
+	editor            *keys.EditorKeyMap
 }
 
 type Model struct {
@@ -116,12 +117,13 @@ func NewModel(
 	_ = lipgloss.HasDarkBackground()
 
 	keyMaps := &KeyMaps{
-		editor:          keys.GetDefaultEditorKeyMap(),
-		filter:          keys.GetFilterKeyMap(),
-		global:          keys.GetGlobalKeyMap(),
-		pane:            keys.GetPaneNavigationKeyMap(),
-		tableNavigation: keys.GetTableNavigationKeyMap(),
-		tableAction:     keys.GetTableActionKeyMap(),
+		editor:            keys.GetDefaultEditorKeyMap(),
+		filter:            keys.GetFilterKeyMap(),
+		global:            keys.GetGlobalKeyMap(),
+		pane:              keys.GetPaneNavigationKeyMap(),
+		tableNavigation:   keys.GetTableNavigationKeyMap(),
+		tableAction:       keys.GetTableActionKeyMap(),
+		tableCustomAction: keys.GetTableCustomActionKeyMap(),
 	}
 
 	spinnerObj := spinner.New(spinner.WithSpinner(spinner.Line))
@@ -486,6 +488,7 @@ func (m *Model) updateHelpBindings() {
 			if m.FocusedPosition() == structure.TopPane {
 				m.helpModel.AddBindingSet("Table Nav", keys.KeyMapToSlice(*m.keyMaps.tableNavigation))
 				m.helpModel.AddBindingSet("Table Actions", keys.KeyMapToSlice(*m.keyMaps.tableAction))
+				m.helpModel.AddBindingSet("Command Actions", keys.KeyMapToSlice(*m.keyMaps.tableCustomAction))
 			}
 		}
 	}

@@ -44,7 +44,7 @@ func GetDefaultAction() *Action {
 	)
 	deleteKey := key.NewBinding(
 		key.WithKeys("delete"),
-		key.WithHelp("\x7f", "delete row"),
+		key.WithHelp("<delete>", "delete row"),
 	)
 
 	return &Action{

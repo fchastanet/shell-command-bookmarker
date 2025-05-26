@@ -11,6 +11,7 @@ devel
 difflib
 dotenv
 envsubst
+errexit
 errorlint
 exhaustruct
 exportloopref
@@ -60,6 +61,7 @@ pflag
 pgdn
 pgdown
 pgup
+pipefail
 prealloc
 promlint
 protobuf

@@ -18,3 +18,11 @@ type ShellcheckParseError struct {
 func (e *ShellcheckParseError) Error() string {
 	return fmt.Sprintf("shellcheck parse error: %v | Output: %s", e.Err, e.Output)
 }
+
+type ComposeInsufficientCommandsProvidedError struct {
+	Err error
+}
+
+func (e *ComposeInsufficientCommandsProvidedError) Error() string {
+	return "Please select at least 1 command to compose a new command"
+}
