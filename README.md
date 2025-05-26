@@ -1,6 +1,4 @@
-# Bash Tools Command Bookmarker
-
-[![GoTemplate](https://img.shields.io/badge/go/template-black?logo=go)](https://github.com/SchwarzIT/go-template)
+# Shell Command Bookmarker
 
 > **_TIP:_** Checkout related projects of this suite
 >
@@ -9,21 +7,21 @@
 > - [Bash Tools](https://fchastanet.github.io/bash-tools/)
 > - [Bash Dev Env](https://fchastanet.github.io/bash-dev-env/)
 > - [Bash Compiler](https://fchastanet.github.io/bash-compiler/)
-> - [Bash Tools Command Bookmarker](https://fchastanet.github.io/bash-tools-command-bookmarker/)
+> - [Shell Command Bookmarker](https://fchastanet.github.io/shell-command-bookmarker/)
 
 <!-- markdownlint-capture -->
 
 <!-- markdownlint-disable MD013 -->
 
-[![GitHub release (latest SemVer)](https://img.shields.io/github/release/fchastanet/bash-tools-command-bookmarker?logo=github&sort=semver)](https://github.com/fchastanet/bash-tools-command-bookmarker/releases)
-[![GitHubLicense](https://img.shields.io/github/license/Naereen/StrapDown.js.svg)](https://github.com/fchastanet/bash-tools-command-bookmarker/blob/master/LICENSE)
+[![GitHub release (latest SemVer)](https://img.shields.io/github/release/fchastanet/shell-command-bookmarker?logo=github&sort=semver)](https://github.com/fchastanet/shell-command-bookmarker/releases)
+[![GitHubLicense](https://img.shields.io/github/license/Naereen/StrapDown.js.svg)](https://github.com/fchastanet/shell-command-bookmarker/blob/master/LICENSE)
 [![pre-commit](https://img.shields.io/badge/pre--commit-enabled-brightgreen?logo=pre-commit)](https://github.com/pre-commit/pre-commit)
-[![CI/CD](https://github.com/fchastanet/bash-tools-command-bookmarker/actions/workflows/main.yml/badge.svg)](https://github.com/fchastanet/bash-tools-command-bookmarker/actions?query=workflow%3A%22Lint+and+test%22+branch%3Amaster)
+[![CI/CD](https://github.com/fchastanet/shell-command-bookmarker/actions/workflows/main.yml/badge.svg)](https://github.com/fchastanet/shell-command-bookmarker/actions?query=workflow%3A%22Lint+and+test%22+branch%3Amaster)
 [![ProjectStatus](http://opensource.box.com/badges/active.svg)](http://opensource.box.com/badges "Project Status")
-[![DeepSource](https://deepsource.io/gh/fchastanet/bash-tools-command-bookmarker.svg/?label=active+issues&show_trend=true)](https://deepsource.io/gh/fchastanet/bash-tools-command-bookmarker/?ref=repository-badge)
-[![DeepSource](https://deepsource.io/gh/fchastanet/bash-tools-command-bookmarker.svg/?label=resolved+issues&show_trend=true)](https://deepsource.io/gh/fchastanet/bash-tools-command-bookmarker/?ref=repository-badge)
-[![AverageTimeToResolveAnIssue](http://isitmaintained.com/badge/resolution/fchastanet/bash-tools-command-bookmarker.svg)](http://isitmaintained.com/project/fchastanet/bash-tools-command-bookmarker "Average time to resolve an issue")
-[![PercentageOfIssuesStillOpen](http://isitmaintained.com/badge/open/fchastanet/bash-tools-command-bookmarker.svg)](http://isitmaintained.com/project/fchastanet/bash-tools-command-bookmarker "Percentage of issues still open")
+[![DeepSource](https://deepsource.io/gh/fchastanet/shell-command-bookmarker.svg/?label=active+issues&show_trend=true)](https://deepsource.io/gh/fchastanet/shell-command-bookmarker/?ref=repository-badge)
+[![DeepSource](https://deepsource.io/gh/fchastanet/shell-command-bookmarker.svg/?label=resolved+issues&show_trend=true)](https://deepsource.io/gh/fchastanet/shell-command-bookmarker/?ref=repository-badge)
+[![AverageTimeToResolveAnIssue](http://isitmaintained.com/badge/resolution/fchastanet/shell-command-bookmarker.svg)](http://isitmaintained.com/project/fchastanet/shell-command-bookmarker "Average time to resolve an issue")
+[![PercentageOfIssuesStillOpen](http://isitmaintained.com/badge/open/fchastanet/shell-command-bookmarker.svg)](http://isitmaintained.com/project/fchastanet/shell-command-bookmarker "Percentage of issues still open")
 
 <!-- markdownlint-restore -->
 

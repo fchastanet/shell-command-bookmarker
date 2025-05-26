@@ -14,7 +14,7 @@ func Get() string {
 }
 
 // A user may install this tool using
-// `go install github.com/fchastanet/bash-tools-command-bookmarker@latest`
+// `go install github.com/fchastanet/shell-command-bookmarker@latest`
 // without -ldflags, in which case the version above is unset. As
 // a workaround we use the embedded build version that *is* set when using
 // `go install` (and is only set for `go install` and not for `go build`).

@@ -5,4 +5,4 @@
 [Bash Tools](https://fchastanet.github.io/bash-tools/) |
 [Bash Dev Env](https://fchastanet.github.io/bash-dev-env/) |
 [Bash Compiler](https://fchastanet.github.io/bash-compiler/) |
-[Bash Shell Command Bookmarker](/)
+[Shell Command Bookmarker](/)
