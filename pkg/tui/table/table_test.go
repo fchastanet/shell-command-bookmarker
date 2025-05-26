@@ -40,10 +40,13 @@ func (v *Cache) Get(resource.ID) EditorInterface {
 // testing. The rows are sorted from lowest int to highest int.
 func setupTest() Model[*testResource] {
 	renderer := func(_ *testResource) RenderedRow { return nil }
+	cellRenderer := func(_ *testResource, cellContent string, _ int, _ bool) string {
+		return cellContent
+	}
 	editorCache := &Cache{}
 	tbl := New(
 		editorCache,
-		GetDefaultStyle(tui.GetDefaultScrollbarStyle()), nil, renderer, 0, 0,
+		GetDefaultStyle(tui.GetDefaultScrollbarStyle()), nil, renderer, cellRenderer, 0, 0,
 		WithSortFunc(func(i, j *testResource) int {
 			if i.n < j.n {
 				return -1

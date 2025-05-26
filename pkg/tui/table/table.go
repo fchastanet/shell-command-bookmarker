@@ -37,6 +37,7 @@ type Model[V resource.Identifiable] struct {
 	navigationKeyMap *Navigation
 	actionKeyMap     *Action
 	rowRenderer      RowRenderer[V]
+	cellRenderer     DynamicCellRenderer[V]
 	rendered         map[resource.ID]RenderedRow
 	editorsCache     EditorsCacheInterface
 
@@ -84,6 +85,8 @@ type ColumnKey string
 
 type RowRenderer[V any] func(V) RenderedRow
 
+type DynamicCellRenderer[V any] func(row V, cellContent string, colIndex int, rowsEdited bool) string
+
 // RenderedRow provides the rendered string for each column in a row.
 type RenderedRow map[ColumnKey]string
 
@@ -96,7 +99,9 @@ type BulkInsertMsg[T any] []T
 func New[V resource.Identifiable](
 	editorsCache EditorsCacheInterface,
 	tableStyles *Style,
-	cols []Column, fn RowRenderer[V],
+	cols []Column,
+	rowRenderer RowRenderer[V],
+	cellRenderer DynamicCellRenderer[V],
 	width, height int, opts ...Option[V],
 ) Model[V] {
 	filter := textinput.New()
@@ -110,7 +115,8 @@ func New[V resource.Identifiable](
 		actionKeyMap:     nil,
 		cols:             make([]Column, len(cols)),
 		rows:             []V{},
-		rowRenderer:      fn,
+		rowRenderer:      rowRenderer,
+		cellRenderer:     cellRenderer,
 		items:            make(map[resource.ID]V),
 		rendered:         make(map[resource.ID]RenderedRow),
 		selected:         make(map[resource.ID]V),
@@ -826,10 +832,7 @@ func (m *Model[V]) renderCells(
 	cells := m.rendered[row.GetID()]
 	styledCells := make([]string, len(m.cols))
 	for i, col := range m.cols {
-		content := cells[col.Key]
-		if i == 0 && rowsEdited {
-			content += "*"
-		}
+		content := m.cellRenderer(row, cells[col.Key], i, rowsEdited)
 
 		// Truncate content if it is wider than column
 		truncated := col.TruncationFunc(content, col.Width, "…")

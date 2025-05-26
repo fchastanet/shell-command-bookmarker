@@ -28,6 +28,7 @@ type Style struct {
 	CurrentRow            *lipgloss.Style
 	SelectedRow           *lipgloss.Style
 	CurrentAndSelectedRow *lipgloss.Style
+	CellEdited            *lipgloss.Style
 
 	// Height of the table header
 	HeaderHeight int
@@ -50,6 +51,7 @@ func GetDefaultStyle(scrollbarStyle *tui.ScrollbarStyle) *Style {
 	tableBorderStyle := lipgloss.NewStyle().
 		BorderStyle(lipgloss.NormalBorder()).
 		BorderForeground(lipgloss.Color("240"))
+	cellEdited := regular.Italic(true).Foreground(colors.Yellow)
 
 	// Row styles using the color theme
 	row := lipgloss.NewStyle()
@@ -67,6 +69,7 @@ func GetDefaultStyle(scrollbarStyle *tui.ScrollbarStyle) *Style {
 		Border:                &tableBorderStyle,
 		FiltersBlock:          &tableFilterBlock,
 		Cell:                  &tableCell,
+		CellEdited:            &cellEdited,
 		Row:                   &row,
 		CurrentRow:            &currentRow,
 		SelectedRow:           &selectedRow,
