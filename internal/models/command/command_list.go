@@ -109,6 +109,7 @@ func (mm *ListMaker) Make(_ resource.ID, width, height int) (structure.ChildMode
 		m.getColumns(0),
 		renderer,
 		cellRenderer,
+		matchFilter,
 		width,
 		height,
 		table.WithSortFunc(dbmodels.CommandSorter),

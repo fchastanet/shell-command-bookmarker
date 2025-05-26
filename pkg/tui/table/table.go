@@ -42,8 +42,9 @@ type Model[V resource.Identifiable] struct {
 	editorsCache     EditorsCacheInterface
 
 	// items are the unfiltered set of items available to the table.
-	items    map[resource.ID]V
-	sortFunc SortFunc[V]
+	items               map[resource.ID]V
+	sortFunc            SortFunc[V]
+	matchFilterCallback func(filterValue string, item V) bool
 
 	selected map[resource.ID]V
 
@@ -102,35 +103,37 @@ func New[V resource.Identifiable](
 	cols []Column,
 	rowRenderer RowRenderer[V],
 	cellRenderer DynamicCellRenderer[V],
+	matchFilterCallback func(filterValue string, item V) bool,
 	width, height int, opts ...Option[V],
 ) Model[V] {
 	filter := textinput.New()
 	filter.Prompt = "Filter: "
 
 	m := Model[V]{
-		focused:          false,
-		styles:           tableStyles,
-		editorsCache:     editorsCache,
-		navigationKeyMap: nil,
-		actionKeyMap:     nil,
-		cols:             make([]Column, len(cols)),
-		rows:             []V{},
-		rowRenderer:      rowRenderer,
-		cellRenderer:     cellRenderer,
-		items:            make(map[resource.ID]V),
-		rendered:         make(map[resource.ID]RenderedRow),
-		selected:         make(map[resource.ID]V),
-		selectable:       true,
-		filter:           filter,
-		border:           lipgloss.NormalBorder(),
-		borderColor:      lipgloss.NoColor{},
-		currentRowIndex:  -1,
-		currentRowID:     resource.ID(0),
-		sortFunc:         nil,
-		start:            0,
-		width:            width,
-		height:           height,
-		previewKind:      resource.DefaultKind{},
+		focused:             false,
+		styles:              tableStyles,
+		editorsCache:        editorsCache,
+		navigationKeyMap:    nil,
+		actionKeyMap:        nil,
+		cols:                make([]Column, len(cols)),
+		rows:                []V{},
+		rowRenderer:         rowRenderer,
+		cellRenderer:        cellRenderer,
+		matchFilterCallback: matchFilterCallback,
+		items:               make(map[resource.ID]V),
+		rendered:            make(map[resource.ID]RenderedRow),
+		selected:            make(map[resource.ID]V),
+		selectable:          true,
+		filter:              filter,
+		border:              lipgloss.NormalBorder(),
+		borderColor:         lipgloss.NoColor{},
+		currentRowIndex:     -1,
+		currentRowID:        resource.ID(0),
+		sortFunc:            nil,
+		start:               0,
+		width:               width,
+		height:              height,
+		previewKind:         resource.DefaultKind{},
 	}
 	for _, fn := range opts {
 		fn(&m)
@@ -716,23 +719,7 @@ func (m *Model[V]) matchFilter(item V) bool {
 		return true
 	}
 
-	for _, col := range m.rendered[item.GetID()] {
-		// Try exact match first (fastest)
-		if strings.Contains(strings.ToLower(col), strings.ToLower(filterValue)) {
-			return true
-		}
-
-		// Try fuzzy subsequence matching if exact match fails
-		if FuzzyMatchSubsequence(col, filterValue) {
-			return true
-		}
-
-		// Try advanced scoring if needed
-		if FuzzyMatchScore(col, filterValue) > ScoreThreshold {
-			return true
-		}
-	}
-	return false
+	return m.matchFilterCallback(filterValue, item)
 }
 
 // MoveUp moves the current row up by any number of rows.
