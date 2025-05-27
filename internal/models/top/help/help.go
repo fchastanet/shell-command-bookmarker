@@ -104,7 +104,7 @@ func (m *Model) viewBindingSets(rows int) string {
 
 	// Process each binding set
 	for _, set := range m.bindingSets {
-		bindings := removeDuplicateBindings(set.Bindings)
+		bindings := removeDuplicateAndDisabledBindings(set.Bindings)
 		if len(bindings) == 0 {
 			continue
 		}
@@ -158,12 +158,15 @@ func (m *Model) viewBindingSets(rows int) string {
 		Render(content)
 }
 
-// removeDuplicateBindings removes duplicate bindings from a list of bindings. A
+// removeDuplicateAndDisabledBindings removes duplicate bindings from a list of bindings. A
 // binding is deemed a duplicate if another binding has the same list of keys.
-func removeDuplicateBindings(bindings []*key.Binding) []*key.Binding {
+func removeDuplicateAndDisabledBindings(bindings []*key.Binding) []*key.Binding {
 	seen := make(map[string]struct{})
 	var i int
 	for _, b := range bindings {
+		if !b.Enabled() {
+			continue
+		}
 		bKey := strings.Join(b.Keys(), " ")
 		if _, ok := seen[bKey]; ok {
 			// duplicate, skip

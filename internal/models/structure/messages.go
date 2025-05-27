@@ -46,3 +46,8 @@ type FocusedPaneChangedMsg struct {
 	From Position
 	To   Position
 }
+
+// CommandSelectedForShellMsg is sent when a command is selected for pasting to shell
+type CommandSelectedForShellMsg struct {
+	Command string
+}

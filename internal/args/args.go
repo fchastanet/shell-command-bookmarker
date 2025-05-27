@@ -11,10 +11,13 @@ import (
 const maxScreenSize = 80
 
 type Cli struct {
-	DBPath   FilePath    `arg:""    name:"db-path"   optional:"" type:"path" help:"Path to the SQLite database file"`            //nolint:tagalign //avoid reformat annotations
-	Version  VersionFlag `short:"v" name:"version"                           help:"Print version information and quit"`          //nolint:tagalign //avoid reformat annotations
-	MaxTasks int         `short:"t" name:"max-tasks" default:"1"             help:"Maximum number of tasks to run concurrently"` //nolint:tagalign //avoid reformat annotations
-	Debug    bool        `short:"d"                                          help:"Set log in debug level"`                      //nolint:tagalign //avoid reformat annotations
+	DBPath       FilePath    `arg:""    name:"db-path"     optional:"" type:"path" help:"Path to the SQLite database file"`            //nolint:tagalign //avoid reformat annotations
+	Version      VersionFlag `short:"v" name:"version"                             help:"Print version information and quit"`          //nolint:tagalign //avoid reformat annotations
+	OutputFile   string      `short:"o" name:"output-file" optional:""             help:"File to write selected command to"`           //nolint:tagalign //avoid reformat annotations
+	MaxTasks     int         `short:"t" name:"max-tasks"   default:"1"             help:"Maximum number of tasks to run concurrently"` //nolint:tagalign //avoid reformat annotations
+	Debug        bool        `short:"d"                                            help:"Set log in debug level"`                      //nolint:tagalign //avoid reformat annotations
+	GenerateZsh  bool        `          name:"zsh"         optional:""             help:"Generate Zsh integration script to stdout"`   //nolint:tagalign //avoid reformat annotations
+	GenerateBash bool        `          name:"bash"        optional:""             help:"Generate Bash integration script to stdout"`  //nolint:tagalign //avoid reformat annotations
 }
 
 type FilePath string

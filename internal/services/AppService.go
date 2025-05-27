@@ -19,8 +19,13 @@ type AppService struct {
 type AppServiceConfig struct {
 	DBPath       string
 	SqliteSchema string
+	OutputFile   string // Flag to indicate if we're in shell selection mode
 	MaxTasks     int
 	Debug        bool
+}
+
+func (app *AppService) IsShellSelectionMode() bool {
+	return app.Config.OutputFile != ""
 }
 
 func NewAppService(cfg AppServiceConfig) *AppService {

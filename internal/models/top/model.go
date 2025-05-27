@@ -3,6 +3,7 @@ package top
 import (
 	"fmt"
 	"log/slog"
+	"os"
 	"strings"
 	"time"
 
@@ -32,6 +33,8 @@ const (
 	promptMode             // confirm prompt is visible and taking input
 	filterMode             // filter is visible and taking input
 )
+
+const OutputFileMode = 0o600
 
 // indicate parent components that filter has been closed.
 type FilterClosedMsg struct{}
@@ -122,8 +125,8 @@ func NewModel(
 		global:            keys.GetGlobalKeyMap(),
 		pane:              keys.GetPaneNavigationKeyMap(),
 		tableNavigation:   keys.GetTableNavigationKeyMap(),
-		tableAction:       keys.GetTableActionKeyMap(),
-		tableCustomAction: keys.GetTableCustomActionKeyMap(),
+		tableAction:       keys.GetTableActionKeyMap(appService.IsShellSelectionMode()),
+		tableCustomAction: keys.GetTableCustomActionKeyMap(appService.IsShellSelectionMode()),
 	}
 
 	spinnerObj := spinner.New(spinner.WithSpinner(spinner.Line))
@@ -207,6 +210,9 @@ func (m *Model) dispatchMessage(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tui.MemoryStatsMsg:
 		m.handleMemoryStats(msg)
 		return m, tui.PerformanceMonitorTick(performanceMonitorInterval)
+	case structure.CommandSelectedForShellMsg:
+		cmd := m.handleCommandSelectedForShellMsg(msg)
+		return m, cmd
 	}
 	if keyMsg, ok := msg.(tea.KeyMsg); ok {
 		return m.handleKeyMsg(keyMsg)
@@ -216,6 +222,16 @@ func (m *Model) dispatchMessage(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, cmd
 	}
 	return m, nil
+}
+
+func (m *Model) handleCommandSelectedForShellMsg(msg structure.CommandSelectedForShellMsg) tea.Cmd {
+	// When a command is selected for shell, store it and quit
+	if err := os.WriteFile(m.appService.Config.OutputFile, []byte(msg.Command), OutputFileMode); err != nil {
+		slog.Error("Failed to write command to output file", "error", err)
+		fmt.Fprintf(os.Stderr, "Error writing command to output file: %v\n", err)
+	}
+	m.quitting = true
+	return tea.Quit
 }
 
 // handleFocusPaneChangedMsg handles the pane focus change message
@@ -402,8 +418,13 @@ func (m *Model) manageKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 	switch {
 	case key.Matches(msg, *m.keyMaps.global.Quit):
-		// ctrl-c quits the app, but not before prompting the user for
-		// confirmation.
+		// In shell selection mode (with output-file parameter), Ctrl+C should exit immediately without confirmation
+		if m.appService.IsShellSelectionMode() {
+			m.quitting = true
+			return m, QuitWithClearScreen()
+		}
+
+		// In normal mode, Ctrl+C prompts for confirmation before quitting
 		return m, tui.YesNoPrompt("Quit Shell Command Bookmarker?", true, QuitWithClearScreen())
 	case key.Matches(msg, *m.keyMaps.global.Help):
 		// '?' toggles help widget

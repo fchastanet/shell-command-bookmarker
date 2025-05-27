@@ -26,19 +26,19 @@
 <!-- markdownlint-restore -->
 
 - [1. Excerpt](#1-excerpt)
-- [2. Documentation](#2-documentation)
-  - [2.1. Go Libraries used](#21-go-libraries-used)
+- [2. Features](#2-features)
 - [3. Development](#3-development)
-  - [3.1. Necessary tools](#31-necessary-tools)
-  - [3.2. Pre-commit hook](#32-pre-commit-hook)
-  - [3.3. pre-commit external tools install](#33-pre-commit-external-tools-install)
-  - [3.4. detect dead code](#34-detect-dead-code)
-  - [3.5. Build/run/clean](#35-buildrunclean)
-    - [3.5.1. Build](#351-build)
-    - [3.5.2. Tests](#352-tests)
-    - [3.5.3. Coverage](#353-coverage)
-    - [3.5.4. run the binary](#354-run-the-binary)
-    - [3.5.5. Clean](#355-clean)
+  - [3.1. Go Libraries used](#31-go-libraries-used)
+  - [3.2. Necessary tools](#32-necessary-tools)
+  - [3.3. Pre-commit hook](#33-pre-commit-hook)
+  - [3.4. pre-commit external tools install](#34-pre-commit-external-tools-install)
+  - [3.5. detect dead code](#35-detect-dead-code)
+  - [3.6. Build/run/clean](#36-buildrunclean)
+    - [3.6.1. Build](#361-build)
+    - [3.6.2. Tests](#362-tests)
+    - [3.6.3. Coverage](#363-coverage)
+    - [3.6.4. run the binary](#364-run-the-binary)
+    - [3.6.5. Clean](#365-clean)
 - [4. Commands](#4-commands)
 
 ## 1. Excerpt
@@ -68,9 +68,28 @@ UI with features like:
 This tool is part of a larger suite of Bash productivity tools designed to
 enhance shell workflows and command management.
 
-## 2. Documentation
+## 2. Features
 
-### 2.1. Go Libraries used
+- **Bookmark Commands**: Save frequently used shell commands for quick access.
+- **Tagging System**: Organize commands with tags for easy categorization.
+- **Search Functionality**: Quickly find commands using a search bar.
+- **Command Execution**: Execute bookmarked commands directly from the
+  interface.
+- **Keyboard Shortcuts**: Use keyboard shortcuts for efficient navigation and
+  command execution.
+- **Persistent Storage**: Save bookmarks and tags to a SQLite database for
+  persistence across sessions.
+- **Shell Integration**: Easily paste commands into the shell prompt using
+  keyboard shortcuts.
+  - see [doc/shell-integration.md](doc/shell-integration.md) for more details.
+- **Cross-Platform Compatibility**: Works on any terminal that supports the
+  Bubbletea framework.
+- **Open Source**: Licensed under the MIT License, allowing for free use and
+  modification.
+
+## 3. Development
+
+### 3.1. Go Libraries used
 
 - [slog](https://pkg.go.dev/golang.org/x/exp/slog) is logging system
   - [slog tutorial](https://betterstack.com/community/guides/logging/logging-in-go/#customizing-the-default-logger)
@@ -81,15 +100,13 @@ enhance shell workflows and command management.
 - snippets from
   [Brandon Fulljames](https://github.com/Evertras/bubble-table/blob/main/table/dimensions.go)
 
-## 3. Development
-
-### 3.1. Necessary tools
+### 3.2. Necessary tools
 
 ```bash
 go install golang.org/x/tools/cmd/goimports@latest
 ```
 
-### 3.2. Pre-commit hook
+### 3.3. Pre-commit hook
 
 This repository uses pre-commit software to ensure every commits respects a set
 of rules specified by the `.pre-commit-config.yaml` file. It supposes pre-commit
@@ -104,7 +121,7 @@ pre-commit install --hook-type pre-commit --hook-type pre-push
 Now each time you commit or push, some linters/compilation tools are launched
 automatically
 
-### 3.3. pre-commit external tools install
+### 3.4. pre-commit external tools install
 
 ```bash
 go install github.com/securego/gosec/v2/cmd/gosec@latest
@@ -116,18 +133,18 @@ go install github.com/go-critic/go-critic/cmd/go-critic@latest
 go install -v github.com/go-critic/go-critic/cmd/gocritic@latest
 ```
 
-### 3.4. detect dead code
+### 3.5. detect dead code
 
 ```bash
 go install golang.org/x/tools/cmd/deadcode@latest
 deadcode -filter "github.com/fchastanet/shell-command-bookmarker" ./app/main.go
 ```
 
-### 3.5. Build/run/clean
+### 3.6. Build/run/clean
 
 Formatting is managed exclusively by pre-commit hooks.
 
-#### 3.5.1. Build
+#### 3.6.1. Build
 
 ```bash
 .build/build-docker.sh
@@ -137,25 +154,25 @@ Formatting is managed exclusively by pre-commit hooks.
 .build/build-local.sh
 ```
 
-#### 3.5.2. Tests
+#### 3.6.2. Tests
 
 ```bash
 .build/test.sh
 ```
 
-#### 3.5.3. Coverage
+#### 3.6.3. Coverage
 
 ```bash
 .build/coverage.sh
 ```
 
-#### 3.5.4. run the binary
+#### 3.6.4. run the binary
 
 ```bash
 .build/run.sh
 ```
 
-#### 3.5.5. Clean
+#### 3.6.5. Clean
 
 ```bash
 .build/clean.sh
@@ -166,5 +183,5 @@ Formatting is managed exclusively by pre-commit hooks.
 Run the project
 
 ```bash
-go run ./main
+HISTFILE=~/.bash_history go run -tags "sqlite_fts5" ./app/main.go -d
 ```

@@ -35,11 +35,27 @@ func mainImpl() error {
 		return err
 	}
 
+	// Handle shell integration script generation if requested
+	if cli.GenerateBash || cli.GenerateZsh {
+		shellIntegrationService := services.NewShellIntegrationService()
+
+		if cli.GenerateBash {
+			fmt.Print(shellIntegrationService.GenerateBashIntegration())
+			return nil
+		}
+
+		if cli.GenerateZsh {
+			fmt.Print(shellIntegrationService.GenerateZshIntegration())
+			return nil
+		}
+	}
+
 	appService := services.NewAppService(services.AppServiceConfig{
 		SqliteSchema: sqliteSchema,
 		MaxTasks:     1,
 		DBPath:       string(cli.DBPath),
 		Debug:        cli.Debug,
+		OutputFile:   cli.OutputFile,
 	})
 	defer appService.Cleanup()
 	err = appService.Init()
@@ -70,5 +86,8 @@ func mainImpl() error {
 		slog.Error("Error running program", "error", err)
 		return err
 	}
+
 	return nil
 }
+
+// The shell integration code has been moved to the ShellIntegrationService

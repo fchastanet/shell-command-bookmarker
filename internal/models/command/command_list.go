@@ -355,6 +355,9 @@ func (m *commandsList) handleKeyMsg(msg tea.KeyMsg) (cmd tea.Cmd, forward bool) 
 	if key.Matches(msg, *m.tableCustomActionKeyMap.CopyToClipboard) {
 		return m.handleCopyToClipboard(), false
 	}
+	if key.Matches(msg, *m.tableCustomActionKeyMap.SelectForShell) {
+		return m.handleSelectForShell(), false
+	}
 	return nil, true
 }
 
@@ -404,6 +407,22 @@ func (m *commandsList) handleCopyToClipboard() tea.Cmd {
 	m.Model.DeselectAll()
 	return func() tea.Msg {
 		return tui.InfoMsg(fmt.Sprintf("Copied %d command(s) to clipboard", len(rows)))
+	}
+}
+
+func (m *commandsList) handleSelectForShell() tea.Cmd {
+	rows := m.Model.SelectedOrCurrent()
+	if len(rows) == 0 {
+		return func() tea.Msg {
+			return tui.ErrorMsg(&ErrNoCommandsSelected{})
+		}
+	}
+
+	// We only want the first command for shell pasting
+	commandString := m.HistoryService.CreateCommandsString(rows[:1])
+
+	return func() tea.Msg {
+		return structure.CommandSelectedForShellMsg{Command: commandString}
 	}
 }
 

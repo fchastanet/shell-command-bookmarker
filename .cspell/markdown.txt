@@ -1,4 +1,5 @@
 betteralign
+bindkey
 Brandon
 Chastanet
 deadcode
