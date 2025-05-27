@@ -46,7 +46,7 @@
 
 > [!WARNING]
 >
-> **Development in progress, not functional yet !**
+> **Beta Version available, not fully tested !**
 
 ![application preview](doc/preview.png)
 
@@ -65,6 +65,9 @@ UI with features like:
 - Keyboard shortcuts
 - Focus management between different UI components
 - Command organization and filtering
+- Persistent storage using SQLite for saving bookmarks and tags
+- Shell integration (Bash/Zsh) for easy command execution
+- Open source under the MIT License
 
 This tool is part of a larger suite of Bash productivity tools designed to
 enhance shell workflows and command management.
