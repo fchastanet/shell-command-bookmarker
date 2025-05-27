@@ -289,3 +289,16 @@ func (s *HistoryService) generateComposeCommandScript(commands []*models.Command
 	}
 	return script.String()
 }
+
+// CreateCommandsString creates a concatenated string of all commands
+// suitable for copying to clipboard
+func (s *HistoryService) CreateCommandsString(commands []*models.Command) string {
+	var script strings.Builder
+	for i, cmd := range commands {
+		script.WriteString(cmd.Script)
+		if i < len(commands)-1 {
+			script.WriteString("\n")
+		}
+	}
+	return script.String()
+}

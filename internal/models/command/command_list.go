@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log/slog"
 
+	"github.com/atotto/clipboard"
 	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/bubbles/spinner"
 	tea "github.com/charmbracelet/bubbletea"
@@ -351,6 +352,9 @@ func (m *commandsList) handleKeyMsg(msg tea.KeyMsg) (cmd tea.Cmd, forward bool) 
 	if key.Matches(msg, *m.tableCustomActionKeyMap.ComposeCommand) {
 		return m.handleComposeCommand(), false
 	}
+	if key.Matches(msg, *m.tableCustomActionKeyMap.CopyToClipboard) {
+		return m.handleCopyToClipboard(), false
+	}
 	return nil, true
 }
 
@@ -359,7 +363,7 @@ func (m *commandsList) handleComposeCommand() tea.Cmd {
 	newCmd, err := m.HistoryService.ComposeCommand(rows)
 	if err != nil {
 		return func() tea.Msg {
-			return tui.ErrorMsg(fmt.Errorf("failed to compose command: %w", err))
+			return tui.ErrorMsg(&ComposeCommandError{Err: err})
 		}
 	}
 	m.Model.DeselectAll()
@@ -379,6 +383,28 @@ func (m *commandsList) handleComposeCommand() tea.Cmd {
 			RowID: newCmd.ID,
 		}),
 	)
+}
+
+func (m *commandsList) handleCopyToClipboard() tea.Cmd {
+	rows := m.Model.SelectedOrCurrent()
+	if len(rows) == 0 {
+		return func() tea.Msg {
+			return tui.ErrorMsg(&ErrNoCommandsSelected{})
+		}
+	}
+
+	commandsString := m.HistoryService.CreateCommandsString(rows)
+	err := clipboard.WriteAll(commandsString)
+	if err != nil {
+		return func() tea.Msg {
+			return tui.ErrorMsg(&ErrClipboardCopyFailed{Err: err})
+		}
+	}
+
+	m.Model.DeselectAll()
+	return func() tea.Msg {
+		return tui.InfoMsg(fmt.Sprintf("Copied %d command(s) to clipboard", len(rows)))
+	}
 }
 
 func (m *commandsList) View() string {

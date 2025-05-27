@@ -6,7 +6,8 @@ import (
 )
 
 type TableCustomActionKeyMap struct {
-	ComposeCommand *key.Binding
+	ComposeCommand  *key.Binding
+	CopyToClipboard *key.Binding
 }
 
 func GetTableCustomActionKeyMap() *TableCustomActionKeyMap {
@@ -14,8 +15,13 @@ func GetTableCustomActionKeyMap() *TableCustomActionKeyMap {
 		key.WithKeys("c"),
 		key.WithHelp("c", "compose command"),
 	)
+	copyToClipboard := key.NewBinding(
+		key.WithKeys("y"),
+		key.WithHelp("y", "copy to clipboard"),
+	)
 	return &TableCustomActionKeyMap{
-		ComposeCommand: &composeCommand,
+		ComposeCommand:  &composeCommand,
+		CopyToClipboard: &copyToClipboard,
 	}
 }
 
