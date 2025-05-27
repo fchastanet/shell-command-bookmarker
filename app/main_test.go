@@ -12,12 +12,10 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-// TestMainImplWithBashFlag tests that the mainImpl function correctly outputs
-// a Bash script when the --bash flag is provided
-func TestMainImplWithBashFlag(t *testing.T) {
+func RunMainImpl(shellOption string) (error, string) {
 	// Set up a temporary CLI object with bash flag
 	oldOsArgs := os.Args
-	os.Args = []string{"cmd", "--bash"}
+	os.Args = []string{"cmd", shellOption}
 	defer func() { os.Args = oldOsArgs }()
 
 	// Capture stdout
@@ -34,6 +32,14 @@ func TestMainImplWithBashFlag(t *testing.T) {
 	var buf bytes.Buffer
 	_, _ = io.Copy(&buf, r)
 	output := buf.String()
+
+	return err, output
+}
+
+// TestMainImplWithBashFlag tests that the mainImpl function correctly outputs
+// a Bash script when the --bash flag is provided
+func TestMainImplWithBashFlag(t *testing.T) {
+	err, output := RunMainImpl("--bash")
 
 	// Check results
 	assert.Nil(t, err)
@@ -44,25 +50,7 @@ func TestMainImplWithBashFlag(t *testing.T) {
 // TestMainImplWithZshFlag tests that the mainImpl function correctly outputs
 // a Zsh script when the --zsh flag is provided
 func TestMainImplWithZshFlag(t *testing.T) {
-	// Set up a temporary CLI object with zsh flag
-	oldOsArgs := os.Args
-	os.Args = []string{"cmd", "--zsh"}
-	defer func() { os.Args = oldOsArgs }()
-
-	// Capture stdout
-	oldStdout := os.Stdout
-	r, w, _ := os.Pipe()
-	os.Stdout = w
-	defer func() { os.Stdout = oldStdout }()
-
-	// Run mainImpl
-	err := mainImpl()
-
-	// Close the writer and get the output
-	w.Close()
-	var buf bytes.Buffer
-	_, _ = io.Copy(&buf, r)
-	output := buf.String()
+	err, output := RunMainImpl("--zsh")
 
 	// Check results
 	assert.Nil(t, err)

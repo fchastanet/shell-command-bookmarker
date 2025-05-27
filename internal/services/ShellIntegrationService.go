@@ -7,7 +7,7 @@ import (
 //go:embed templates/bash-integration.sh
 var bashIntegrationTemplate string
 
-//go:embed templates/zsh-integration.sh
+//go:embed templates/zsh-integration.zsh
 var zshIntegrationTemplate string
 
 // ShellIntegrationService provides shell integration scripts
