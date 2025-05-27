@@ -40,6 +40,7 @@
     - [3.6.4. run the binary](#364-run-the-binary)
     - [3.6.5. Clean](#365-clean)
 - [4. Commands](#4-commands)
+- [5. Resources](#5-resources)
 
 ## 1. Excerpt
 
@@ -185,3 +186,10 @@ Run the project
 ```bash
 HISTFILE=~/.bash_history go run -tags "sqlite_fts5" ./app/main.go -d
 ```
+
+## 5. Resources
+
+- [TUI Best Practices](doc/tui-best-practices.md)
+- [Go Best Practices](doc/go-best-practices.md)
+- [Building BubbleTea Programs](https://leg100.github.io/en/posts/building-bubbletea-programs/)
+- [Bubbletea Documentation](https://pkg.go.dev/github.com/charmbracelet/bubbletea)
