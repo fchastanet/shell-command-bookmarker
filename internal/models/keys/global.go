@@ -22,7 +22,7 @@ func GetGlobalKeyMap() *GlobalKeyMap {
 	)
 	help := key.NewBinding(
 		key.WithKeys("h", "H", "alt+?", "alt+,"),
-		key.WithHelp("H/Alt+?", "close help"),
+		key.WithHelp("h/Alt+?", "close help"),
 	)
 	debug := key.NewBinding(
 		key.WithKeys("f10", "f12"),
