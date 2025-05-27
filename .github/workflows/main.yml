@@ -57,8 +57,8 @@ jobs:
         run: |
           (
             echo "job_tag=${{github.run_id}}-${{matrix.os}}"
-            echo "image_tag=bash-shell-command-bookmarker-${{matrix.os}}"
-            echo "image_name=scrasnups/bash-shell-command-bookmarker"
+            echo "image_tag=shell-command-bookmarker-${{matrix.os}}"
+            echo "image_name=scrasnups/shell-command-bookmarker"
             echo "branch_name=${GITHUB_REF##*/}"
           ) >> "${GITHUB_ENV}"
 
