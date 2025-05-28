@@ -48,7 +48,9 @@
 >
 > **Beta Version available, not fully tested !**
 
-![application preview](doc/preview.png)
+| **Dark theme**                               | **Light theme**                               |
+| -------------------------------------------- | --------------------------------------------- |
+| ![application preview](doc/preview-dark.png) | ![application preview](doc/preview-light.png) |
 
 This tool provides a terminal-based user interface (TUI) for managing and
 organizing shell commands. It allows users to:
