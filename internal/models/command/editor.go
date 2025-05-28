@@ -37,12 +37,13 @@ type EditorMaker struct {
 
 // Number of input fields
 const (
-	numInputFields           = 3   // Title, Description, Script
-	titleInputMaxSize        = 50  // Max size for title input
-	descriptionInputMaxSize  = 200 // Max size for description input
-	descriptionInputHeight   = 5   // Height for description input
-	scriptInputHeight        = 5   // Height for script input
-	descriptionWordwrapWidth = 80  // Word wrap width for description input
+	numInputFields           = 3    // Title, Description, Script
+	titleInputMaxSize        = 50   // Max size for title input
+	descriptionInputMaxSize  = 1000 // Max size for description input
+	descriptionInputHeight   = 5    // Height for description input
+	scriptInputHeight        = 5    // Height for script input
+	descriptionWordwrapWidth = 80   // Word wrap width for description input
+	inputFieldPadding        = 2
 )
 
 // Make creates a new command editor model based on the command ID
@@ -133,12 +134,19 @@ func (m *commandEditor) formatLintStatus() string {
 // Update handles updates to the command editor
 func (m *commandEditor) Update(msg tea.Msg) tea.Cmd {
 	var cmds []tea.Cmd
+	slog.Debug("commandEditor.Update", "msgType", fmt.Sprintf("%T", msg), "focused", m.focused)
 
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		m.handleWindowSizeMsg(msg)
 	case structure.FocusedPaneChangedMsg:
 		cmds = append(cmds, m.handleFocusedPaneChangedMsg(msg))
+	case table.RowSelectedActionMsg[*dbmodels.Command]:
+		// This message is sent when a row is selected in the command table
+		m.command = msg.Row
+		m.inputs[0].SetValue(m.command.Title)
+		m.inputs[1].SetValue(m.command.Description)
+		m.inputs[2].SetValue(m.command.Script)
 	case tea.KeyMsg:
 		cmd := m.handleKeyMsg(msg)
 		if cmd != nil {
@@ -165,7 +173,7 @@ func (m *commandEditor) handleWindowSizeMsg(msg tea.WindowSizeMsg) {
 	m.width = msg.Width
 	m.height = msg.Height
 	for _, input := range m.inputs {
-		input.SetWidth(m.width)
+		input.SetWidth(m.width - inputFieldPadding)
 	}
 }
 

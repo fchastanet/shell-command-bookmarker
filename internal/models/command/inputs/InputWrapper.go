@@ -1,6 +1,8 @@
 package inputs
 
 import (
+	"fmt"
+
 	"github.com/charmbracelet/bubbles/textinput"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -64,5 +66,9 @@ func (w *InputWrapper) View() string {
 	if w.readOnly {
 		return w.Model.Value()
 	}
-	return w.Model.View()
+	txt := w.Model.View()
+	if !w.readOnly && w.Model.CharLimit > 0 {
+		txt += fmt.Sprintf("\nLength: %d/%d\n", len(w.Model.Value()), w.Model.CharLimit)
+	}
+	return txt
 }

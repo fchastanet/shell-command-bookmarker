@@ -186,7 +186,8 @@ func (p *PaneManager) handleSpecialMessages(msg tea.Msg) (tea.Cmd, bool) {
 		return p.setBottomPane(msg.RowID, true), true
 	case table.RowSelectedActionMsg[*models.Command]:
 		if _, ok := p.panes[structure.BottomPane]; ok {
-			return p.setBottomPane(msg.RowID, false), true
+			cmd := p.setBottomPane(msg.RowID, false)
+			return cmd, cmd != nil
 		}
 	case command.EditorCancelledMsg:
 		// The command editor was cancelled, so we need to close the bottom pane
@@ -422,6 +423,22 @@ func (p *PaneManager) Get(rsc resource.ID) table.EditorInterface {
 	return nil
 }
 
+func (p *PaneManager) makeModel(msg structure.NavigationMsg) (structure.ChildModel, error) {
+	maker := p.makerFactory(msg.Page.Kind)
+	if maker == nil {
+		return nil, &ErrNoMaker{Kind: msg.Page.Kind}
+	}
+	var err error
+	model, err := maker.Make(msg.Page.ID, 0, 0)
+	if err != nil {
+		return nil, &ErrMakePage{Msg: msg, Err: err}
+	}
+	if model == nil {
+		return nil, &ErrMakePageEmptyModel{Msg: msg}
+	}
+	return model, nil
+}
+
 func (p *PaneManager) setPane(msg structure.NavigationMsg) (cmd tea.Cmd) {
 	var cmds []tea.Cmd
 	oldPos := p.focused
@@ -434,17 +451,10 @@ func (p *PaneManager) setPane(msg structure.NavigationMsg) (cmd tea.Cmd) {
 	}
 	model := p.cache.Get(msg.Page)
 	if model == nil {
-		maker := p.makerFactory(msg.Page.Kind)
-		if maker == nil {
-			return tui.ReportError(&ErrNoMaker{Kind: msg.Page.Kind})
-		}
 		var err error
-		model, err = maker.Make(msg.Page.ID, 0, 0)
+		model, err = p.makeModel(msg)
 		if err != nil {
-			return tui.ReportError(&ErrMakePage{Msg: msg, Err: err})
-		}
-		if model == nil {
-			return tui.ReportError(&ErrMakePageEmptyModel{Msg: msg})
+			return tui.ReportError(err)
 		}
 		p.cache.Put(msg.Page, model)
 		cmds = append(cmds, model.Init())
@@ -461,7 +471,10 @@ func (p *PaneManager) setPane(msg structure.NavigationMsg) (cmd tea.Cmd) {
 	if !msg.DisableFocus {
 		p.focusPane(msg.Position)
 	}
-	cmds = append(cmds, GetFocusedPaneChangedCmd(oldPos, p.focused))
+	if oldPos != p.focused {
+		// If same focused pane has changed, no need to notify about it.
+		cmds = append(cmds, GetFocusedPaneChangedCmd(oldPos, p.focused))
+	}
 	return tea.Batch(cmds...)
 }
 

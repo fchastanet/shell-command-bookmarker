@@ -1,6 +1,7 @@
 package inputs
 
 import (
+	"fmt"
 	"log/slog"
 
 	"github.com/charmbracelet/bubbles/textarea"
@@ -56,6 +57,7 @@ func WithMarkdown(markdownWordWrapWidth int) TextAreaWrapperOption {
 
 func (w *TextAreaWrapper) SetCharLimit(charLimit int) {
 	w.CharLimit = charLimit
+	w.CharLimit = charLimit
 }
 
 // Update implements the Input interface
@@ -96,7 +98,11 @@ func (w *TextAreaWrapper) View() string {
 		}
 		return text
 	}
-	return w.Model.View()
+	txt := w.Model.View()
+	if !w.readOnly && w.CharLimit > 0 {
+		txt += fmt.Sprintf("\nLength: %d/%d\n", w.Length(), w.CharLimit)
+	}
+	return txt
 }
 
 // SetWidth implements the Input interface

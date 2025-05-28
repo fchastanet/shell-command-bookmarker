@@ -102,8 +102,8 @@ func (mm *ListMaker) Make(_ resource.ID, width, height int) (structure.ChildMode
 	renderer := func(cmd *dbmodels.Command) table.RenderedRow {
 		return mm.renderRow(cmd, m)
 	}
-	cellRenderer := func(_ *dbmodels.Command, cellContent string, colIndex int, rowsEdited bool) string {
-		if rowsEdited && colIndex == indexColumnStatus {
+	cellRenderer := func(_ *dbmodels.Command, cellContent string, colIndex int, rowEdited bool) string {
+		if rowEdited && colIndex == indexColumnStatus {
 			cellContent = m.styles.TableStyle.CellEdited.Render("Edited")
 		}
 		return cellContent
