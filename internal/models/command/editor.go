@@ -9,10 +9,9 @@ import (
 	"time"
 
 	"github.com/charmbracelet/bubbles/key"
-	"github.com/charmbracelet/bubbles/textarea"
-	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/fchastanet/shell-command-bookmarker/internal/models/command/inputs"
 	"github.com/fchastanet/shell-command-bookmarker/internal/models/keys"
 	"github.com/fchastanet/shell-command-bookmarker/internal/models/structure"
 	"github.com/fchastanet/shell-command-bookmarker/internal/models/styles"
@@ -36,13 +35,20 @@ type EditorMaker struct {
 	EditorKeyMap *keys.EditorKeyMap
 }
 
+// Number of input fields
+const (
+	numInputFields           = 3   // Title, Description, Script
+	titleInputMaxSize        = 50  // Max size for title input
+	descriptionInputMaxSize  = 200 // Max size for description input
+	descriptionInputHeight   = 5   // Height for description input
+	scriptInputHeight        = 5   // Height for script input
+	descriptionWordwrapWidth = 80  // Word wrap width for description input
+)
+
 // Make creates a new command editor model based on the command ID
 func (mm *EditorMaker) Make(id resource.ID, width, height int) (structure.ChildModel, error) {
 	// Convert the resource ID to a command ID
 	commandID := id
-
-	// Number of input fields
-	const numInputFields = 3 // Title, Description, Script
 
 	// Load the command from the database
 	command, err := mm.App.DBService.GetCommandByID(commandID)
@@ -61,7 +67,7 @@ func (mm *EditorMaker) Make(id resource.ID, width, height int) (structure.ChildM
 		command:       command,
 		width:         width,
 		height:        height,
-		inputs:        make([]Input, numInputFields),
+		inputs:        make([]inputs.Input, numInputFields),
 		focused:       -1,
 		EditorKeyMap:  mm.EditorKeyMap,
 		pagePosition:  0,
@@ -75,7 +81,7 @@ type commandEditor struct {
 	styles        *styles.Styles
 	command       *dbmodels.Command
 	EditorKeyMap  *keys.EditorKeyMap
-	inputs        []Input
+	inputs        []inputs.Input
 	width         int
 	height        int
 	focused       int
@@ -83,86 +89,25 @@ type commandEditor struct {
 	contentHeight int
 }
 
-type Input interface {
-	Update(msg tea.Msg) (Input, tea.Cmd)
-	Blur()
-	Focus() tea.Cmd
-	Value() string
-	View() string
-	SetWidth(width int)
-	SetHeight(height int)
-}
-
-// InputWrapper wraps textinput.Model to implement the Input interface
-type InputWrapper struct {
-	*textinput.Model
-}
-
-// Update implements the Input interface
-func (w *InputWrapper) Update(msg tea.Msg) (Input, tea.Cmd) {
-	newModel, cmd := w.Model.Update(msg)
-	w.Model = &newModel
-	return w, cmd
-}
-
-func (*InputWrapper) SetHeight(_ int) {
-	// do nothing
-}
-
-func (w *InputWrapper) SetWidth(width int) {
-	w.Width = width
-}
-
-// EditLineWrapper wraps textarea.Model to implement the Input interface
-type EditLineWrapper struct {
-	*textarea.Model
-}
-
-// Update implements the Input interface
-func (w *EditLineWrapper) Update(msg tea.Msg) (Input, tea.Cmd) {
-	newModel, cmd := w.Model.Update(msg)
-	w.Model = &newModel
-	return w, cmd
-}
-
-// Blur implements the Input interface
-func (w *EditLineWrapper) Blur() {
-	w.Model.Blur()
-}
-
-// Focus implements the Input interface
-func (w *EditLineWrapper) Focus() tea.Cmd {
-	return w.Model.Focus()
-}
-
-// SetValue implements the Input interface
-func (w *EditLineWrapper) SetValue(value string) {
-	w.Model.SetValue(value)
-}
-
 // Init initializes the command editor
 func (m *commandEditor) Init() tea.Cmd {
 	// Initialize the text inputs
-	textInput := textinput.New()
-	textInput.CharLimit = 50
-	titleInput := InputWrapper{&textInput}
-	titleInput.Placeholder = "Enter title"
+	titleInput := inputs.NewInputWrapper("Enter title")
+	titleInput.SetCharLimit(titleInputMaxSize)
 	titleInput.SetValue(m.command.Title)
 	titleInput.Focus()
 
-	textInput2 := textarea.New()
-	textInput2.CharLimit = 200
-	descriptionInput := EditLineWrapper{&textInput2}
-	descriptionInput.Placeholder = "Enter description"
+	descriptionInput := inputs.NewTextAreaWrapper(
+		descriptionInputHeight,
+		"Enter description (markdown)",
+		inputs.WithMarkdown(descriptionWordwrapWidth))
+	descriptionInput.SetCharLimit(descriptionInputMaxSize)
 	descriptionInput.SetValue(m.command.Description)
-	descriptionInput.CharLimit = 200
 
-	scriptTextArea := textarea.New()
-	scriptInput := EditLineWrapper{&scriptTextArea}
-	scriptInput.Placeholder = "Enter script"
+	scriptInput := inputs.NewTextAreaWrapper(scriptInputHeight, "Enter script")
 	scriptInput.SetValue(m.command.Script)
 
-	m.inputs = []Input{&titleInput, &descriptionInput, &scriptInput}
+	m.inputs = []inputs.Input{titleInput, descriptionInput, scriptInput}
 
 	return nil
 }
@@ -193,7 +138,7 @@ func (m *commandEditor) Update(msg tea.Msg) tea.Cmd {
 	case tea.WindowSizeMsg:
 		m.handleWindowSizeMsg(msg)
 	case structure.FocusedPaneChangedMsg:
-		cmds = append(cmds, m.handleFocusedPaneChangedMsg())
+		cmds = append(cmds, m.handleFocusedPaneChangedMsg(msg))
 	case tea.KeyMsg:
 		cmd := m.handleKeyMsg(msg)
 		if cmd != nil {
@@ -224,12 +169,16 @@ func (m *commandEditor) handleWindowSizeMsg(msg tea.WindowSizeMsg) {
 	}
 }
 
-func (m *commandEditor) handleFocusedPaneChangedMsg() tea.Cmd {
+func (m *commandEditor) handleFocusedPaneChangedMsg(msg structure.FocusedPaneChangedMsg) tea.Cmd {
 	if m.focused >= 0 && m.inputs[m.focused] != nil {
 		m.inputs[m.focused].Blur()
 	}
-
-	m.focused = -1
+	if msg.To == structure.BottomPane {
+		m.focused = -1
+	}
+	for _, input := range m.inputs {
+		input.SetReadOnly(msg.To != structure.BottomPane)
+	}
 	return tui.GetDummyCmd()
 }
 
