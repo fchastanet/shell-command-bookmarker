@@ -458,6 +458,8 @@ func (p *PaneManager) setPane(msg structure.NavigationMsg) (cmd tea.Cmd) {
 		}
 		p.cache.Put(msg.Page, model)
 		cmds = append(cmds, model.Init())
+	} else {
+		model.Update(msg)
 	}
 	p.panes[msg.Position] = pane{
 		model: model,

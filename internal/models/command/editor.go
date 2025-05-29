@@ -30,9 +30,10 @@ var (
 )
 
 type EditorMaker struct {
-	App          *services.AppService
-	Styles       *styles.Styles
-	EditorKeyMap *keys.EditorKeyMap
+	App           *services.AppService
+	Styles        *styles.Styles
+	EditorKeyMap  *keys.EditorKeyMap
+	commandEditor *commandEditor
 }
 
 // Number of input fields
@@ -48,32 +49,30 @@ const (
 
 // Make creates a new command editor model based on the command ID
 func (mm *EditorMaker) Make(id resource.ID, width, height int) (structure.ChildModel, error) {
-	// Convert the resource ID to a command ID
-	commandID := id
-
-	// Load the command from the database
-	command, err := mm.App.DBService.GetCommandByID(commandID)
-	if err != nil {
-		return nil, fmt.Errorf("failed to load command %d: %w", commandID, err)
-	}
-
-	if command == nil {
-		return nil, fmt.Errorf("%w %d", ErrCommandNotFound, commandID)
-	}
-
 	// Create the editor model
-	return &commandEditor{
-		AppService:    mm.App,
-		styles:        mm.Styles,
-		command:       command,
-		width:         width,
-		height:        height,
-		inputs:        make([]inputs.Input, numInputFields),
-		focused:       -1,
-		EditorKeyMap:  mm.EditorKeyMap,
-		pagePosition:  0,
-		contentHeight: 0,
-	}, nil
+	if mm.commandEditor == nil {
+		mm.commandEditor = &commandEditor{
+			AppService:    mm.App,
+			styles:        mm.Styles,
+			command:       nil,
+			width:         width,
+			height:        height,
+			inputs:        make([]inputs.Input, numInputFields),
+			focused:       -1,
+			EditorKeyMap:  mm.EditorKeyMap,
+			pagePosition:  0,
+			contentHeight: 0,
+			initialized:   false,
+		}
+		mm.commandEditor.Init()
+	}
+	command, err := mm.commandEditor.getCommand(id)
+	if err != nil {
+		return nil, err
+	}
+	mm.commandEditor.setCommand(command)
+
+	return mm.commandEditor, nil
 }
 
 // commandEditor is the model for editing a command
@@ -88,14 +87,42 @@ type commandEditor struct {
 	focused       int
 	pagePosition  int
 	contentHeight int
+	initialized   bool
+}
+
+func (m *commandEditor) getCommand(commandID resource.ID) (*dbmodels.Command, error) {
+	// Load the command from the database
+	command, err := m.DBService.GetCommandByID(commandID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load command %d: %w", commandID, err)
+	}
+
+	if command == nil {
+		return nil, fmt.Errorf("%w %d", ErrCommandNotFound, commandID)
+	}
+	return command, nil
+}
+
+func (m *commandEditor) setCommand(command *dbmodels.Command) {
+	if command == nil {
+		slog.Error("setCommand called with nil command")
+		return
+	}
+	m.command = command
+	m.inputs[0].SetValue(m.command.Title)
+	m.inputs[1].SetValue(m.command.Description)
+	m.inputs[2].SetValue(m.command.Script)
+	m.initInputs()
 }
 
 // Init initializes the command editor
 func (m *commandEditor) Init() tea.Cmd {
+	if m.initialized {
+		return nil
+	}
 	// Initialize the text inputs
 	titleInput := inputs.NewInputWrapper("Enter title")
 	titleInput.SetCharLimit(titleInputMaxSize)
-	titleInput.SetValue(m.command.Title)
 	titleInput.Focus()
 
 	descriptionInput := inputs.NewTextAreaWrapper(
@@ -103,14 +130,12 @@ func (m *commandEditor) Init() tea.Cmd {
 		"Enter description (markdown)",
 		inputs.WithMarkdown(descriptionWordwrapWidth))
 	descriptionInput.SetCharLimit(descriptionInputMaxSize)
-	descriptionInput.SetValue(m.command.Description)
 
 	scriptInput := inputs.NewTextAreaWrapper(scriptInputHeight, "Enter script")
-	scriptInput.SetValue(m.command.Script)
 
 	m.inputs = []inputs.Input{titleInput, descriptionInput, scriptInput}
 	m.focused = -1
-	m.initInputs()
+	m.initialized = true
 
 	return nil
 }
@@ -143,12 +168,11 @@ func (m *commandEditor) Update(msg tea.Msg) tea.Cmd {
 		m.handleWindowSizeMsg(msg)
 	case structure.FocusedPaneChangedMsg:
 		cmds = append(cmds, m.handleFocusedPaneChangedMsg(msg))
+	case structure.NavigationMsg:
+		cmds = append(cmds, m.handleNavigationMsg(msg))
 	case table.RowSelectedActionMsg[*dbmodels.Command]:
 		// This message is sent when a row is selected in the command table
-		m.command = msg.Row
-		m.inputs[0].SetValue(m.command.Title)
-		m.inputs[1].SetValue(m.command.Description)
-		m.inputs[2].SetValue(m.command.Script)
+		m.setCommand(msg.Row)
 	case tea.KeyMsg:
 		cmd := m.handleKeyMsg(msg)
 		if cmd != nil {
@@ -169,6 +193,27 @@ func (m *commandEditor) Update(msg tea.Msg) tea.Cmd {
 	}
 
 	return tea.Batch(cmds...)
+}
+
+func (m *commandEditor) handleNavigationMsg(msg structure.NavigationMsg) tea.Cmd {
+	cmd, err := m.getCommand(msg.Page.ID)
+	if err != nil {
+		slog.Error("Failed to load command for navigation", "id", msg.Page.ID, "error", err)
+		return tui.ReportError(&ErrCommandLoadingFailure{
+			CommandID: msg.Page.ID,
+			Err:       err,
+		})
+	}
+	if cmd != nil {
+		m.setCommand(cmd)
+	} else {
+		slog.Error("Failed to load command for navigation", "id", msg.Page.ID)
+		return tui.ReportError(&ErrCommandLoadingFailure{
+			CommandID: msg.Page.ID,
+			Err:       nil,
+		})
+	}
+	return nil
 }
 
 func (m *commandEditor) handleWindowSizeMsg(msg tea.WindowSizeMsg) {
