@@ -49,13 +49,16 @@ func NewTextAreaWrapper(
 func WithMarkdown(markdownWordWrapWidth int) TextAreaWrapperOption {
 	return func(tr *TextAreaWrapper) error {
 		slog.Info("Markdown rendering enabled for TextAreaWrapper")
-		r, _ := glamour.NewTermRenderer(
-			// detect background color and pick either the default dark or light theme
-			glamour.WithAutoStyle(),
-			// wrap output at specific width (default is 80)
-			glamour.WithWordWrap(markdownWordWrapWidth),
-		)
-		tr.markdownRenderer = r
+		initGlamour := func() {
+			r, _ := glamour.NewTermRenderer(
+				// detect background color and pick either the default dark or light theme
+				glamour.WithAutoStyle(),
+				// wrap output at specific width (default is 80)
+				glamour.WithWordWrap(markdownWordWrapWidth),
+			)
+			tr.markdownRenderer = r
+		}
+		go initGlamour()
 		return nil
 	}
 }
