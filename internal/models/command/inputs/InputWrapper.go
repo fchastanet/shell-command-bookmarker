@@ -4,22 +4,27 @@ import (
 	"fmt"
 
 	"github.com/charmbracelet/bubbles/textinput"
+	"github.com/charmbracelet/lipgloss"
+	"github.com/fchastanet/shell-command-bookmarker/pkg/tui/colors"
 
 	tea "github.com/charmbracelet/bubbletea"
 )
 
 // InputWrapper wraps textinput.Model to implement the Input interface
 type InputWrapper struct {
-	Model    *textinput.Model
-	readOnly bool
+	Model        *textinput.Model
+	warningStyle *lipgloss.Style
+	readOnly     bool
 }
 
 func NewInputWrapper(placeHolder string) *InputWrapper {
 	textInput := textinput.New()
 	textInput.Placeholder = placeHolder
+	warningStyle := lipgloss.NewStyle().Foreground(colors.Yellow).Bold(true)
 	return &InputWrapper{
-		Model:    &textInput,
-		readOnly: false,
+		Model:        &textInput,
+		readOnly:     false,
+		warningStyle: &warningStyle,
 	}
 }
 
@@ -68,7 +73,14 @@ func (w *InputWrapper) View() string {
 	}
 	txt := w.Model.View()
 	if !w.readOnly && w.Model.CharLimit > 0 {
-		txt += fmt.Sprintf("\nLength: %d/%d\n", len(w.Model.Value()), w.Model.CharLimit)
+		length := len(w.Model.Value())
+		availSpace := w.Model.CharLimit - length
+		if availSpace <= 0 {
+			warningMsg := w.warningStyle.Render("No more characters can be added, limit reached.")
+			txt += "\n" + warningMsg
+		} else {
+			txt += fmt.Sprintf("\nLength: %d/%d", length, w.Model.CharLimit)
+		}
 	}
 	return txt
 }

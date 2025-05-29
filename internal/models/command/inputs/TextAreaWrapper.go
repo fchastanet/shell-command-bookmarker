@@ -7,13 +7,16 @@ import (
 	"github.com/charmbracelet/bubbles/textarea"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/glamour"
+	"github.com/charmbracelet/lipgloss"
+	"github.com/fchastanet/shell-command-bookmarker/pkg/tui/colors"
 )
 
 // TextAreaWrapper wraps textarea.Model to implement the Input interface
 type TextAreaWrapper struct {
 	*textarea.Model
-	readOnly         bool
 	markdownRenderer *glamour.TermRenderer
+	warningStyle     *lipgloss.Style
+	readOnly         bool
 }
 
 type TextAreaWrapperOption func(*TextAreaWrapper) error
@@ -25,11 +28,13 @@ func NewTextAreaWrapper(
 	textArea := textarea.New()
 	textArea.Placeholder = placeHolder
 	textArea.SetHeight(height)
+	warningStyle := lipgloss.NewStyle().Foreground(colors.Yellow).Bold(true)
 
 	wrapper := &TextAreaWrapper{
 		Model:            &textArea,
 		readOnly:         false,
 		markdownRenderer: nil,
+		warningStyle:     &warningStyle,
 	}
 
 	for _, opt := range options {
@@ -56,7 +61,6 @@ func WithMarkdown(markdownWordWrapWidth int) TextAreaWrapperOption {
 }
 
 func (w *TextAreaWrapper) SetCharLimit(charLimit int) {
-	w.CharLimit = charLimit
 	w.CharLimit = charLimit
 }
 
@@ -100,7 +104,13 @@ func (w *TextAreaWrapper) View() string {
 	}
 	txt := w.Model.View()
 	if !w.readOnly && w.CharLimit > 0 {
-		txt += fmt.Sprintf("\nLength: %d/%d\n", w.Length(), w.CharLimit)
+		availSpace := w.CharLimit - w.Length()
+		if availSpace <= 0 {
+			txt += "\n"
+			txt += w.warningStyle.Render("No more characters can be added, limit reached.")
+		} else {
+			txt += fmt.Sprintf("\nLength: %d/%d", w.Length(), w.CharLimit)
+		}
 	}
 	return txt
 }

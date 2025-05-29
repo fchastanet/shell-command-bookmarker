@@ -109,6 +109,8 @@ func (m *commandEditor) Init() tea.Cmd {
 	scriptInput.SetValue(m.command.Script)
 
 	m.inputs = []inputs.Input{titleInput, descriptionInput, scriptInput}
+	m.focused = -1
+	m.initInputs()
 
 	return nil
 }
@@ -184,10 +186,14 @@ func (m *commandEditor) handleFocusedPaneChangedMsg(msg structure.FocusedPaneCha
 	if msg.To == structure.BottomPane {
 		m.focused = -1
 	}
-	for _, input := range m.inputs {
-		input.SetReadOnly(msg.To != structure.BottomPane)
-	}
+	m.initInputs()
 	return tui.GetDummyCmd()
+}
+
+func (m *commandEditor) initInputs() {
+	for i, input := range m.inputs {
+		input.SetReadOnly(m.focused != i)
+	}
 }
 
 func (m *commandEditor) handleKeyMsg(msg tea.KeyMsg) tea.Cmd {
@@ -374,10 +380,12 @@ func (m *commandEditor) nextField() tea.Cmd {
 	}
 	if m.focused == len(m.inputs)-1 {
 		m.focused = -1
+		m.initInputs()
 		return nil
 	}
 
 	m.focused = (m.focused + 1) % len(m.inputs)
+	m.initInputs()
 
 	return m.inputs[m.focused].Focus()
 }
@@ -390,12 +398,14 @@ func (m *commandEditor) prevField() tea.Cmd {
 	switch m.focused {
 	case -1:
 		m.focused = len(m.inputs) - 1
+		m.initInputs()
 		return nil
 	case 0:
 		m.focused = -1
 	default:
 		m.focused = (m.focused - 1) % len(m.inputs)
 	}
+	m.initInputs()
 	if m.focused >= 0 {
 		return m.inputs[m.focused].Focus()
 	}
