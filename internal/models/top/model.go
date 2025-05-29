@@ -11,6 +11,7 @@ import (
 	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/bubbles/spinner"
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/huh"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/fchastanet/shell-command-bookmarker/internal/models"
 	"github.com/fchastanet/shell-command-bookmarker/internal/models/keys"
@@ -79,6 +80,7 @@ type KeyMaps struct {
 	tableAction       *table.Action
 	tableCustomAction *keys.TableCustomActionKeyMap
 	editor            *keys.EditorKeyMap
+	form              *huh.KeyMap
 }
 
 type Model struct {
@@ -90,7 +92,8 @@ type Model struct {
 	styles     *styles.Styles
 	keyMaps    *KeyMaps
 
-	prompt      *tui.Prompt
+	prompt *huh.Form
+
 	spinner     *spinner.Model
 	footerModel footer.Model
 	headerModel header.Model
@@ -127,6 +130,7 @@ func NewModel(
 		tableNavigation:   keys.GetTableNavigationKeyMap(),
 		tableAction:       keys.GetTableActionKeyMap(appService.IsShellSelectionMode()),
 		tableCustomAction: keys.GetTableCustomActionKeyMap(appService.IsShellSelectionMode()),
+		form:              keys.GetFormKeyMap(),
 	}
 
 	spinnerObj := spinner.New(spinner.WithSpinner(spinner.Line))
@@ -197,8 +201,6 @@ func (m *Model) dispatchMessage(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, tea.Quit
 	case spinner.TickMsg:
 		return m.handleSpinnerTick(msg)
-	case tui.PromptMsg:
-		return m.handlePrompt(&msg)
 	case tui.ErrorMsg, tui.InfoMsg, MessageClearTickMsg:
 		return m.handleStatusMsg(msg)
 	case tea.WindowSizeMsg:
@@ -214,6 +216,27 @@ func (m *Model) dispatchMessage(msg tea.Msg) (tea.Model, tea.Cmd) {
 		cmd := m.handleCommandSelectedForShellMsg(msg)
 		return m, cmd
 	}
+
+	if m.prompt != nil && m.mode == promptMode {
+		_, cmd := m.prompt.Update(msg)
+		if m.prompt.State != huh.StateNormal {
+			if m.prompt.GetBool("quit") || m.prompt.State == huh.StateAborted {
+				m.mode = normalMode
+				return m, QuitWithClearScreen()
+			}
+			// If the prompt was completed but not to quit, just reset the prompt
+			m.mode = normalMode
+			m.prompt = nil
+			m.updateHelpBindings()
+			// Send out message to panes to resize themselves to remove room for the prompt
+			m.PaneManager.Update(tea.WindowSizeMsg{
+				Height: m.viewHeight(),
+				Width:  m.viewWidth(),
+			})
+		}
+		return m, cmd
+	}
+
 	if keyMsg, ok := msg.(tea.KeyMsg); ok {
 		return m.handleKeyMsg(keyMsg)
 	}
@@ -278,21 +301,6 @@ func (m *Model) handleSpinnerTick(msg spinner.TickMsg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-// handlePrompt processes prompt messages
-func (m *Model) handlePrompt(msg *tui.PromptMsg) (tea.Model, tea.Cmd) {
-	// Enable prompt widget
-	m.mode = promptMode
-	var blink tea.Cmd
-	m.prompt, blink = tui.NewPrompt(msg, m.styles.PromptStyle)
-	// Send out message to panes to resize themselves to make room for the prompt above it.
-	slog.Debug("handlePrompt", "viewHeight", m.viewHeight())
-	_ = m.PaneManager.Update(tea.WindowSizeMsg{
-		Height: m.viewHeight(),
-		Width:  m.viewWidth(),
-	})
-	return m, blink
-}
-
 // handleStatusMsg processes status messages
 func (m *Model) handleStatusMsg(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmds []tea.Cmd
@@ -346,9 +354,6 @@ func (m *Model) handleWindowSize(msg tea.WindowSizeMsg) (tea.Model, tea.Cmd) {
 func (m *Model) handleBlink(msg cursor.BlinkMsg) (tea.Model, tea.Cmd) {
 	// Send blink message to prompt if in prompt mode otherwise forward it
 	// to the active pane to handle.
-	if m.mode == promptMode {
-		return m, m.prompt.HandleBlink(msg)
-	}
 	return m, m.FocusedModel().Update(msg)
 }
 
@@ -366,17 +371,7 @@ func (m *Model) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 	switch m.mode {
 	case promptMode:
-		closePrompt, cmd := m.prompt.HandleKey(msg)
-		if closePrompt {
-			// Send message to panes to resize themselves to expand back
-			// into space occupied by prompt.
-			m.mode = normalMode
-			_ = m.PaneManager.Update(tea.WindowSizeMsg{
-				Height: m.viewHeight(),
-				Width:  m.viewWidth(),
-			})
-		}
-		return m, cmd
+		// already handled in Update method above
 	case filterMode:
 		switch {
 		case key.Matches(msg, *m.keyMaps.filter.Blur):
@@ -406,11 +401,40 @@ func (m *Model) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if cmd != nil {
 			return m, cmd
 		}
-		// In normal mode, we let manageKey handle the key message.
-		return m.manageKey(msg)
+		// If still normal mode, we let manageKey handle the key message.
+		if m.mode == normalMode {
+			return m.manageKey(msg)
+		}
 	}
 
 	return m, nil
+}
+
+func (m *Model) handleQuitPrompt() tea.Cmd {
+	// Enable prompt widget
+	m.mode = promptMode
+	group := huh.NewGroup(
+		huh.NewConfirm().
+			Title("Quit Shell Command Bookmarker?").
+			Key("quit").
+			Affirmative("Yes!").
+			Negative("No.").
+			WithKeyMap(m.keyMaps.form),
+	)
+	m.prompt = huh.NewForm(group)
+	m.prompt.WithKeyMap(m.keyMaps.form)
+
+	m.updateHelpBindings()
+	// Send out message to panes to resize themselves to make room for the prompt above it.
+	slog.Debug("handlePrompt", "viewHeight", m.viewHeight())
+	var cmds []tea.Cmd
+	windowSizeMsg := tea.WindowSizeMsg{
+		Height: m.viewHeight(),
+		Width:  m.viewWidth(),
+	}
+	_, cmd := m.prompt.Update(windowSizeMsg)
+	cmds = append(cmds, cmd, m.PaneManager.Update(windowSizeMsg))
+	return tea.Batch(cmds...)
 }
 
 func (m *Model) manageKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
@@ -425,7 +449,8 @@ func (m *Model) manageKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 
 		// In normal mode, Ctrl+C prompts for confirmation before quitting
-		return m, tui.YesNoPrompt("Quit Shell Command Bookmarker?", true, QuitWithClearScreen())
+		cmd := m.handleQuitPrompt()
+		return m, cmd
 	case key.Matches(msg, *m.keyMaps.global.Help):
 		// '?' toggles help widget
 		m.helpModel.Toggle()
@@ -470,7 +495,9 @@ func (m *Model) View() string {
 
 	// Add prompt if in prompt mode.
 	if m.mode == promptMode {
-		components = append(components, m.prompt.View(m.width))
+		promptView := m.prompt.View()
+		lines := strings.Split(promptView, "\n")
+		components = append(components, lines[:len(lines)-2]...) // Exclude inlined help
 	}
 	// Add panes
 	components = append(components, lipgloss.NewStyle().
@@ -498,7 +525,7 @@ func (m *Model) updateHelpBindings() {
 		switch m.mode {
 		case promptMode:
 			// For prompt mode, just use a single set
-			m.helpModel.AddBindingSet("Prompt Controls", m.prompt.HelpBindings())
+			m.helpModel.AddBindingSet("Prompt Controls", keys.GetFormBindings())
 		case filterMode:
 			// For filter mode, just use a single set
 			m.helpModel.AddBindingSet("Filter Controls", keys.KeyMapToSlice(*m.keyMaps.filter))
@@ -529,7 +556,7 @@ func (m *Model) viewHeight() int {
 
 	// Subtract prompt height if in prompt mode
 	if m.mode == promptMode {
-		vh -= lipgloss.Height(m.prompt.View(m.width))
+		vh -= lipgloss.Height(m.prompt.View())
 	}
 
 	// Subtract help height if visible

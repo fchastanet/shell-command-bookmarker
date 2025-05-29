@@ -7,6 +7,7 @@ require (
 	github.com/atotto/clipboard v0.1.4
 	github.com/charmbracelet/bubbletea v1.3.4
 	github.com/charmbracelet/glamour v0.10.0
+	github.com/charmbracelet/huh v0.7.0
 	github.com/davecgh/go-spew v1.1.1
 	github.com/lithammer/fuzzysearch v1.1.8
 	golang.org/x/exp v0.0.0-20250408133849-7e4ce0ab07d0
@@ -15,13 +16,17 @@ require (
 require (
 	github.com/alecthomas/chroma/v2 v2.14.0 // indirect
 	github.com/aymerick/douceur v0.2.0 // indirect
+	github.com/catppuccin/go v0.3.0 // indirect
 	github.com/charmbracelet/colorprofile v0.2.3-0.20250311203215-f60798e515dc // indirect
 	github.com/charmbracelet/x/cellbuf v0.0.13 // indirect
 	github.com/charmbracelet/x/exp/slice v0.0.0-20250327172914-2fdc97757edf // indirect
+	github.com/charmbracelet/x/exp/strings v0.0.0-20240722160745-212f7b056ed0 // indirect
 	github.com/dlclark/regexp2 v1.11.0 // indirect
+	github.com/dustin/go-humanize v1.0.1 // indirect
 	github.com/gorilla/css v1.0.1 // indirect
 	github.com/kr/pretty v0.3.0 // indirect
 	github.com/microcosm-cc/bluemonday v1.0.27 // indirect
+	github.com/mitchellh/hashstructure/v2 v2.0.2 // indirect
 	github.com/muesli/reflow v0.3.0 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/xo/terminfo v0.0.0-20220910002029-abceb7e1c41e // indirect
