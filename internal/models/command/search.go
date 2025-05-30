@@ -47,7 +47,7 @@ func (m *search) Init() tea.Cmd {
 	return tea.Batch()
 }
 
-func (m *search) BeforeSwitchPane() tea.Cmd {
+func (*search) BeforeSwitchPane() tea.Cmd {
 	return nil
 }
 

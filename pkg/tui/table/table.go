@@ -196,7 +196,7 @@ func WithPreview[V resource.Identifiable](kind resource.Kind) Option[V] {
 	}
 }
 
-func (m *Model[V]) BeforeSwitchPane() tea.Cmd {
+func (*Model[V]) BeforeSwitchPane() tea.Cmd {
 	return nil
 }
 

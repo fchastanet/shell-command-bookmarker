@@ -200,7 +200,7 @@ type commandsList struct {
 	width     int
 }
 
-func (m *commandsList) BeforeSwitchPane() tea.Cmd {
+func (*commandsList) BeforeSwitchPane() tea.Cmd {
 	return nil
 }
 
