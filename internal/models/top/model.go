@@ -221,7 +221,7 @@ func (m *Model) dispatchMessage(msg tea.Msg) tea.Cmd {
 	}
 
 	if m.prompt != nil && m.mode == promptMode {
-		return m.dispatchPromptMessage(msg)
+		return m.handlePromptMode(msg)
 	}
 
 	if keyMsg, ok := msg.(tea.KeyMsg); ok {
@@ -234,7 +234,13 @@ func (m *Model) dispatchMessage(msg tea.Msg) tea.Cmd {
 	return nil
 }
 
-func (m *Model) dispatchPromptMessage(msg tea.Msg) tea.Cmd {
+func (m *Model) handlePromptMode(msg tea.Msg) tea.Cmd {
+	if keyMsg, ok := msg.(tea.KeyMsg); ok {
+		if key.Matches(keyMsg, *m.keyMaps.global.Help) {
+			m.displayHelp()
+			return nil
+		}
+	}
 	cmd := m.prompt.Update(msg)
 	if m.prompt.IsCompleted() {
 		// If the prompt was completed, just reset the prompt
@@ -454,15 +460,7 @@ func (m *Model) manageKey(msg tea.KeyMsg) tea.Cmd {
 		)
 		return cmd
 	case key.Matches(msg, *m.keyMaps.global.Help):
-		// '?' toggles help widget
-		m.helpModel.Toggle()
-		m.updateHelpBindings()
-		// Help widget takes up space so update panes' dimensions
-		slog.Debug("handleHelpToggle", "viewHeight", m.viewHeight())
-		m.PaneManager.Update(tea.WindowSizeMsg{
-			Height: m.viewHeight(),
-			Width:  m.viewWidth(),
-		})
+		m.displayHelp()
 	case key.Matches(msg, *m.keyMaps.tableAction.Filter):
 		// '/' enables filter mode if the current model indicates it
 		// supports it, which it does so by sending back a non-nil command.
@@ -481,6 +479,18 @@ func (m *Model) manageKey(msg tea.KeyMsg) tea.Cmd {
 	default:
 	}
 	return nil
+}
+
+func (m *Model) displayHelp() {
+	// '?' toggles help widget
+	m.helpModel.Toggle()
+	m.updateHelpBindings()
+	// Help widget takes up space so update panes' dimensions
+	slog.Debug("handleHelpToggle", "viewHeight", m.viewHeight())
+	m.PaneManager.Update(tea.WindowSizeMsg{
+		Height: m.viewHeight(),
+		Width:  m.viewWidth(),
+	})
 }
 
 func (m *Model) View() string {
