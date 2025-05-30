@@ -92,7 +92,7 @@ type Model struct {
 	styles     *styles.Styles
 	keyMaps    *KeyMaps
 
-	prompt *huh.Form
+	prompt *tui.YesNoPromptMsg
 
 	spinner     *spinner.Model
 	footerModel footer.Model
@@ -182,25 +182,28 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	// Use enhanced logging for better debugging
 	m.appService.LoggerService.EnhancedLogTeaMsg(msg)
 
-	return m.dispatchMessage(msg)
+	cmd := m.dispatchMessage(msg)
+	return m, cmd
 }
 
 // dispatchMessage routes messages to their appropriate handlers
 //
 //nolint:cyclop // not really complex
-func (m *Model) dispatchMessage(msg tea.Msg) (tea.Model, tea.Cmd) {
+func (m *Model) dispatchMessage(msg tea.Msg) tea.Cmd {
 	// First handle performance monitoring messages
 	if cmd := m.handlePerformanceMessages(msg); cmd != nil {
-		return m, cmd
+		return cmd
 	}
 
 	// Then handle other specific message types
 	switch msg := msg.(type) {
 	case QuitClearScreenMsg:
 		m.quitting = true
-		return m, tea.Quit
+		return tea.Quit
 	case spinner.TickMsg:
 		return m.handleSpinnerTick(msg)
+	case tui.YesNoPromptMsg:
+		return m.handleYesNoPrompt(msg)
 	case tui.ErrorMsg, tui.InfoMsg, MessageClearTickMsg:
 		return m.handleStatusMsg(msg)
 	case tea.WindowSizeMsg:
@@ -211,20 +214,16 @@ func (m *Model) dispatchMessage(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.handleBlink(msg)
 	case tui.MemoryStatsMsg:
 		m.handleMemoryStats(msg)
-		return m, tui.PerformanceMonitorTick(performanceMonitorInterval)
+		return tui.PerformanceMonitorTick(performanceMonitorInterval)
 	case structure.CommandSelectedForShellMsg:
 		cmd := m.handleCommandSelectedForShellMsg(msg)
-		return m, cmd
+		return cmd
 	}
 
 	if m.prompt != nil && m.mode == promptMode {
-		_, cmd := m.prompt.Update(msg)
-		if m.prompt.State != huh.StateNormal {
-			if m.prompt.GetBool("quit") || m.prompt.State == huh.StateAborted {
-				m.mode = normalMode
-				return m, QuitWithClearScreen()
-			}
-			// If the prompt was completed but not to quit, just reset the prompt
+		cmd := m.prompt.Update(msg)
+		if m.prompt.IsCompleted() {
+			// If the prompt was completed, just reset the prompt
 			m.mode = normalMode
 			m.prompt = nil
 			m.updateHelpBindings()
@@ -234,7 +233,7 @@ func (m *Model) dispatchMessage(msg tea.Msg) (tea.Model, tea.Cmd) {
 				Width:  m.viewWidth(),
 			})
 		}
-		return m, cmd
+		return cmd
 	}
 
 	if keyMsg, ok := msg.(tea.KeyMsg); ok {
@@ -242,9 +241,9 @@ func (m *Model) dispatchMessage(msg tea.Msg) (tea.Model, tea.Cmd) {
 	}
 	cmd := m.PaneManager.Update(msg)
 	if cmd != nil {
-		return m, cmd
+		return cmd
 	}
-	return m, nil
+	return nil
 }
 
 func (m *Model) handleCommandSelectedForShellMsg(msg structure.CommandSelectedForShellMsg) tea.Cmd {
@@ -258,7 +257,7 @@ func (m *Model) handleCommandSelectedForShellMsg(msg structure.CommandSelectedFo
 }
 
 // handleFocusPaneChangedMsg handles the pane focus change message
-func (m *Model) handleFocusPaneChangedMsg(msg tea.Msg) (tea.Model, tea.Cmd) {
+func (m *Model) handleFocusPaneChangedMsg(msg tea.Msg) tea.Cmd {
 	// Update the help bindings when the focused pane changes
 	m.updateHelpBindings()
 	// Send message to panes to resize themselves to make room for the prompt above it.
@@ -268,7 +267,7 @@ func (m *Model) handleFocusPaneChangedMsg(msg tea.Msg) (tea.Model, tea.Cmd) {
 		Width:  m.viewWidth(),
 	})
 	m.PaneManager.Update(msg)
-	return m, nil
+	return nil
 }
 
 // handlePerformanceMessages handles performance monitoring related messages
@@ -291,18 +290,18 @@ func (m *Model) handlePerformanceMessages(msg tea.Msg) tea.Cmd {
 }
 
 // handleSpinnerTick processes spinner tick messages
-func (m *Model) handleSpinnerTick(msg spinner.TickMsg) (tea.Model, tea.Cmd) {
+func (m *Model) handleSpinnerTick(msg spinner.TickMsg) tea.Cmd {
 	var cmd tea.Cmd
 	*m.spinner, cmd = m.spinner.Update(msg)
 	if m.spinning {
 		// Continue spinning spinner.
-		return m, cmd
+		return cmd
 	}
-	return m, nil
+	return nil
 }
 
 // handleStatusMsg processes status messages
-func (m *Model) handleStatusMsg(msg tea.Msg) (tea.Model, tea.Cmd) {
+func (m *Model) handleStatusMsg(msg tea.Msg) tea.Cmd {
 	var cmds []tea.Cmd
 
 	switch msg := msg.(type) {
@@ -324,9 +323,9 @@ func (m *Model) handleStatusMsg(msg tea.Msg) (tea.Model, tea.Cmd) {
 	}
 
 	if len(cmds) > 0 {
-		return m, tea.Batch(cmds...)
+		return tea.Batch(cmds...)
 	}
-	return m, nil
+	return nil
 }
 
 // scheduleClearMessage creates a tick command that triggers after the specified duration
@@ -337,24 +336,22 @@ func scheduleClearMessage(d time.Duration) tea.Cmd {
 }
 
 // handleWindowSize processes window size messages
-func (m *Model) handleWindowSize(msg tea.WindowSizeMsg) (tea.Model, tea.Cmd) {
+func (m *Model) handleWindowSize(msg tea.WindowSizeMsg) tea.Cmd {
 	m.width = msg.Width
 	m.height = msg.Height
 	m.helpModel.SetWidth(m.width)
 	m.footerModel.SetWidth(m.width)
 	m.headerModel.SetWidth(m.width) // Set the header width
 	slog.Debug("handleWindowSize", "viewHeight", m.viewHeight())
-	return m, m.PaneManager.Update(tea.WindowSizeMsg{
+	return m.PaneManager.Update(tea.WindowSizeMsg{
 		Height: m.viewHeight(),
 		Width:  m.viewWidth(),
 	})
 }
 
 // handleBlink processes cursor blink messages
-func (m *Model) handleBlink(msg cursor.BlinkMsg) (tea.Model, tea.Cmd) {
-	// Send blink message to prompt if in prompt mode otherwise forward it
-	// to the active pane to handle.
-	return m, m.FocusedModel().Update(msg)
+func (m *Model) handleBlink(msg cursor.BlinkMsg) tea.Cmd {
+	return m.FocusedModel().Update(msg)
 }
 
 // handleMemoryStats processes and displays memory statistics
@@ -366,7 +363,7 @@ func (m *Model) handleMemoryStats(msg tui.MemoryStatsMsg) {
 }
 
 // handleKeyMsg processes key messages
-func (m *Model) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m *Model) handleKeyMsg(msg tea.KeyMsg) tea.Cmd {
 	var cmd tea.Cmd
 
 	switch m.mode {
@@ -379,7 +376,7 @@ func (m *Model) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			// to blur the filter widget
 			m.mode = normalMode
 			cmd = m.FocusedModel().Update(tui.FilterBlurMsg{})
-			return m, cmd
+			return cmd
 		case key.Matches(msg, *m.keyMaps.filter.Close):
 			// Switch back to normal mode, and send message to current model
 			// to close the filter widget
@@ -387,19 +384,19 @@ func (m *Model) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			closeMsg := tui.FilterCloseMsg{}
 			cmd = m.FocusedModel().Update(closeMsg)
 			if cmd == nil {
-				return m, FilterClosed
+				return FilterClosed
 			}
-			return m, cmd
+			return cmd
 		default:
 			// Wrap key message in a filter key message and send to current
 			// model.
 			cmd = m.FocusedModel().Update(tui.FilterKeyMsg(msg))
-			return m, cmd
+			return cmd
 		}
 	case normalMode:
 		cmd := m.PaneManager.Update(msg)
 		if cmd != nil {
-			return m, cmd
+			return cmd
 		}
 		// If still normal mode, we let manageKey handle the key message.
 		if m.mode == normalMode {
@@ -407,37 +404,30 @@ func (m *Model) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 	}
 
-	return m, nil
+	return nil
 }
 
-func (m *Model) handleQuitPrompt() tea.Cmd {
-	// Enable prompt widget
+func (m *Model) handleYesNoPrompt(promptMsg tui.YesNoPromptMsg) tea.Cmd {
+	var cmds []tea.Cmd
 	m.mode = promptMode
-	group := huh.NewGroup(
-		huh.NewConfirm().
-			Title("Quit Shell Command Bookmarker?").
-			Key("quit").
-			Affirmative("Yes!").
-			Negative("No.").
-			WithKeyMap(m.keyMaps.form),
-	)
-	m.prompt = huh.NewForm(group)
-	m.prompt.WithKeyMap(m.keyMaps.form)
+	m.prompt = &promptMsg
 
+	cmds = append(cmds, m.prompt.Init())
 	m.updateHelpBindings()
 	// Send out message to panes to resize themselves to make room for the prompt above it.
-	slog.Debug("handlePrompt", "viewHeight", m.viewHeight())
-	var cmds []tea.Cmd
 	windowSizeMsg := tea.WindowSizeMsg{
 		Height: m.viewHeight(),
 		Width:  m.viewWidth(),
 	}
-	_, cmd := m.prompt.Update(windowSizeMsg)
-	cmds = append(cmds, cmd, m.PaneManager.Update(windowSizeMsg))
+	cmds = append(
+		cmds,
+		m.prompt.Update(windowSizeMsg),
+		m.PaneManager.Update(windowSizeMsg),
+	)
 	return tea.Batch(cmds...)
 }
 
-func (m *Model) manageKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m *Model) manageKey(msg tea.KeyMsg) tea.Cmd {
 	var cmd tea.Cmd
 
 	switch {
@@ -445,12 +435,20 @@ func (m *Model) manageKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		// In shell selection mode (with output-file parameter), Ctrl+C should exit immediately without confirmation
 		if m.appService.IsShellSelectionMode() {
 			m.quitting = true
-			return m, QuitWithClearScreen()
+			return QuitWithClearScreen()
 		}
 
 		// In normal mode, Ctrl+C prompts for confirmation before quitting
-		cmd := m.handleQuitPrompt()
-		return m, cmd
+		cmd := tui.YesNoPrompt(
+			"Quit Shell Command Bookmarker?",
+			keys.GetFormKeyMap(),
+			func() tea.Cmd {
+				m.quitting = true
+				m.mode = normalMode
+				return QuitWithClearScreen()
+			},
+		)
+		return cmd
 	case key.Matches(msg, *m.keyMaps.global.Help):
 		// '?' toggles help widget
 		m.helpModel.Toggle()
@@ -467,18 +465,18 @@ func (m *Model) manageKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if cmd = m.FocusedModel().Update(tui.FilterFocusReqMsg{}); cmd != nil {
 			m.mode = filterMode
 		}
-		return m, cmd
+		return cmd
 	case key.Matches(msg, *m.keyMaps.global.Debug):
 		// ctrl+d shows memory stats for debugging performance
 		if m.perfMonitorActive {
-			return m, tui.StopPerformanceMonitor()
+			return tui.StopPerformanceMonitor()
 		}
-		return m, tui.StartPerformanceMonitor(performanceMonitorInterval)
+		return tui.StartPerformanceMonitor(performanceMonitorInterval)
 	case key.Matches(msg, *m.keyMaps.global.Search):
-		return m, models.NavigateTo(structure.SearchKind, structure.WithPosition(structure.LeftPane))
+		return models.NavigateTo(structure.SearchKind, structure.WithPosition(structure.LeftPane))
 	default:
 	}
-	return m, nil
+	return nil
 }
 
 func (m *Model) View() string {
@@ -495,9 +493,7 @@ func (m *Model) View() string {
 
 	// Add prompt if in prompt mode.
 	if m.mode == promptMode {
-		promptView := m.prompt.View()
-		lines := strings.Split(promptView, "\n")
-		components = append(components, lines[:len(lines)-2]...) // Exclude inlined help
+		components = append(components, m.prompt.View())
 	}
 	// Add panes
 	components = append(components, lipgloss.NewStyle().

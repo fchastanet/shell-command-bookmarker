@@ -1,59 +1,66 @@
 package tui
 
 import (
-	"github.com/charmbracelet/bubbles/key"
+	"strings"
+
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
+	"github.com/charmbracelet/huh"
 )
 
-// PromptMsg enables the prompt widget.
-type PromptMsg struct {
-	// Action to carry out when key is pressed.
-	Action PromptAction
-	// Key that when pressed triggers the action and closes the prompt.
-	Key *key.Binding
-	// Cancel is a key that when pressed skips the action and closes the prompt.
-	Cancel *key.Binding
-	// Prompt to display to the user.
-	Prompt string
-	// Set initial value for the user to edit.
-	InitialValue string
-	// Set placeholder text in prompt
-	Placeholder string
-	// CancelAnyOther, if true, checks if any key other than that specified in
-	// Key is pressed. If so then the action is skipped and the prompt is
-	// closed. Overrides Cancel key binding.
-	CancelAnyOther bool
+// YesNoPromptMsg enables the prompt widget.
+type YesNoPromptMsg struct {
+	form      *huh.Form
+	yesAction PromptAction
 }
 
-type PromptAction func(text string) tea.Cmd
-
-type PromptStyle struct {
-	ThickBorder *lipgloss.Style
-	Regular     *lipgloss.Style
-	PlaceHolder *lipgloss.Style
-	Height      int
-}
+type PromptAction func() tea.Cmd
 
 // YesNoPrompt sends a message to enable the prompt widget, specifically
 // asking the user for a yes/no answer. If yes is given then the action is
 // invoked.
-func YesNoPrompt(prompt string, quit bool, action tea.Cmd) tea.Cmd {
-	cancel := key.NewBinding(key.WithKeys("n", "N"))
-	yes := key.NewBinding(key.WithKeys("y", "Y"), key.WithHelp("y", "confirm"))
-	if quit {
-		yes = key.NewBinding(key.WithKeys("y", "Y", "ctrl+c"), key.WithHelp("y/ctrl+c", "confirm and quit"))
-	}
-
-	return CmdHandler(PromptMsg{
-		Prompt:         prompt + " (y/N): ",
-		InitialValue:   "",
-		Placeholder:    "",
-		Cancel:         &cancel,
-		CancelAnyOther: true,
-		Action: func(_ string) tea.Cmd {
-			return action
-		},
-		Key: &yes,
+func YesNoPrompt(
+	prompt string,
+	keyMap *huh.KeyMap,
+	yesAction PromptAction,
+) tea.Cmd {
+	group := huh.NewGroup(
+		huh.NewConfirm().
+			Title(prompt).
+			Key("confirmKey").
+			Affirmative("Yes!").
+			Negative("No."),
+	)
+	form := huh.NewForm(group)
+	form.WithKeyMap(keyMap)
+	return CmdHandler(YesNoPromptMsg{
+		form:      form,
+		yesAction: yesAction,
 	})
+}
+
+func (m YesNoPromptMsg) IsCompleted() bool {
+	return m.form.State != huh.StateNormal
+}
+
+func (m YesNoPromptMsg) Init() tea.Cmd {
+	return m.form.Init()
+}
+
+func (m YesNoPromptMsg) Update(msg tea.Msg) tea.Cmd {
+	var cmds []tea.Cmd
+	_, cmd := m.form.Update(msg)
+	cmds = append(cmds, cmd)
+	if m.form.State != huh.StateNormal {
+		if m.form.GetBool("confirmKey") || m.form.State == huh.StateAborted {
+			cmds = append(cmds, m.yesAction())
+		}
+	}
+	return tea.Batch(cmds...)
+}
+
+func (m YesNoPromptMsg) View() string {
+	formView := m.form.View()
+	// Exclude inlined help
+	lines := strings.Split(formView, "\n")
+	return strings.Join(lines[:len(lines)-2], "\n")
 }

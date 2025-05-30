@@ -42,7 +42,7 @@ func (m *search) Init() tea.Cmd {
 	model.Prompt = "Search: "
 	model.SetValue("")
 	model.Placeholder = ""
-	model.PlaceholderStyle = *m.Styles.PromptStyle.PlaceHolder
+	model.PlaceholderStyle = *m.Styles.PlaceHolder
 	m.model = &model
 	return tea.Batch()
 }
