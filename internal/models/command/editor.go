@@ -90,6 +90,10 @@ type commandEditor struct {
 	initialized   bool
 }
 
+func (m *commandEditor) BeforeSwitchPane() tea.Cmd {
+	return m.confirmAbandonChanges()
+}
+
 func (m *commandEditor) getCommand(commandID resource.ID) (*dbmodels.Command, error) {
 	// Load the command from the database
 	command, err := m.DBService.GetCommandByID(commandID)

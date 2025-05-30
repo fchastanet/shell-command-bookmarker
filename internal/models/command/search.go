@@ -47,6 +47,10 @@ func (m *search) Init() tea.Cmd {
 	return tea.Batch()
 }
 
+func (m *search) BeforeSwitchPane() tea.Cmd {
+	return nil
+}
+
 func (m *search) Update(msg tea.Msg) tea.Cmd {
 	var cmds []tea.Cmd
 

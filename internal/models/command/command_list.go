@@ -200,6 +200,10 @@ type commandsList struct {
 	width     int
 }
 
+func (m *commandsList) BeforeSwitchPane() tea.Cmd {
+	return nil
+}
+
 func (m *commandsList) getColumns(width int) []table.Column {
 	slog.Debug("getColumns", "width", width)
 	const columnsCount = 5

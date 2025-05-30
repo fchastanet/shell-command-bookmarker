@@ -45,6 +45,9 @@ func (e *ErrMakePageEmptyModel) Error() string {
 }
 
 func GetFocusedPaneChangedCmd(from, to structure.Position) tea.Cmd {
+	if from == to {
+		return nil
+	}
 	return func() tea.Msg {
 		return structure.FocusedPaneChangedMsg{From: from, To: to}
 	}
@@ -283,27 +286,24 @@ func (p *PaneManager) handleGrowPaneHeight() tea.Cmd {
 }
 
 func (p *PaneManager) handleSwitchPane(back bool) tea.Cmd {
-	fromPos := p.focused
-	p.cycleFocusedPane(back)
-	return GetFocusedPaneChangedCmd(fromPos, p.focused)
+	return p.cycleFocusedPane(back)
 }
 
 func (p *PaneManager) handleFocusPane(position structure.Position) tea.Cmd {
-	fromPos := p.focused
-	p.focusPane(position)
-	return GetFocusedPaneChangedCmd(fromPos, p.focused)
+	return p.focusPane(position)
 }
 
 func (p *PaneManager) setBottomPane(rowID resource.ID, focusIfSameRowID bool) tea.Cmd {
 	// Handle row default action by opening the editor in the bottom right pane
 	bottomPane := p.panes[structure.BottomPane]
 	if bottomPane.page.ID == rowID {
+		var cmd tea.Cmd
 		// The bottom right pane is already showing the editor for this command
 		// so just bring it into focus.
 		if focusIfSameRowID {
-			p.focusPane(structure.BottomPane)
+			cmd = p.focusPane(structure.BottomPane)
 		}
-		return GetFocusedPaneChangedCmd(structure.TopPane, p.focused)
+		return cmd
 	}
 	return p.setPane(
 		structure.NavigationMsg{
@@ -328,7 +328,7 @@ func (p *PaneManager) FocusedPosition() structure.Position {
 
 // cycleFocusedPane makes the next pane the focused pane. If last is true then the
 // previous pane is made the focused pane.
-func (p *PaneManager) cycleFocusedPane(last bool) {
+func (p *PaneManager) cycleFocusedPane(last bool) tea.Cmd {
 	positions := maps.Keys(p.panes)
 	slices.Sort(positions)
 	var focusedIndex int
@@ -346,18 +346,16 @@ func (p *PaneManager) cycleFocusedPane(last bool) {
 	} else {
 		newFocusedIndex = (focusedIndex + 1) % len(positions)
 	}
-	p.focusPane(positions[newFocusedIndex])
+	return p.focusPane(positions[newFocusedIndex])
 }
 
 func (p *PaneManager) closeFocusedPane() tea.Cmd {
 	if len(p.panes) == 1 {
 		return tui.ReportError(ErrCannotCloseLastPane)
 	}
-	fromPos := p.focused
 	delete(p.panes, p.focused)
 	p.updateChildSizes()
-	p.cycleFocusedPane(false)
-	return GetFocusedPaneChangedCmd(fromPos, p.focused)
+	return p.cycleFocusedPane(false)
 }
 
 func (p *PaneManager) updateLeftWidth(delta int) {
@@ -436,13 +434,12 @@ func (p *PaneManager) makeModel(msg structure.NavigationMsg) (structure.ChildMod
 
 func (p *PaneManager) setPane(msg structure.NavigationMsg) (cmd tea.Cmd) {
 	var cmds []tea.Cmd
-	oldPos := p.focused
 	if pane, ok := p.panes[msg.Position]; ok && pane.page == msg.Page {
 		// Pane is already showing requested page, so just bring it into focus.
 		if !msg.DisableFocus {
-			p.focusPane(msg.Position)
+			cmds = append(cmds, p.focusPane(msg.Position))
 		}
-		return GetFocusedPaneChangedCmd(oldPos, p.focused)
+		return tea.Batch(cmds...)
 	}
 	model := p.cache.Get(msg.Page)
 	if model == nil {
@@ -454,7 +451,7 @@ func (p *PaneManager) setPane(msg structure.NavigationMsg) (cmd tea.Cmd) {
 		p.cache.Put(msg.Page, model)
 		cmds = append(cmds, model.Init())
 	} else {
-		model.Update(msg)
+		cmds = append(cmds, model.Update(msg))
 	}
 	p.panes[msg.Position] = pane{
 		model: model,
@@ -466,21 +463,29 @@ func (p *PaneManager) setPane(msg structure.NavigationMsg) (cmd tea.Cmd) {
 	}
 	p.updateChildSizes()
 	if !msg.DisableFocus {
-		p.focusPane(msg.Position)
-	}
-	if oldPos != p.focused {
-		// If same focused pane has changed, no need to notify about it.
-		cmds = append(cmds, GetFocusedPaneChangedCmd(oldPos, p.focused))
+		cmds = append(cmds, p.focusPane(msg.Position))
 	}
 	return tea.Batch(cmds...)
 }
 
-func (p *PaneManager) focusPane(position structure.Position) {
+func (p *PaneManager) focusPane(position structure.Position) tea.Cmd {
+	fromPos := p.focused
+	if position == fromPos {
+		// Already focused on the requested pane
+		return nil
+	}
 	if _, ok := p.panes[position]; !ok {
 		// There is no pane to focus at requested position
-		return
+		return nil
+	}
+	if _, ok := p.panes[fromPos]; ok {
+		cmd := p.panes[fromPos].model.BeforeSwitchPane()
+		if cmd != nil {
+			return cmd
+		}
 	}
 	p.focused = position
+	return GetFocusedPaneChangedCmd(fromPos, p.focused)
 }
 
 func (p *PaneManager) paneWidth(position structure.Position) int {

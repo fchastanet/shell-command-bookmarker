@@ -196,6 +196,10 @@ func WithPreview[V resource.Identifiable](kind resource.Kind) Option[V] {
 	}
 }
 
+func (m *Model[V]) BeforeSwitchPane() tea.Cmd {
+	return nil
+}
+
 func (m *Model[V]) IsFocused() bool {
 	return m.focused
 }
