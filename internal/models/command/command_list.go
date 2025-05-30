@@ -329,28 +329,32 @@ func (m *commandsList) handleDeleteRow(msg table.RowDeleteActionMsg[*dbmodels.Co
 	)
 
 	// Pass our wrapper function as the action to YesNoPrompt
-	return tui.YesNoPrompt(confirmMessage, keys.GetFormKeyMap(), func() tea.Cmd {
-		nextRowID := m.Model.GetNextRowIDRelativeToCurrentRow()
-		// Mark the command as deleted in the database
-		originalStatus := cmd.Status
-		cmd.Status = dbmodels.CommandStatusDeleted
-		err := m.DBService.UpdateCommand(cmd)
-		if err != nil {
-			slog.Error("Error marking command as deleted", "error", err, "id", cmd.GetID())
-			// Revert status change if update fails
-			cmd.Status = originalStatus
-			return tui.ReportError(fmt.Errorf("failed to mark command as deleted: %w", err))
-		}
+	return tui.YesNoPrompt(
+		confirmMessage,
+		keys.GetFormKeyMap(),
+		func() tea.Cmd {
+			nextRowID := m.Model.GetNextRowIDRelativeToCurrentRow()
+			// Mark the command as deleted in the database
+			originalStatus := cmd.Status
+			cmd.Status = dbmodels.CommandStatusDeleted
+			err := m.DBService.UpdateCommand(cmd)
+			if err != nil {
+				slog.Error("Error marking command as deleted", "error", err, "id", cmd.GetID())
+				// Revert status change if update fails
+				cmd.Status = originalStatus
+				return tui.ReportError(fmt.Errorf("failed to mark command as deleted: %w", err))
+			}
 
-		// Return a message that will trigger the reload
-		infoMsg := tui.InfoMsg(fmt.Sprintf(
-			"Command #%d marked as deleted", cmd.GetID(),
-		))
-		return tui.CmdHandler(table.ReloadMsg[*dbmodels.Command]{
-			RowID:   nextRowID,
-			InfoMsg: &infoMsg,
-		})
-	})
+			// Return a message that will trigger the reload
+			infoMsg := tui.InfoMsg(fmt.Sprintf(
+				"Command #%d marked as deleted", cmd.GetID(),
+			))
+			return tui.CmdHandler(table.ReloadMsg[*dbmodels.Command]{
+				RowID:   nextRowID,
+				InfoMsg: &infoMsg,
+			})
+		},
+	)
 }
 
 func (m *commandsList) handleKeyMsg(msg tea.KeyMsg) (cmd tea.Cmd, forward bool) {

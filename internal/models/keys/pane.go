@@ -14,7 +14,6 @@ type PaneNavigationKeyMap struct {
 	GrowPaneHeight   *key.Binding
 	ShrinkPaneWidth  *key.Binding
 	GrowPaneWidth    *key.Binding
-	ClosePane        *key.Binding
 }
 
 // Navigation returns key bindings for navigation.
@@ -38,10 +37,6 @@ func GetPaneNavigationKeyMap() *PaneNavigationKeyMap {
 	leftPane := key.NewBinding(
 		key.WithKeys("alt+3", "alt+\""),
 		key.WithHelp("Alt+3/Alt+\"", "left pane"),
-	)
-	closePane := key.NewBinding(
-		key.WithKeys("alt+X", "alt+x"),
-		key.WithHelp("Alt+x", "close pane"),
 	)
 	shrinkPaneHeight := key.NewBinding(
 		key.WithKeys("alt+up"),
@@ -70,6 +65,5 @@ func GetPaneNavigationKeyMap() *PaneNavigationKeyMap {
 		GrowPaneHeight:   &growPaneHeight,
 		ShrinkPaneWidth:  &shrinkPaneWidth,
 		GrowPaneWidth:    &growPaneWidth,
-		ClosePane:        &closePane,
 	}
 }

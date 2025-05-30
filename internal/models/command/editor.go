@@ -256,7 +256,7 @@ func (m *commandEditor) handleKeyMsg(msg tea.KeyMsg) tea.Cmd {
 	case key.Matches(msg, *m.EditorKeyMap.Save):
 		return m.save()
 	case key.Matches(msg, *m.EditorKeyMap.Cancel):
-		return m.cancel()
+		return m.confirmAbandonChanges()
 	}
 
 	return tea.Batch(cmds...)
@@ -309,7 +309,7 @@ func (m *commandEditor) addCommonElements(content *strings.Builder) {
 	content.WriteString(title + "\n\n")
 
 	// Labels for our fields
-	labels := []string{"Title:", "Description:", "Script:"}
+	labels := []string{"Title:", "Description(markdown):", "Script:"}
 
 	// Render each field with its label
 	for i, label := range labels {
@@ -418,6 +418,22 @@ func (m *commandEditor) generateScrollbar(contentStr, visibleContent string) str
 	)
 }
 
+func (m *commandEditor) confirmAbandonChanges() tea.Cmd {
+	// If no changes are made, just return
+	if !m.EditionInProgress() {
+		return nil
+	}
+
+	// Prompt the user for confirmation
+	return tui.YesNoPrompt(
+		fmt.Sprintf("Abandon changes for command #%d?", m.command.ID),
+		keys.GetFormKeyMap(),
+		func() tea.Cmd {
+			return m.cancel()
+		},
+	)
+}
+
 // nextField focuses the next field
 func (m *commandEditor) nextField() tea.Cmd {
 	if m.focused >= 0 {
@@ -426,7 +442,7 @@ func (m *commandEditor) nextField() tea.Cmd {
 	if m.focused == len(m.inputs)-1 {
 		m.focused = -1
 		m.initInputs()
-		return nil
+		return m.confirmAbandonChanges()
 	}
 
 	m.focused = (m.focused + 1) % len(m.inputs)
@@ -444,7 +460,7 @@ func (m *commandEditor) prevField() tea.Cmd {
 	case -1:
 		m.focused = len(m.inputs) - 1
 		m.initInputs()
-		return nil
+		return m.confirmAbandonChanges()
 	case 0:
 		m.focused = -1
 	default:
@@ -518,10 +534,22 @@ type EditorCancelledMsg struct{}
 
 // cancel returns from the editor without saving
 func (m *commandEditor) cancel() tea.Cmd {
+	m.revertChanges()
+	infoMsg := tui.InfoMsg(fmt.Sprintf("Abandoned changes for command #%d", m.command.ID))
 	return tea.Batch(
-		tui.ReportInfo("Edit cancelled for command #%d", m.command.ID),
 		tui.CmdHandler(EditorCancelledMsg{}),
+		tui.CmdHandler(table.ReloadMsg[*dbmodels.Command]{
+			RowID:   m.command.ID,
+			InfoMsg: &infoMsg,
+		}),
 	)
+}
+
+func (m *commandEditor) revertChanges() {
+	// Revert changes to the original command state
+	m.inputs[0].SetValue(m.command.Title)
+	m.inputs[1].SetValue(m.command.Description)
+	m.inputs[2].SetValue(m.command.Script)
 }
 
 // BorderText returns text to display in the border

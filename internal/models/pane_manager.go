@@ -215,11 +215,6 @@ func (p *PaneManager) updateUnfocusedPanes(msg tea.Msg) []tea.Cmd {
 }
 
 func (p *PaneManager) handleKeyEvent(keyMsg tea.KeyMsg) tea.Cmd {
-	// Handle close pane action separately
-	if key.Matches(keyMsg, *p.paneKeyMap.ClosePane) {
-		return p.closeFocusedPane()
-	}
-
 	// Handle pane resize operations
 	if cmd := p.handleResizeKeys(keyMsg); cmd != nil {
 		return cmd
@@ -601,10 +596,6 @@ func (p *PaneManager) addResizingBindings(bindings *[]*key.Binding, bottomPanePr
 }
 
 func (p *PaneManager) addNavigationBindings(bindings *[]*key.Binding, bottomPanePresent, topPanePresent bool) {
-	if p.focused != structure.TopPane && (bottomPanePresent || p.isPanePresent(structure.LeftPane)) {
-		*bindings = append(*bindings, p.paneKeyMap.ClosePane)
-	}
-
 	if p.focused == structure.TopPane && bottomPanePresent {
 		*bindings = append(*bindings, p.paneKeyMap.SwitchBottomPane)
 	} else if p.focused != structure.TopPane && topPanePresent {
