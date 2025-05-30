@@ -26,3 +26,11 @@ type ComposeInsufficientCommandsProvidedError struct {
 func (e *ComposeInsufficientCommandsProvidedError) Error() string {
 	return "Please select at least 1 command to compose a new command"
 }
+
+type InvalidTerminalError struct {
+	Err error
+}
+
+func (e *InvalidTerminalError) Error() string {
+	return "invalid terminal error"
+}

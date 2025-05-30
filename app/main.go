@@ -12,6 +12,7 @@ import (
 	"github.com/fchastanet/shell-command-bookmarker/internal/models/styles"
 	"github.com/fchastanet/shell-command-bookmarker/internal/models/top"
 	"github.com/fchastanet/shell-command-bookmarker/internal/services"
+	"github.com/mattn/go-isatty"
 
 	// Import for side effects
 	_ "embed"
@@ -29,6 +30,11 @@ func main() {
 }
 
 func mainImpl() error {
+	if !isatty.IsTerminal(os.Stdout.Fd()) || isatty.IsCygwinTerminal(os.Stdout.Fd()) {
+		slog.Error("This program requires a terminal to run. Please run it in a terminal emulator.")
+		return &services.InvalidTerminalError{}
+	}
+
 	var cli args.Cli
 	err := args.ParseArgs(&cli)
 	if err != nil {
