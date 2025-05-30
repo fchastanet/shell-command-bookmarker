@@ -102,8 +102,8 @@ func (mm *ListMaker) Make(_ resource.ID, width, height int) (structure.ChildMode
 	renderer := func(cmd *dbmodels.Command) table.RenderedRow {
 		return mm.renderRow(cmd, m)
 	}
-	cellRenderer := func(_ *dbmodels.Command, cellContent string, colIndex int, rowsEdited bool) string {
-		if rowsEdited && colIndex == indexColumnStatus {
+	cellRenderer := func(_ *dbmodels.Command, cellContent string, colIndex int, rowEdited bool) string {
+		if rowEdited && colIndex == indexColumnStatus {
 			cellContent = m.styles.TableStyle.CellEdited.Render("Edited")
 		}
 		return cellContent
@@ -198,6 +198,10 @@ type commandsList struct {
 	reloading bool
 	height    int
 	width     int
+}
+
+func (*commandsList) BeforeSwitchPane() tea.Cmd {
+	return nil
 }
 
 func (m *commandsList) getColumns(width int) []table.Column {
@@ -320,32 +324,41 @@ func (m *commandsList) handleDeleteRow(msg table.RowDeleteActionMsg[*dbmodels.Co
 	if cmd == nil {
 		return nil
 	}
-
-	confirmMessage := fmt.Sprintf("Delete command #%d: %s?", cmd.GetID(), cmd.Title)
+	const maxCmdDetailsLength = 50
+	cmdDetails := cmd.GetSingleLineDescription(maxCmdDetailsLength)
+	confirmMessage := fmt.Sprintf(
+		"Delete command #%d: %s?",
+		cmd.GetID(),
+		cmdDetails,
+	)
 
 	// Pass our wrapper function as the action to YesNoPrompt
-	return tui.YesNoPrompt(confirmMessage, false, func() tea.Msg {
-		nextRowID := m.Model.GetNextRowIDRelativeToCurrentRow()
-		// Mark the command as deleted in the database
-		originalStatus := cmd.Status
-		cmd.Status = dbmodels.CommandStatusDeleted
-		err := m.DBService.UpdateCommand(cmd)
-		if err != nil {
-			slog.Error("Error marking command as deleted", "error", err, "id", cmd.GetID())
-			// Revert status change if update fails
-			cmd.Status = originalStatus
-			return tui.ErrorMsg(fmt.Errorf("failed to mark command as deleted: %w", err))
-		}
+	return tui.YesNoPrompt(
+		confirmMessage,
+		keys.GetFormKeyMap(),
+		func() tea.Cmd {
+			nextRowID := m.Model.GetNextRowIDRelativeToCurrentRow()
+			// Mark the command as deleted in the database
+			originalStatus := cmd.Status
+			cmd.Status = dbmodels.CommandStatusDeleted
+			err := m.DBService.UpdateCommand(cmd)
+			if err != nil {
+				slog.Error("Error marking command as deleted", "error", err, "id", cmd.GetID())
+				// Revert status change if update fails
+				cmd.Status = originalStatus
+				return tui.ReportError(fmt.Errorf("failed to mark command as deleted: %w", err))
+			}
 
-		// Return a message that will trigger the reload
-		infoMsg := tui.InfoMsg(fmt.Sprintf(
-			"Command #%d marked as deleted", cmd.GetID(),
-		))
-		return table.ReloadMsg[*dbmodels.Command]{
-			RowID:   nextRowID,
-			InfoMsg: &infoMsg,
-		}
-	})
+			// Return a message that will trigger the reload
+			infoMsg := tui.InfoMsg(fmt.Sprintf(
+				"Command #%d marked as deleted", cmd.GetID(),
+			))
+			return tui.CmdHandler(table.ReloadMsg[*dbmodels.Command]{
+				RowID:   nextRowID,
+				InfoMsg: &infoMsg,
+			})
+		},
+	)
 }
 
 func (m *commandsList) handleKeyMsg(msg tea.KeyMsg) (cmd tea.Cmd, forward bool) {

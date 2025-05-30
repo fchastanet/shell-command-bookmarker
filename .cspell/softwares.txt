@@ -1,5 +1,6 @@
 actionlint
 apdisk
+bluemonday
 checkstyle
 cobertura
 codespell
@@ -13,6 +14,7 @@ github
 gitleaks
 gofmt
 Gofmt
+goldmark
 golint
 goplantuml
 gtpl

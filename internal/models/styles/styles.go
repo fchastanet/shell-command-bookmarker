@@ -12,11 +12,11 @@ import (
 type Styles struct {
 	TableStyle     *table.Style
 	PaneStyle      *PaneStyle
+	PlaceHolder    *lipgloss.Style
 	HelpStyle      *HelpStyle
 	FooterStyle    *FooterStyle
 	HeaderStyle    *HeaderStyle
 	WindowStyle    *WindowStyle
-	PromptStyle    *tui.PromptStyle
 	EditorStyle    *EditorStyle
 	ScrollbarStyle *tui.ScrollbarStyle
 	// ColorTheme is the color theme used in the application.
@@ -105,10 +105,10 @@ func NewStyles() *Styles {
 		FooterStyle:    nil,
 		HeaderStyle:    nil,
 		WindowStyle:    nil,
-		PromptStyle:    nil,
 		EditorStyle:    nil,
 		ScrollbarStyle: nil,
 		ColorTheme:     nil,
+		PlaceHolder:    nil,
 	}
 
 	// Initialize color theme
@@ -132,12 +132,6 @@ func (s *Styles) initBaseStyles(colorTheme *ColorTheme) {
 	// Setup base styles
 	regular := lipgloss.NewStyle()
 	padded := regular.Padding(0, PaddingSmall)
-
-	thickBorder := regular.
-		Border(lipgloss.ThickBorder()).
-		BorderForeground(colors.Violet).
-		BorderForeground(colors.Red).
-		Padding(0, PaddingSmall)
 
 	footerInline := regular.Inline(true)
 	headerInline := regular.Inline(true)
@@ -164,15 +158,6 @@ func (s *Styles) initBaseStyles(colorTheme *ColorTheme) {
 		HighlightColor: highlightColor,
 	}
 
-	// Initialize prompt style
-	placeholder := lipgloss.NewStyle().Faint(true)
-	s.PromptStyle = &tui.PromptStyle{
-		ThickBorder: &thickBorder,
-		Regular:     &regular,
-		PlaceHolder: &placeholder,
-		Height:      HeightPrompt,
-	}
-
 	// Initialize pane style
 	s.PaneStyle = &PaneStyle{
 		DefaultLeftPaneWidth:  WidthLeftPane,
@@ -187,6 +172,9 @@ func (s *Styles) initBaseStyles(colorTheme *ColorTheme) {
 		TopBorder:             &topBorder,
 		BordersWidth:          BordersWidth,
 	}
+
+	placeHolder := lipgloss.NewStyle().Faint(true)
+	s.PlaceHolder = &placeHolder
 
 	// Initialize footer style
 	footerDefaultStyle := padded.Foreground(colors.Black).Background(colors.EvenLighterGrey)

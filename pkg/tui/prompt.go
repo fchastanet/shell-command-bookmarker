@@ -1,144 +1,66 @@
 package tui
 
 import (
-	"github.com/charmbracelet/bubbles/key"
-	"github.com/charmbracelet/bubbles/textinput"
+	"strings"
+
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
+	"github.com/charmbracelet/huh"
 )
 
-// PromptMsg enables the prompt widget.
-type PromptMsg struct {
-	// Action to carry out when key is pressed.
-	Action PromptAction
-	// Key that when pressed triggers the action and closes the prompt.
-	Key *key.Binding
-	// Cancel is a key that when pressed skips the action and closes the prompt.
-	Cancel *key.Binding
-	// Prompt to display to the user.
-	Prompt string
-	// Set initial value for the user to edit.
-	InitialValue string
-	// Set placeholder text in prompt
-	Placeholder string
-	// CancelAnyOther, if true, checks if any key other than that specified in
-	// Key is pressed. If so then the action is skipped and the prompt is
-	// closed. Overrides Cancel key binding.
-	CancelAnyOther bool
+// YesNoPromptMsg enables the prompt widget.
+type YesNoPromptMsg struct {
+	form      *huh.Form
+	yesAction PromptAction
 }
 
-type PromptAction func(text string) tea.Cmd
-
-type PromptStyle struct {
-	ThickBorder *lipgloss.Style
-	Regular     *lipgloss.Style
-	PlaceHolder *lipgloss.Style
-	Height      int
-}
+type PromptAction func() tea.Cmd
 
 // YesNoPrompt sends a message to enable the prompt widget, specifically
 // asking the user for a yes/no answer. If yes is given then the action is
 // invoked.
-func YesNoPrompt(prompt string, quit bool, action tea.Cmd) tea.Cmd {
-	cancel := key.NewBinding(key.WithKeys("n", "N"))
-	yes := key.NewBinding(key.WithKeys("y", "Y"), key.WithHelp("y", "confirm"))
-	if quit {
-		yes = key.NewBinding(key.WithKeys("y", "Y", "ctrl+c"), key.WithHelp("y/ctrl+c", "confirm and quit"))
-	}
-
-	return CmdHandler(PromptMsg{
-		Prompt:         prompt + " (y/N): ",
-		InitialValue:   "",
-		Placeholder:    "",
-		Cancel:         &cancel,
-		CancelAnyOther: true,
-		Action: func(_ string) tea.Cmd {
-			return action
-		},
-		Key: &yes,
+func YesNoPrompt(
+	prompt string,
+	keyMap *huh.KeyMap,
+	yesAction PromptAction,
+) tea.Cmd {
+	group := huh.NewGroup(
+		huh.NewConfirm().
+			Title(prompt).
+			Key("confirmKey").
+			Affirmative("Yes!").
+			Negative("No."),
+	)
+	form := huh.NewForm(group)
+	form.WithKeyMap(keyMap)
+	return CmdHandler(YesNoPromptMsg{
+		form:      form,
+		yesAction: yesAction,
 	})
 }
 
-func NewPrompt(msg *PromptMsg, style *PromptStyle) (*Prompt, tea.Cmd) {
-	model := textinput.New()
-	model.Prompt = msg.Prompt
-	model.SetValue(msg.InitialValue)
-	model.Placeholder = msg.Placeholder
-	model.PlaceholderStyle = *style.PlaceHolder
-	blink := model.Focus()
-
-	prompt := Prompt{
-		model:          model,
-		action:         msg.Action,
-		trigger:        msg.Key,
-		cancel:         msg.Cancel,
-		cancelAnyOther: msg.CancelAnyOther,
-		style:          *style,
-	}
-	return &prompt, blink
+func (m YesNoPromptMsg) IsCompleted() bool {
+	return m.form.State != huh.StateNormal
 }
 
-// Prompt is a widget that prompts the user for input and triggers an action.
-type Prompt struct {
-	action         PromptAction
-	style          PromptStyle
-	trigger        *key.Binding
-	cancel         *key.Binding
-	model          textinput.Model
-	cancelAnyOther bool
+func (m YesNoPromptMsg) Init() tea.Cmd {
+	return m.form.Init()
 }
 
-// HandleKey handles the user key press, and returns a command to be run, and
-// whether the prompt should be closed.
-func (p *Prompt) HandleKey(msg tea.KeyMsg) (closePrompt bool, cmd tea.Cmd) {
-	switch {
-	case key.Matches(msg, *p.trigger):
-		cmd = p.action(p.model.Value())
-		closePrompt = true
-	case key.Matches(msg, *p.cancel), p.cancelAnyOther:
-		cmd = ReportInfo("canceled operation")
-		closePrompt = true
-	default:
-		p.model, cmd = p.model.Update(msg)
+func (m YesNoPromptMsg) Update(msg tea.Msg) tea.Cmd {
+	var cmds []tea.Cmd
+	_, cmd := m.form.Update(msg)
+	cmds = append(cmds, cmd)
+	if m.form.State != huh.StateNormal {
+		if m.form.GetBool("confirmKey") || m.form.State == huh.StateAborted {
+			cmds = append(cmds, m.yesAction())
+		}
 	}
-	return
+	return tea.Batch(cmds...)
 }
 
-// HandleBlink handles the bubbletea blink message.
-func (p *Prompt) HandleBlink(msg tea.Msg) (cmd tea.Cmd) {
-	switch msg := msg.(type) {
-	case tea.KeyMsg:
-		// Ignore key presses, they're handled by HandleKey above.
-	default:
-		// The blink message type is unexported so we just send unknown types to
-		// the model.
-		p.model, cmd = p.model.Update(msg)
-	}
-	return
-}
-
-func (p *Prompt) View(width int) string {
-	paddedBorder := p.style.ThickBorder
-	paddedBorderWidth := paddedBorder.GetHorizontalBorderSize() + paddedBorder.GetHorizontalPadding()
-	// Set available width for user entered value before it horizontally
-	// scrolls.
-	p.model.Width = max(0, width-lipgloss.Width(p.model.Prompt)-paddedBorderWidth)
-	// Render a prompt, surrounded by a padded red border, spanning the width of the
-	// terminal, accounting for width of border. Inline and MaxWidth ensures the
-	// prompt remains on a single line.
-	content := p.style.Regular.Inline(true).MaxWidth(width - paddedBorderWidth).Render(p.model.View())
-	return paddedBorder.Width(width - paddedBorder.GetHorizontalBorderSize()).Render(content)
-}
-
-func (p *Prompt) HelpBindings() []*key.Binding {
-	bindings := []*key.Binding{
-		p.trigger,
-	}
-	if p.cancelAnyOther {
-		cancel := key.NewBinding(key.WithHelp("n", "cancel"))
-		bindings = append(bindings, &cancel)
-	} else {
-		bindings = append(bindings, p.cancel)
-	}
-	return bindings
+func (m YesNoPromptMsg) View() string {
+	formView := m.form.View()
+	// Exclude inlined help
+	lines := strings.Split(formView, "\n")
+	return strings.Join(lines[:len(lines)-2], "\n")
 }

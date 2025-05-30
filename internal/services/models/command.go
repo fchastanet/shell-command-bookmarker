@@ -95,6 +95,19 @@ func (c *Command) GetID() resource.ID {
 	return c.ID
 }
 
+func (c *Command) GetSingleLineDescription(maxChars int) string {
+	if c.Title == "" {
+		if len(c.Script) > maxChars {
+			return c.Script[:maxChars] + "..."
+		}
+		return c.Script
+	}
+	if len(c.Title) > maxChars {
+		return c.Title[:maxChars] + "..."
+	}
+	return c.Title
+}
+
 func CommandSorter(i, j *Command) int {
 	switch {
 	case i.ID < j.ID:

@@ -26,7 +26,7 @@ func GetDefaultEditorKeyMap() *EditorKeyMap {
 		key.WithHelp("Ctrl+s", "save"),
 	)
 	cancelKey := key.NewBinding(
-		key.WithKeys("esc"),
+		key.WithKeys("esc", "ctrl+c"),
 		key.WithHelp("␛", "cancel"),
 	)
 	previousPage := key.NewBinding(

@@ -9,10 +9,9 @@ import (
 	"time"
 
 	"github.com/charmbracelet/bubbles/key"
-	"github.com/charmbracelet/bubbles/textarea"
-	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/fchastanet/shell-command-bookmarker/internal/models/command/inputs"
 	"github.com/fchastanet/shell-command-bookmarker/internal/models/keys"
 	"github.com/fchastanet/shell-command-bookmarker/internal/models/structure"
 	"github.com/fchastanet/shell-command-bookmarker/internal/models/styles"
@@ -31,42 +30,49 @@ var (
 )
 
 type EditorMaker struct {
-	App          *services.AppService
-	Styles       *styles.Styles
-	EditorKeyMap *keys.EditorKeyMap
+	App           *services.AppService
+	Styles        *styles.Styles
+	EditorKeyMap  *keys.EditorKeyMap
+	commandEditor *commandEditor
 }
+
+// Number of input fields
+const (
+	numInputFields           = 3    // Title, Description, Script
+	titleInputMaxSize        = 50   // Max size for title input
+	descriptionInputMaxSize  = 1000 // Max size for description input
+	descriptionInputHeight   = 5    // Height for description input
+	scriptInputHeight        = 5    // Height for script input
+	descriptionWordwrapWidth = 80   // Word wrap width for description input
+	inputFieldPadding        = 2
+)
 
 // Make creates a new command editor model based on the command ID
 func (mm *EditorMaker) Make(id resource.ID, width, height int) (structure.ChildModel, error) {
-	// Convert the resource ID to a command ID
-	commandID := id
-
-	// Number of input fields
-	const numInputFields = 3 // Title, Description, Script
-
-	// Load the command from the database
-	command, err := mm.App.DBService.GetCommandByID(commandID)
-	if err != nil {
-		return nil, fmt.Errorf("failed to load command %d: %w", commandID, err)
-	}
-
-	if command == nil {
-		return nil, fmt.Errorf("%w %d", ErrCommandNotFound, commandID)
-	}
-
 	// Create the editor model
-	return &commandEditor{
-		AppService:    mm.App,
-		styles:        mm.Styles,
-		command:       command,
-		width:         width,
-		height:        height,
-		inputs:        make([]Input, numInputFields),
-		focused:       -1,
-		EditorKeyMap:  mm.EditorKeyMap,
-		pagePosition:  0,
-		contentHeight: 0,
-	}, nil
+	if mm.commandEditor == nil {
+		mm.commandEditor = &commandEditor{
+			AppService:    mm.App,
+			styles:        mm.Styles,
+			command:       nil,
+			width:         width,
+			height:        height,
+			inputs:        make([]inputs.Input, numInputFields),
+			focused:       -1,
+			EditorKeyMap:  mm.EditorKeyMap,
+			pagePosition:  0,
+			contentHeight: 0,
+			initialized:   false,
+		}
+		mm.commandEditor.Init()
+	}
+	command, err := mm.commandEditor.getCommand(id)
+	if err != nil {
+		return nil, err
+	}
+	mm.commandEditor.setCommand(command)
+
+	return mm.commandEditor, nil
 }
 
 // commandEditor is the model for editing a command
@@ -75,94 +81,65 @@ type commandEditor struct {
 	styles        *styles.Styles
 	command       *dbmodels.Command
 	EditorKeyMap  *keys.EditorKeyMap
-	inputs        []Input
+	inputs        []inputs.Input
 	width         int
 	height        int
 	focused       int
 	pagePosition  int
 	contentHeight int
+	initialized   bool
 }
 
-type Input interface {
-	Update(msg tea.Msg) (Input, tea.Cmd)
-	Blur()
-	Focus() tea.Cmd
-	Value() string
-	View() string
-	SetWidth(width int)
-	SetHeight(height int)
+func (m *commandEditor) BeforeSwitchPane() tea.Cmd {
+	return m.confirmAbandonChanges()
 }
 
-// InputWrapper wraps textinput.Model to implement the Input interface
-type InputWrapper struct {
-	*textinput.Model
+func (m *commandEditor) getCommand(commandID resource.ID) (*dbmodels.Command, error) {
+	// Load the command from the database
+	command, err := m.DBService.GetCommandByID(commandID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load command %d: %w", commandID, err)
+	}
+
+	if command == nil {
+		return nil, fmt.Errorf("%w %d", ErrCommandNotFound, commandID)
+	}
+	return command, nil
 }
 
-// Update implements the Input interface
-func (w *InputWrapper) Update(msg tea.Msg) (Input, tea.Cmd) {
-	newModel, cmd := w.Model.Update(msg)
-	w.Model = &newModel
-	return w, cmd
-}
-
-func (*InputWrapper) SetHeight(_ int) {
-	// do nothing
-}
-
-func (w *InputWrapper) SetWidth(width int) {
-	w.Width = width
-}
-
-// EditLineWrapper wraps textarea.Model to implement the Input interface
-type EditLineWrapper struct {
-	*textarea.Model
-}
-
-// Update implements the Input interface
-func (w *EditLineWrapper) Update(msg tea.Msg) (Input, tea.Cmd) {
-	newModel, cmd := w.Model.Update(msg)
-	w.Model = &newModel
-	return w, cmd
-}
-
-// Blur implements the Input interface
-func (w *EditLineWrapper) Blur() {
-	w.Model.Blur()
-}
-
-// Focus implements the Input interface
-func (w *EditLineWrapper) Focus() tea.Cmd {
-	return w.Model.Focus()
-}
-
-// SetValue implements the Input interface
-func (w *EditLineWrapper) SetValue(value string) {
-	w.Model.SetValue(value)
+func (m *commandEditor) setCommand(command *dbmodels.Command) {
+	if command == nil {
+		slog.Error("setCommand called with nil command")
+		return
+	}
+	m.command = command
+	m.inputs[0].SetValue(m.command.Title)
+	m.inputs[1].SetValue(m.command.Description)
+	m.inputs[2].SetValue(m.command.Script)
+	m.initInputs()
 }
 
 // Init initializes the command editor
 func (m *commandEditor) Init() tea.Cmd {
+	if m.initialized {
+		return nil
+	}
 	// Initialize the text inputs
-	textInput := textinput.New()
-	textInput.CharLimit = 50
-	titleInput := InputWrapper{&textInput}
-	titleInput.Placeholder = "Enter title"
-	titleInput.SetValue(m.command.Title)
+	titleInput := inputs.NewInputWrapper("Enter title")
+	titleInput.SetCharLimit(titleInputMaxSize)
 	titleInput.Focus()
 
-	textInput2 := textarea.New()
-	textInput2.CharLimit = 200
-	descriptionInput := EditLineWrapper{&textInput2}
-	descriptionInput.Placeholder = "Enter description"
-	descriptionInput.SetValue(m.command.Description)
-	descriptionInput.CharLimit = 200
+	descriptionInput := inputs.NewTextAreaWrapper(
+		descriptionInputHeight,
+		"Enter description (markdown)",
+		inputs.WithMarkdown(descriptionWordwrapWidth))
+	descriptionInput.SetCharLimit(descriptionInputMaxSize)
 
-	scriptTextArea := textarea.New()
-	scriptInput := EditLineWrapper{&scriptTextArea}
-	scriptInput.Placeholder = "Enter script"
-	scriptInput.SetValue(m.command.Script)
+	scriptInput := inputs.NewTextAreaWrapper(scriptInputHeight, "Enter script")
 
-	m.inputs = []Input{&titleInput, &descriptionInput, &scriptInput}
+	m.inputs = []inputs.Input{titleInput, descriptionInput, scriptInput}
+	m.focused = -1
+	m.initialized = true
 
 	return nil
 }
@@ -188,12 +165,18 @@ func (m *commandEditor) formatLintStatus() string {
 // Update handles updates to the command editor
 func (m *commandEditor) Update(msg tea.Msg) tea.Cmd {
 	var cmds []tea.Cmd
+	slog.Debug("commandEditor.Update", "msgType", fmt.Sprintf("%T", msg), "focused", m.focused)
 
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		m.handleWindowSizeMsg(msg)
 	case structure.FocusedPaneChangedMsg:
-		cmds = append(cmds, m.handleFocusedPaneChangedMsg())
+		cmds = append(cmds, m.handleFocusedPaneChangedMsg(msg))
+	case structure.NavigationMsg:
+		cmds = append(cmds, m.handleNavigationMsg(msg))
+	case table.RowSelectedActionMsg[*dbmodels.Command]:
+		// This message is sent when a row is selected in the command table
+		m.setCommand(msg.Row)
 	case tea.KeyMsg:
 		cmd := m.handleKeyMsg(msg)
 		if cmd != nil {
@@ -216,21 +199,50 @@ func (m *commandEditor) Update(msg tea.Msg) tea.Cmd {
 	return tea.Batch(cmds...)
 }
 
+func (m *commandEditor) handleNavigationMsg(msg structure.NavigationMsg) tea.Cmd {
+	cmd, err := m.getCommand(msg.Page.ID)
+	if err != nil {
+		slog.Error("Failed to load command for navigation", "id", msg.Page.ID, "error", err)
+		return tui.ReportError(&ErrCommandLoadingFailure{
+			CommandID: msg.Page.ID,
+			Err:       err,
+		})
+	}
+	if cmd != nil {
+		m.setCommand(cmd)
+	} else {
+		slog.Error("Failed to load command for navigation", "id", msg.Page.ID)
+		return tui.ReportError(&ErrCommandLoadingFailure{
+			CommandID: msg.Page.ID,
+			Err:       nil,
+		})
+	}
+	return nil
+}
+
 func (m *commandEditor) handleWindowSizeMsg(msg tea.WindowSizeMsg) {
 	m.width = msg.Width
 	m.height = msg.Height
 	for _, input := range m.inputs {
-		input.SetWidth(m.width)
+		input.SetWidth(m.width - inputFieldPadding)
 	}
 }
 
-func (m *commandEditor) handleFocusedPaneChangedMsg() tea.Cmd {
+func (m *commandEditor) handleFocusedPaneChangedMsg(msg structure.FocusedPaneChangedMsg) tea.Cmd {
 	if m.focused >= 0 && m.inputs[m.focused] != nil {
 		m.inputs[m.focused].Blur()
 	}
-
-	m.focused = -1
+	if msg.To == structure.BottomPane {
+		m.focused = -1
+	}
+	m.initInputs()
 	return tui.GetDummyCmd()
+}
+
+func (m *commandEditor) initInputs() {
+	for i, input := range m.inputs {
+		input.SetReadOnly(m.focused != i)
+	}
 }
 
 func (m *commandEditor) handleKeyMsg(msg tea.KeyMsg) tea.Cmd {
@@ -248,7 +260,7 @@ func (m *commandEditor) handleKeyMsg(msg tea.KeyMsg) tea.Cmd {
 	case key.Matches(msg, *m.EditorKeyMap.Save):
 		return m.save()
 	case key.Matches(msg, *m.EditorKeyMap.Cancel):
-		return m.cancel()
+		return m.confirmAbandonChanges()
 	}
 
 	return tea.Batch(cmds...)
@@ -301,7 +313,7 @@ func (m *commandEditor) addCommonElements(content *strings.Builder) {
 	content.WriteString(title + "\n\n")
 
 	// Labels for our fields
-	labels := []string{"Title:", "Description:", "Script:"}
+	labels := []string{"Title:", "Description(markdown):", "Script:"}
 
 	// Render each field with its label
 	for i, label := range labels {
@@ -410,6 +422,22 @@ func (m *commandEditor) generateScrollbar(contentStr, visibleContent string) str
 	)
 }
 
+func (m *commandEditor) confirmAbandonChanges() tea.Cmd {
+	// If no changes are made, just return
+	if !m.EditionInProgress() {
+		return nil
+	}
+
+	// Prompt the user for confirmation
+	return tui.YesNoPrompt(
+		fmt.Sprintf("Abandon changes for command #%d?", m.command.ID),
+		keys.GetFormKeyMap(),
+		func() tea.Cmd {
+			return m.cancel()
+		},
+	)
+}
+
 // nextField focuses the next field
 func (m *commandEditor) nextField() tea.Cmd {
 	if m.focused >= 0 {
@@ -417,10 +445,12 @@ func (m *commandEditor) nextField() tea.Cmd {
 	}
 	if m.focused == len(m.inputs)-1 {
 		m.focused = -1
-		return nil
+		m.initInputs()
+		return m.confirmAbandonChanges()
 	}
 
 	m.focused = (m.focused + 1) % len(m.inputs)
+	m.initInputs()
 
 	return m.inputs[m.focused].Focus()
 }
@@ -433,12 +463,14 @@ func (m *commandEditor) prevField() tea.Cmd {
 	switch m.focused {
 	case -1:
 		m.focused = len(m.inputs) - 1
-		return nil
+		m.initInputs()
+		return m.confirmAbandonChanges()
 	case 0:
 		m.focused = -1
 	default:
 		m.focused = (m.focused - 1) % len(m.inputs)
 	}
+	m.initInputs()
 	if m.focused >= 0 {
 		return m.inputs[m.focused].Focus()
 	}
@@ -506,10 +538,22 @@ type EditorCancelledMsg struct{}
 
 // cancel returns from the editor without saving
 func (m *commandEditor) cancel() tea.Cmd {
+	m.revertChanges()
+	infoMsg := tui.InfoMsg(fmt.Sprintf("Abandoned changes for command #%d", m.command.ID))
 	return tea.Batch(
-		tui.ReportInfo("Edit cancelled for command #%d", m.command.ID),
 		tui.CmdHandler(EditorCancelledMsg{}),
+		tui.CmdHandler(table.ReloadMsg[*dbmodels.Command]{
+			RowID:   m.command.ID,
+			InfoMsg: &infoMsg,
+		}),
 	)
+}
+
+func (m *commandEditor) revertChanges() {
+	// Revert changes to the original command state
+	m.inputs[0].SetValue(m.command.Title)
+	m.inputs[1].SetValue(m.command.Description)
+	m.inputs[2].SetValue(m.command.Script)
 }
 
 // BorderText returns text to display in the border

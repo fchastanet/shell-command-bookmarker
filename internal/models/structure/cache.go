@@ -1,8 +1,6 @@
 package structure
 
 import (
-	"strconv"
-
 	tea "github.com/charmbracelet/bubbletea"
 )
 
@@ -21,7 +19,7 @@ func NewCache() *Cache {
 }
 
 func (*Cache) getPageCacheKey(page Page) string {
-	return page.Kind.Key() + strconv.FormatInt(int64(page.ID), 10)
+	return page.Kind.Key()
 }
 
 func (c *Cache) Get(page Page) ChildModel {

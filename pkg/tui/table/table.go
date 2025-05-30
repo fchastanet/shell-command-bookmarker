@@ -86,7 +86,7 @@ type ColumnKey string
 
 type RowRenderer[V any] func(V) RenderedRow
 
-type DynamicCellRenderer[V any] func(row V, cellContent string, colIndex int, rowsEdited bool) string
+type DynamicCellRenderer[V any] func(row V, cellContent string, colIndex int, rowEdited bool) string
 
 // RenderedRow provides the rendered string for each column in a row.
 type RenderedRow map[ColumnKey]string
@@ -194,6 +194,10 @@ func WithPreview[V resource.Identifiable](kind resource.Kind) Option[V] {
 	return func(m *Model[V]) {
 		m.previewKind = kind
 	}
+}
+
+func (*Model[V]) BeforeSwitchPane() tea.Cmd {
+	return nil
 }
 
 func (m *Model[V]) IsFocused() bool {
@@ -814,12 +818,12 @@ func (m *Model[V]) headersView() string {
 }
 
 func (m *Model[V]) renderCells(
-	row V, current, selected bool, rowsEdited bool,
+	row V, current, selected bool, rowEdited bool,
 ) []string {
 	cells := m.rendered[row.GetID()]
 	styledCells := make([]string, len(m.cols))
 	for i, col := range m.cols {
-		content := m.cellRenderer(row, cells[col.Key], i, rowsEdited)
+		content := m.cellRenderer(row, cells[col.Key], i, rowEdited)
 
 		// Truncate content if it is wider than column
 		truncated := col.TruncationFunc(content, col.Width, "…")
@@ -867,13 +871,13 @@ func (m *Model[V]) renderRow(rowIdx int) string {
 		rowStyle = *m.styles.SelectedRow
 	}
 
-	rowsEdited := false
+	rowEdited := false
 	editor := m.editorsCache.Get(row.GetID())
-	if editor != nil && editor.EditionInProgress() {
+	if current && editor != nil && editor.EditionInProgress() {
 		rowStyle = rowStyle.Italic(true)
-		rowsEdited = true
+		rowEdited = true
 	}
-	renderedCells := m.renderCells(row, current, selected, rowsEdited)
+	renderedCells := m.renderCells(row, current, selected, rowEdited)
 
 	// Join cells together to form a row, ensuring it doesn't exceed maximum
 	// table width

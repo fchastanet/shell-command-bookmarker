@@ -10,6 +10,7 @@ type ChildModel interface {
 	Init() tea.Cmd
 	Update(tea.Msg) tea.Cmd
 	View() string
+	BeforeSwitchPane() tea.Cmd
 }
 
 // Page identifies an instance of a model

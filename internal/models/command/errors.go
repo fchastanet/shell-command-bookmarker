@@ -1,6 +1,10 @@
 package command
 
-import "fmt"
+import (
+	"fmt"
+
+	"github.com/fchastanet/shell-command-bookmarker/pkg/resource"
+)
 
 // ComposeCommandError represents an error when composing a command fails
 type ComposeCommandError struct {
@@ -25,4 +29,13 @@ type ErrClipboardCopyFailed struct {
 
 func (e *ErrClipboardCopyFailed) Error() string {
 	return "failed to copy to clipboard: " + e.Err.Error()
+}
+
+type ErrCommandLoadingFailure struct {
+	Err       error
+	CommandID resource.ID
+}
+
+func (e *ErrCommandLoadingFailure) Error() string {
+	return fmt.Sprintf("failed to load command with ID %d: %v", e.CommandID, e.Err)
 }
