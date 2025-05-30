@@ -15,7 +15,7 @@ func GetFormKeyMap() *huh.KeyMap {
 }
 
 func GetFormBindings() []*key.Binding {
-	bindings := []*key.Binding{}
+	var bindings []*key.Binding
 	defaultHuhKeyMap := GetFormKeyMap()
 	bindings = append(
 		bindings,

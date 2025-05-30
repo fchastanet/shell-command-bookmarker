@@ -221,19 +221,7 @@ func (m *Model) dispatchMessage(msg tea.Msg) tea.Cmd {
 	}
 
 	if m.prompt != nil && m.mode == promptMode {
-		cmd := m.prompt.Update(msg)
-		if m.prompt.IsCompleted() {
-			// If the prompt was completed, just reset the prompt
-			m.mode = normalMode
-			m.prompt = nil
-			m.updateHelpBindings()
-			// Send out message to panes to resize themselves to remove room for the prompt
-			m.PaneManager.Update(tea.WindowSizeMsg{
-				Height: m.viewHeight(),
-				Width:  m.viewWidth(),
-			})
-		}
-		return cmd
+		return m.dispatchPromptMessage(msg)
 	}
 
 	if keyMsg, ok := msg.(tea.KeyMsg); ok {
@@ -244,6 +232,22 @@ func (m *Model) dispatchMessage(msg tea.Msg) tea.Cmd {
 		return cmd
 	}
 	return nil
+}
+
+func (m *Model) dispatchPromptMessage(msg tea.Msg) tea.Cmd {
+	cmd := m.prompt.Update(msg)
+	if m.prompt.IsCompleted() {
+		// If the prompt was completed, just reset the prompt
+		m.mode = normalMode
+		m.prompt = nil
+		m.updateHelpBindings()
+		// Send out message to panes to resize themselves to remove room for the prompt
+		m.PaneManager.Update(tea.WindowSizeMsg{
+			Height: m.viewHeight(),
+			Width:  m.viewWidth(),
+		})
+	}
+	return cmd
 }
 
 func (m *Model) handleCommandSelectedForShellMsg(msg structure.CommandSelectedForShellMsg) tea.Cmd {
