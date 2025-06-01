@@ -33,5 +33,6 @@
     "git-commit": true,
     "inlineSuggest": true,
     "autoCompletions": true
-  }
+  },
+  "go.coverageDecorator": {"type": "highlight"}
 }

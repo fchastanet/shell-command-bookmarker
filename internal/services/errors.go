@@ -32,5 +32,5 @@ type InvalidTerminalError struct {
 }
 
 func (e *InvalidTerminalError) Error() string {
-	return "invalid terminal error"
+	return fmt.Errorf("invalid terminal error: %w", e.Err).Error()
 }
