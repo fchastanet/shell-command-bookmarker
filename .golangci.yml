@@ -73,6 +73,7 @@ linters:
             - github.com/lithammer/fuzzysearch/fuzzy
             - golang.org/x/exp/maps
             - github.com/atotto/clipboard
+            - github.com/mattn/go-isatty
           deny:
             - pkg: github.com/stretchr/testify
               desc: no testify on non test files

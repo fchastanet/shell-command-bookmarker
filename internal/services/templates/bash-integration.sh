@@ -22,5 +22,8 @@ shell_command_bookmarker_paste() {
 # Bind to Ctrl+G (you can change this to your preference)
 bind -x '"\C-g": shell_command_bookmarker_paste'
 
+# Add alias for convenience
+alias bookmark='shell_command_bookmarker_paste'
+
 echo "Shell Command Bookmarker bash integration loaded."
 echo "Press Ctrl+G or type 'bookmark' to insert a saved command."

@@ -52,7 +52,7 @@ func (mm *EditorMaker) Make(id resource.ID, width, height int) (structure.ChildM
 	// Create the editor model
 	if mm.commandEditor == nil {
 		mm.commandEditor = &commandEditor{
-			AppService:    mm.App,
+			AppService:    mm.App.Self(),
 			styles:        mm.Styles,
 			command:       nil,
 			width:         width,

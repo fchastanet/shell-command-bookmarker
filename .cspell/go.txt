@@ -2,6 +2,7 @@ ansi
 borderize
 bubbletea
 cancelreader
+cmdline
 colorprofile
 coninput
 copystructure
@@ -62,6 +63,7 @@ pgdn
 pgdown
 pgup
 pipefail
+ppid
 prealloc
 promlint
 protobuf

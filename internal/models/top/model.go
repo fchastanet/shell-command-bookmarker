@@ -115,7 +115,7 @@ type Model struct {
 }
 
 func NewModel(
-	appService *services.AppService,
+	appService services.AppServiceInterface,
 	myStyles *styles.Styles,
 ) Model {
 	// Work-around for
@@ -152,7 +152,7 @@ func NewModel(
 			keyMaps.pane,
 		),
 		spinner:           &spinnerObj,
-		appService:        appService,
+		appService:        appService.Self(),
 		styles:            myStyles,
 		keyMaps:           keyMaps,
 		helpModel:         helpModel,

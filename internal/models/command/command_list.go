@@ -19,7 +19,7 @@ import (
 )
 
 type ListMaker struct {
-	App                     *services.AppService
+	App                     services.AppServiceInterface
 	TableCustomActionKeyMap *keys.TableCustomActionKeyMap
 	NavigationKeyMap        *table.Navigation
 	ActionKeyMap            *table.Action
@@ -84,7 +84,7 @@ func (mm *ListMaker) Make(_ resource.ID, width, height int) (structure.ChildMode
 	}
 
 	m := &commandsList{
-		AppService:              mm.App,
+		AppService:              mm.App.Self(),
 		Model:                   nil,
 		editorsCache:            mm.EditorsCache,
 		tableCustomActionKeyMap: mm.TableCustomActionKeyMap,

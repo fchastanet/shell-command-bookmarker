@@ -20,14 +20,14 @@ type Maker interface {
 // NewMakerFactory makes model makers for making models
 func NewMakerFactory(
 	editorsCache table.EditorsCacheInterface,
-	app *services.AppService,
+	app services.AppServiceInterface,
 	myStyles *styles.Styles,
 	spinnerObj *spinner.Model,
 	keyMaps *KeyMaps,
 ) func(kind resource.Kind) models.Maker {
 	makers := make(map[resource.Kind]models.Maker)
 	makers[structure.CommandListKind] = &command.ListMaker{
-		App:                     app,
+		App:                     app.Self(),
 		EditorsCache:            editorsCache,
 		Styles:                  myStyles,
 		Spinner:                 spinnerObj,
@@ -36,12 +36,12 @@ func NewMakerFactory(
 		ActionKeyMap:            keyMaps.tableAction,
 	}
 	makers[structure.SearchKind] = &command.SearchMaker{
-		App:     app,
+		App:     app.Self(),
 		Styles:  myStyles,
 		Spinner: spinnerObj,
 	}
 	makers[structure.CommandEditorKind] = &command.EditorMaker{
-		App:          app,
+		App:          app.Self(),
 		Styles:       myStyles,
 		EditorKeyMap: keyMaps.editor,
 	}
