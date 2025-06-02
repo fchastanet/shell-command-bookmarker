@@ -1,14 +1,11 @@
 package table
 
 import (
-	"fmt"
 	"log/slog"
 	"slices"
-	"strconv"
 	"strings"
 
 	"github.com/charmbracelet/bubbles/key"
-	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/fchastanet/shell-command-bookmarker/pkg/resource"
@@ -42,17 +39,14 @@ type Model[V resource.Identifiable] struct {
 	editorsCache     EditorsCacheInterface
 
 	// items are the unfiltered set of items available to the table.
-	items               map[resource.ID]V
-	sortFunc            SortFunc[V]
-	matchFilterCallback func(filterValue string, item V) bool
+	items    map[resource.ID]V
+	sortFunc SortFunc[V]
 
 	selected map[resource.ID]V
 
 	border lipgloss.Border
 	cols   []Column
 	rows   []V
-
-	filter textinput.Model
 
 	currentRowIndex int
 	currentRowID    resource.ID
@@ -94,7 +88,10 @@ type RenderedRow map[ColumnKey]string
 type SortFunc[V any] func(V, V) int
 
 // BulkInsertMsg performs a bulk insertion of entities into a table
-type BulkInsertMsg[T any] []T
+type BulkInsertMsg[T any] struct {
+	InfoMsg string
+	Items   []T
+}
 
 // New creates a new model for the table widget.
 func New[V resource.Identifiable](
@@ -103,37 +100,31 @@ func New[V resource.Identifiable](
 	cols []Column,
 	rowRenderer RowRenderer[V],
 	cellRenderer DynamicCellRenderer[V],
-	matchFilterCallback func(filterValue string, item V) bool,
 	width, height int, opts ...Option[V],
 ) Model[V] {
-	filter := textinput.New()
-	filter.Prompt = "Filter: "
-
 	m := Model[V]{
-		focused:             false,
-		styles:              tableStyles,
-		editorsCache:        editorsCache,
-		navigationKeyMap:    nil,
-		actionKeyMap:        nil,
-		cols:                make([]Column, len(cols)),
-		rows:                []V{},
-		rowRenderer:         rowRenderer,
-		cellRenderer:        cellRenderer,
-		matchFilterCallback: matchFilterCallback,
-		items:               make(map[resource.ID]V),
-		rendered:            make(map[resource.ID]RenderedRow),
-		selected:            make(map[resource.ID]V),
-		selectable:          true,
-		filter:              filter,
-		border:              lipgloss.NormalBorder(),
-		borderColor:         lipgloss.NoColor{},
-		currentRowIndex:     -1,
-		currentRowID:        resource.ID(0),
-		sortFunc:            nil,
-		start:               0,
-		width:               width,
-		height:              height,
-		previewKind:         resource.DefaultKind{},
+		focused:          false,
+		styles:           tableStyles,
+		editorsCache:     editorsCache,
+		navigationKeyMap: nil,
+		actionKeyMap:     nil,
+		cols:             make([]Column, len(cols)),
+		rows:             []V{},
+		rowRenderer:      rowRenderer,
+		cellRenderer:     cellRenderer,
+		items:            make(map[resource.ID]V),
+		rendered:         make(map[resource.ID]RenderedRow),
+		selected:         make(map[resource.ID]V),
+		selectable:       true,
+		border:           lipgloss.NormalBorder(),
+		borderColor:      lipgloss.NoColor{},
+		currentRowIndex:  -1,
+		currentRowID:     resource.ID(0),
+		sortFunc:         nil,
+		start:            0,
+		width:            width,
+		height:           height,
+		previewKind:      resource.DefaultKind{},
 	}
 	for _, fn := range opts {
 		fn(&m)
@@ -210,7 +201,6 @@ func (m *Model[V]) Focus() {
 
 func (m *Model[V]) Blur() {
 	m.focused = false
-	m.filter.Blur()
 }
 
 func (m *Model[V]) SetRows(rows []V) {
@@ -229,11 +219,6 @@ func (m *Model[V]) SetHeight(height int) {
 	m.height = height
 }
 
-func (m *Model[V]) filterVisible() bool {
-	// Filter is visible if it's either in focus, or it has a non-empty value.
-	return m.filter.Focused() || m.filter.Value() != ""
-}
-
 // setDimensions sets the dimensions of the table.
 func (m *Model[V]) setDimensions(width, height int) {
 	m.height = height
@@ -247,10 +232,6 @@ func (m *Model[V]) setDimensions(width, height int) {
 func (m *Model[V]) rowAreaHeight() int {
 	height := max(0, m.height-m.styles.HeaderHeight)
 
-	if m.filterVisible() {
-		// Accommodate height of filter widget
-		return max(0, height-m.styles.FilterHeight)
-	}
 	slog.Debug("table rowAreaHeight", "height", height)
 	return height
 }
@@ -263,93 +244,51 @@ func (m *Model[V]) visibleRows() int {
 }
 
 // Update is the Bubble Tea update loop.
-func (m *Model[V]) Update(msg tea.Msg) (*Model[V], tea.Cmd) {
+func (m *Model[V]) Update(msg tea.Msg) tea.Cmd {
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
 		return m.handleKeyMsg(msg)
 	case tea.WindowSizeMsg:
 		m.setDimensions(msg.Width, msg.Height)
-		return m, nil
-	case tui.FilterFocusReqMsg, tui.FilterBlurMsg, tui.FilterCloseMsg, tui.FilterKeyMsg:
-		return m.handleFilterMsg(msg)
+		return nil
 	case resource.Event[V]:
 		return m.handleResourceEvent(msg)
 	case BulkInsertMsg[V]:
-		m.AddItems(msg...)
-		return m, nil
-	default:
-		if m.filter.Focused() {
-			var cmd tea.Cmd
-			m.filter, cmd = m.filter.Update(msg)
-			return m, cmd
-		}
+		m.SetItems(msg.Items...)
+		return tui.ReportInfo(msg.InfoMsg)
 	}
-	return m, nil
+	return nil
 }
 
 // handleResourceEvent handles resource events such as create, update, delete
-func (m *Model[V]) handleResourceEvent(msg resource.Event[V]) (*Model[V], tea.Cmd) {
+func (m *Model[V]) handleResourceEvent(msg resource.Event[V]) tea.Cmd {
 	switch msg.Type {
 	case resource.CreatedEvent, resource.UpdatedEvent:
 		m.AddItems(msg.Payload)
 	case resource.DeletedEvent:
 		m.removeItem(msg.Payload)
 	}
-	return m, nil
-}
-
-// handleFilterMsg handles filter-related messages
-func (m *Model[V]) handleFilterMsg(msg tea.Msg) (*Model[V], tea.Cmd) {
-	switch msg := msg.(type) {
-	case tui.FilterFocusReqMsg:
-		// Focus the filter widget
-		blink := m.filter.Focus()
-		// Start blinking the cursor
-		return m, blink
-
-	case tui.FilterBlurMsg:
-		// Blur the filter widget
-		m.filter.Blur()
-		return m, nil
-
-	case tui.FilterCloseMsg:
-		// Close the filter widget
-		m.filter.Blur()
-		m.filter.SetValue("")
-		// Un-filter table items
-		m.filterRows(maps.Values(m.items)...)
-		return m, nil
-
-	case tui.FilterKeyMsg:
-		// unwrap key and send to filter widget
-		msgKey := tea.KeyMsg(msg)
-		var cmd tea.Cmd
-		m.filter, cmd = m.filter.Update(msgKey)
-		// Filter table items
-		m.filterRows(maps.Values(m.items)...)
-		return m, cmd
-	}
-	return m, nil
+	return nil
 }
 
 // handleKeyMsg processes key press messages
-func (m *Model[V]) handleKeyMsg(msg tea.KeyMsg) (*Model[V], tea.Cmd) {
+func (m *Model[V]) handleKeyMsg(msg tea.KeyMsg) tea.Cmd {
 	// Group navigation keys
 	if cmd := m.handleNavigationKey(msg); cmd != nil {
-		return m, cmd
+		return cmd
 	}
 
 	// Group selection keys
 	if m.handleSelectionKey(msg) {
-		return m, nil
+		return nil
 	}
 
 	// Handle action keys
 	if cmd := m.handleActionKey(msg); cmd != nil {
-		return m, cmd
+		return cmd
 	}
 
-	return m, nil
+	return nil
 }
 
 func (m *Model[V]) handleActionKey(msg tea.KeyMsg) tea.Cmd {
@@ -454,13 +393,11 @@ func (m *Model[V]) View() string {
 	//
 	// TODO: this allocation logic is wrong
 	components := make([]string, 0, 1+1+m.visibleRows())
-	if m.filterVisible() {
-		components = append(components,
-			m.styles.FiltersBlock.Render(m.filter.View()),
-			// Add horizontal rule between filter widget and table
-			strings.Repeat("─", m.width))
-	}
-	components = append(components, m.headersView())
+	style := lipgloss.NewStyle().
+		BorderStyle(lipgloss.NormalBorder()).
+		BorderForeground(lipgloss.Color("240")).
+		BorderBottom(true)
+	components = append(components, style.Render(m.headersView()))
 	// Generate scrollbar
 	scrollbar := tui.Scrollbar(
 		m.styles.ScrollbarStyle,
@@ -481,21 +418,6 @@ func (m *Model[V]) View() string {
 		MaxHeight(m.height).
 		Render(lipgloss.JoinVertical(lipgloss.Top, components...))
 	return content
-}
-
-// Metadata renders a short string summarizing table row metadata.
-func (m *Model[V]) Metadata() string {
-	var metadata string
-	// Calculate the top and bottom visible row ordinal numbers
-	top := m.start + 1
-	bottom := m.start + m.visibleRows()
-	prefix := fmt.Sprintf("%d-%d of ", top, bottom)
-	if m.filterVisible() {
-		metadata = prefix + fmt.Sprintf("%d/%d", len(m.rows), len(m.items))
-	} else {
-		metadata = prefix + strconv.Itoa(len(m.rows))
-	}
-	return metadata
 }
 
 // CurrentRow returns the current row the user has highlighted.  If the table is
@@ -676,10 +598,6 @@ func (m *Model[V]) processFilteredItems(items []V) {
 	m.rows = make([]V, 0, len(items))
 
 	for _, item := range items {
-		if m.filterVisible() && !m.matchFilter(item) {
-			// Skip item that doesn't match filter
-			continue
-		}
 		m.rows = append(m.rows, item)
 		if m.selectable {
 			if _, ok := m.selected[item.GetID()]; ok {
@@ -713,17 +631,6 @@ func (m *Model[V]) sortAndLocateCurrentRow() {
 		m.currentRowIndex = 0
 		m.currentRowID = m.rows[m.currentRowIndex].GetID()
 	}
-}
-
-// matchFilter returns true if the item with the given ID matches the filter
-// value using fuzzy matching.
-func (m *Model[V]) matchFilter(item V) bool {
-	filterValue := m.filter.Value()
-	if filterValue == "" {
-		return true
-	}
-
-	return m.matchFilterCallback(filterValue, item)
 }
 
 // MoveUp moves the current row up by any number of rows.
@@ -805,7 +712,12 @@ func (m *Model[V]) headersView() string {
 	s := make([]string, 0, len(m.cols))
 	// TODO: use index and don't use append below
 	for _, col := range m.cols {
-		style := lipgloss.NewStyle().Width(col.Width).MaxWidth(col.Width).Inline(true)
+		style := lipgloss.NewStyle().
+			Width(col.Width).
+			MaxWidth(col.Width).
+			Inline(true).
+			Bold(true).
+			Italic(true)
 		if col.RightAlign {
 			style = style.AlignHorizontal(lipgloss.Right)
 		}

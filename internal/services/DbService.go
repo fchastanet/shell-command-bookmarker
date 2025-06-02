@@ -286,3 +286,38 @@ func (s *DBService) UpdateCommand(command *models.Command) error {
 	slog.Info("Command updated successfully", "id", command.ID)
 	return nil
 }
+
+// GetCommandCountsByStatus retrieves a count of commands grouped by status directly from the database
+func (s *DBService) GetCommandCountsByStatus() (map[models.CommandStatus]int, error) {
+	// Use SQL GROUP BY to count by status directly in the database
+	query := `SELECT status, COUNT(*) as count FROM command GROUP BY status`
+
+	rows, err := s.dbAdapter.GetDB().Query(query)
+	if err != nil {
+		slog.Error("Error querying command counts by status", "error", err)
+		return nil, err
+	}
+	defer rows.Close()
+
+	counts := make(map[models.CommandStatus]int)
+
+	for rows.Next() {
+		var statusStr string
+		var count int
+
+		if err := rows.Scan(&statusStr, &count); err != nil {
+			slog.Error("Error scanning command count row", "error", err)
+			return nil, err
+		}
+
+		status := models.CommandStatus(statusStr)
+		counts[status] = count
+	}
+
+	if err := rows.Err(); err != nil {
+		slog.Error("Error iterating command count rows", "error", err)
+		return nil, err
+	}
+
+	return counts, nil
+}

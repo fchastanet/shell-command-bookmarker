@@ -425,7 +425,9 @@ func (m *commandEditor) generateScrollbar(contentStr, visibleContent string) str
 func (m *commandEditor) confirmAbandonChanges() tea.Cmd {
 	// If no changes are made, just return
 	if !m.EditionInProgress() {
-		return nil
+		return tea.Cmd(func() tea.Msg {
+			return EditorCancelledMsg{}
+		})
 	}
 
 	// Prompt the user for confirmation

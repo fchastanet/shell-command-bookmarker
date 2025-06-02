@@ -22,6 +22,7 @@ import (
 	"github.com/fchastanet/shell-command-bookmarker/internal/models/top/help"
 	"github.com/fchastanet/shell-command-bookmarker/internal/services"
 	"github.com/fchastanet/shell-command-bookmarker/internal/version"
+	"github.com/fchastanet/shell-command-bookmarker/pkg/components/tabs"
 	"github.com/fchastanet/shell-command-bookmarker/pkg/tui"
 	"github.com/fchastanet/shell-command-bookmarker/pkg/tui/table"
 )
@@ -32,17 +33,9 @@ type mode int
 const (
 	normalMode mode = iota // default
 	promptMode             // confirm prompt is visible and taking input
-	filterMode             // filter is visible and taking input
 )
 
 const OutputFileMode = 0o600
-
-// indicate parent components that filter has been closed.
-type FilterClosedMsg struct{}
-
-func FilterClosed() tea.Msg {
-	return FilterClosedMsg{}
-}
 
 // QuitClearScreenMsg is a message type for quitting with screen clearing
 type QuitClearScreenMsg struct{}
@@ -73,7 +66,7 @@ const (
 type MessageClearTickMsg struct{}
 
 type KeyMaps struct {
-	filter            *keys.FilterKeyMap
+	filter            *tabs.FilterKeyMap
 	global            *keys.GlobalKeyMap
 	pane              *keys.PaneNavigationKeyMap
 	tableNavigation   *table.Navigation
@@ -135,7 +128,7 @@ func NewModel(
 
 	spinnerObj := spinner.New(spinner.WithSpinner(spinner.Line))
 
-	helpWidget := myStyles.HelpStyle.Main.Render("h/alt+? help")
+	helpWidget := myStyles.HelpStyle.Main.Render("F1/h/alt+? help")
 	versionWidget := myStyles.FooterStyle.Version.Render(version.Get())
 
 	// Create help and footer components
@@ -374,35 +367,9 @@ func (m *Model) handleMemoryStats(msg tui.MemoryStatsMsg) {
 
 // handleKeyMsg processes key messages
 func (m *Model) handleKeyMsg(msg tea.KeyMsg) tea.Cmd {
-	var cmd tea.Cmd
-
 	switch m.mode {
 	case promptMode:
 		// already handled in Update method above
-	case filterMode:
-		switch {
-		case key.Matches(msg, *m.keyMaps.filter.Blur):
-			// Switch back to normal mode, and send message to current model
-			// to blur the filter widget
-			m.mode = normalMode
-			cmd = m.FocusedModel().Update(tui.FilterBlurMsg{})
-			return cmd
-		case key.Matches(msg, *m.keyMaps.filter.Close):
-			// Switch back to normal mode, and send message to current model
-			// to close the filter widget
-			m.mode = normalMode
-			closeMsg := tui.FilterCloseMsg{}
-			cmd = m.FocusedModel().Update(closeMsg)
-			if cmd == nil {
-				return FilterClosed
-			}
-			return cmd
-		default:
-			// Wrap key message in a filter key message and send to current
-			// model.
-			cmd = m.FocusedModel().Update(tui.FilterKeyMsg(msg))
-			return cmd
-		}
 	case normalMode:
 		cmd := m.PaneManager.Update(msg)
 		if cmd != nil {
@@ -438,8 +405,6 @@ func (m *Model) handleYesNoPrompt(promptMsg tui.YesNoPromptMsg) tea.Cmd {
 }
 
 func (m *Model) manageKey(msg tea.KeyMsg) tea.Cmd {
-	var cmd tea.Cmd
-
 	switch {
 	case key.Matches(msg, *m.keyMaps.global.Quit):
 		// In shell selection mode (with output-file parameter), Ctrl+C should exit immediately without confirmation
@@ -461,13 +426,6 @@ func (m *Model) manageKey(msg tea.KeyMsg) tea.Cmd {
 		return cmd
 	case key.Matches(msg, *m.keyMaps.global.Help):
 		m.displayHelp()
-	case key.Matches(msg, *m.keyMaps.tableAction.Filter):
-		// '/' enables filter mode if the current model indicates it
-		// supports it, which it does so by sending back a non-nil command.
-		if cmd = m.FocusedModel().Update(tui.FilterFocusReqMsg{}); cmd != nil {
-			m.mode = filterMode
-		}
-		return cmd
 	case key.Matches(msg, *m.keyMaps.global.Debug):
 		// ctrl+d shows memory stats for debugging performance
 		if m.perfMonitorActive {
@@ -536,14 +494,12 @@ func (m *Model) updateHelpBindings() {
 		case promptMode:
 			// For prompt mode, just use a single set
 			m.helpModel.AddBindingSet("Prompt Controls", keys.GetFormBindings())
-		case filterMode:
-			// For filter mode, just use a single set
-			m.helpModel.AddBindingSet("Filter Controls", keys.KeyMapToSlice(*m.keyMaps.filter))
 		case normalMode:
 			// For normal mode, organize bindings into logical groups
 			m.helpModel.AddBindingSet("Global", keys.KeyMapToSlice(*m.keyMaps.global))
 			m.helpModel.AddBindingSet("Pane Navigation", m.HelpBindings())
 			if m.FocusedPosition() == structure.TopPane {
+				m.helpModel.AddBindingSet("Filter Controls", keys.KeyMapToSlice(*m.keyMaps.filter))
 				m.helpModel.AddBindingSet("Table Nav", keys.KeyMapToSlice(*m.keyMaps.tableNavigation))
 				m.helpModel.AddBindingSet("Table Actions", keys.KeyMapToSlice(*m.keyMaps.tableAction))
 				m.helpModel.AddBindingSet("Command Actions", keys.KeyMapToSlice(*m.keyMaps.tableCustomAction))
