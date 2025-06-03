@@ -78,7 +78,7 @@ func (s *DBService) DuplicateCommand(commandID resource.ID, status models.Comman
 			creation_datetime, ?
 		FROM command WHERE id = ?`,
 		status,
-		time.Now(),
+		time.Now().Format(time.DateTime),
 		commandID,
 	)
 	if err != nil {
