@@ -241,7 +241,7 @@ func (m *commandEditor) handleFocusedPaneChangedMsg(msg structure.FocusedPaneCha
 
 func (m *commandEditor) initInputs() {
 	for i, input := range m.inputs {
-		input.SetReadOnly(m.focused != i)
+		input.SetReadOnly(m.focused != i || !m.command.IsEditable())
 	}
 }
 
@@ -299,18 +299,19 @@ func (m *commandEditor) View() string {
 
 // addCommonElements adds the title, help text, and input fields to the content
 func (m *commandEditor) addCommonElements(content *strings.Builder) {
-	title := m.styles.EditorStyle.Title.Render("Command Editor")
-
 	// Add help text at the top
 	helpTextStyle := *m.styles.EditorStyle.HelpText
 	if m.focused == -1 {
 		helpTextStyle = helpTextStyle.Bold(true).Foreground(lipgloss.Color("255"))
 	}
-	helpText := helpTextStyle.Render("⭾/Shift-⭾: Fields • ⇞/⇟: Scroll • Ctrl+S: Save • Esc: Cancel")
-	content.WriteString(helpText)
-
-	// Add the title
-	content.WriteString(title + "\n\n")
+	var helpText string
+	if m.command.IsEditable() {
+		helpText = helpTextStyle.Render("⭾/Shift-⭾: Fields • ⇞/⇟: Scroll • Ctrl+S: Save • Esc: Cancel")
+	} else {
+		helpText = m.styles.EditorStyle.StatusWarning.Render("Command is read-only") +
+			"         " + helpTextStyle.Render("⭾/Shift-⭾: Fields • ⇞/⇟: Scroll • Esc: Close")
+	}
+	content.WriteString(helpText + "\n\n")
 
 	// Labels for our fields
 	labels := []string{"Title:", "Description(markdown):", "Script:"}

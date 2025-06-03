@@ -232,7 +232,7 @@ func (s *Styles) initComponentStyles(colorTheme *ColorTheme) {
 	s.TableStyle = table.GetDefaultStyle(s.ScrollbarStyle)
 
 	// Initialize editor style
-	titleStyle := bold.Foreground(colors.Black)
+	titleStyle := bold.Foreground(colors.White).Bold(true)
 	labelStyle := bold.Foreground(colors.DarkGrey)
 	labelStyleFocused := bold.Foreground(colors.Blue)
 	helpTextStyle := regular.Foreground(colors.Grey)

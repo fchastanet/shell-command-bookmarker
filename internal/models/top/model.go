@@ -88,12 +88,13 @@ type Model struct {
 
 	prompt *tui.YesNoPromptMsg
 
-	spinner     *spinner.Model
+	spinner *spinner.Model
+
+	selectedCommand *dbmodels.Command
+
 	footerModel footer.Model
 	headerModel header.Model
 	helpModel   help.Model
-
-	selectedCommand *dbmodels.Command
 
 	width  int
 	height int
