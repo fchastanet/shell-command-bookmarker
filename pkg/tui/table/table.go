@@ -254,13 +254,36 @@ func (m *Model[V]) Update(msg tea.Msg) tea.Cmd {
 	case resource.Event[V]:
 		return m.handleResourceEvent(msg)
 	case BulkInsertMsg[V]:
-		m.SetItems(msg.Items...)
-		return tui.ReportInfo(msg.InfoMsg)
+		return m.handleBulkInsert(msg)
 	}
 	return nil
 }
 
-// handleResourceEvent handles resource events such as create, update, delete
+func (m *Model[V]) handleBulkInsert(msg BulkInsertMsg[V]) tea.Cmd {
+	m.SetItems(msg.Items...)
+	var rowCmd tea.Cmd
+	if len(msg.Items) == 0 {
+		m.currentRowIndex = -1
+		rowCmd = tui.CmdHandler(RowSelectedActionMsg[V]{
+			Row:   *new(V),
+			RowID: resource.ID(0),
+		})
+	} else {
+		// should we keep the current row index?
+		if m.currentRowIndex >= len(m.rows) {
+			m.currentRowIndex = 0
+		}
+		rowCmd = tui.CmdHandler(RowSelectedActionMsg[V]{
+			Row:   m.rows[m.currentRowIndex],
+			RowID: m.currentRowID,
+		})
+	}
+	return tea.Batch(
+		rowCmd,
+		tui.ReportInfo(msg.InfoMsg),
+	)
+}
+
 func (m *Model[V]) handleResourceEvent(msg resource.Event[V]) tea.Cmd {
 	switch msg.Type {
 	case resource.CreatedEvent, resource.UpdatedEvent:

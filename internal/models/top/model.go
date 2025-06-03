@@ -21,6 +21,7 @@ import (
 	"github.com/fchastanet/shell-command-bookmarker/internal/models/top/header"
 	"github.com/fchastanet/shell-command-bookmarker/internal/models/top/help"
 	"github.com/fchastanet/shell-command-bookmarker/internal/services"
+	dbmodels "github.com/fchastanet/shell-command-bookmarker/internal/services/models"
 	"github.com/fchastanet/shell-command-bookmarker/internal/version"
 	"github.com/fchastanet/shell-command-bookmarker/pkg/components/tabs"
 	"github.com/fchastanet/shell-command-bookmarker/pkg/tui"
@@ -90,8 +91,9 @@ type Model struct {
 	spinner     *spinner.Model
 	footerModel footer.Model
 	headerModel header.Model
+	helpModel   help.Model
 
-	helpModel help.Model
+	selectedCommand *dbmodels.Command
 
 	width  int
 	height int
@@ -159,6 +161,7 @@ func NewModel(
 		messageClearTime:  time.Time{},
 		perfMonitorActive: false,
 		quitting:          false,
+		selectedCommand:   nil,
 	}
 	makers := NewMakerFactory(m.PaneManager, appService, myStyles, &spinnerObj, keyMaps)
 	m.SetMakerFactory(makers)
@@ -211,6 +214,9 @@ func (m *Model) dispatchMessage(msg tea.Msg) tea.Cmd {
 	case structure.CommandSelectedForShellMsg:
 		cmd := m.handleCommandSelectedForShellMsg(msg)
 		return cmd
+	case table.RowSelectedActionMsg[*dbmodels.Command]:
+		m.selectedCommand = msg.Row
+		m.updateHelpBindings()
 	}
 
 	if m.prompt != nil && m.mode == promptMode {
@@ -261,7 +267,6 @@ func (m *Model) handleCommandSelectedForShellMsg(msg structure.CommandSelectedFo
 
 // handleFocusPaneChangedMsg handles the pane focus change message
 func (m *Model) handleFocusPaneChangedMsg(msg tea.Msg) tea.Cmd {
-	// Update the help bindings when the focused pane changes
 	m.updateHelpBindings()
 	// Send message to panes to resize themselves to make room for the prompt above it.
 	slog.Debug("handleWindowSize", "viewHeight", m.viewHeight())
@@ -501,8 +506,18 @@ func (m *Model) updateHelpBindings() {
 			if m.FocusedPosition() == structure.TopPane {
 				m.helpModel.AddBindingSet("Filter Controls", keys.KeyMapToSlice(*m.keyMaps.filter))
 				m.helpModel.AddBindingSet("Table Nav", keys.KeyMapToSlice(*m.keyMaps.tableNavigation))
-				m.helpModel.AddBindingSet("Table Actions", keys.KeyMapToSlice(*m.keyMaps.tableAction))
-				m.helpModel.AddBindingSet("Command Actions", keys.KeyMapToSlice(*m.keyMaps.tableCustomAction))
+				if m.selectedCommand != nil && m.selectedCommand.Status != dbmodels.CommandStatusObsolete {
+					tableActions := m.keyMaps.tableAction
+					tableActions.Delete.SetEnabled(m.selectedCommand.Status != dbmodels.CommandStatusDeleted)
+
+					m.helpModel.AddBindingSet("Table Actions", keys.KeyMapToSlice(*tableActions))
+					tableCustomAction := m.keyMaps.tableCustomAction
+					tableCustomAction.ComposeCommand.SetEnabled(
+						m.selectedCommand.Status != dbmodels.CommandStatusDeleted &&
+							m.selectedCommand.Status != dbmodels.CommandStatusObsolete,
+					)
+					m.helpModel.AddBindingSet("Command Actions", keys.KeyMapToSlice(*tableCustomAction))
+				}
 			}
 		}
 	}
