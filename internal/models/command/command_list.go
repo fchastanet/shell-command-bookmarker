@@ -275,7 +275,7 @@ func (m *commandsList) Update(msg tea.Msg) tea.Cmd {
 			cmds = append(cmds, cmd)
 		}
 	case table.RowDeleteActionMsg[*dbmodels.Command]:
-		return m.handleDeleteRow(msg)
+		return m.handleDeleteRows()
 	case pkgTabs.CategoryTabChangedMsg:
 		return m.loadCommandsForCurrentCategory()
 	}
@@ -384,46 +384,94 @@ func (m *commandsList) handleFocus() tea.Cmd {
 	return m.loadCommandsForCurrentCategory()
 }
 
-func (m *commandsList) handleDeleteRow(msg table.RowDeleteActionMsg[*dbmodels.Command]) tea.Cmd {
-	cmd := msg.Row
-	if cmd == nil {
-		return nil
+func (m *commandsList) handleDeleteRows() tea.Cmd {
+	rows := m.Model.SelectedOrCurrent()
+	if len(rows) == 0 {
+		return func() tea.Msg {
+			return tui.ErrorMsg(&ErrNoCommandsSelected{})
+		}
 	}
-	const maxCmdDetailsLength = 50
-	cmdDetails := cmd.GetSingleLineDescription(maxCmdDetailsLength)
-	confirmMessage := fmt.Sprintf(
-		"Delete command #%d: %s?",
-		cmd.GetID(),
-		cmdDetails,
-	)
+	for _, row := range rows {
+		if row.Status == dbmodels.CommandStatusDeleted {
+			return func() tea.Msg {
+				return tui.ErrorMsg(&ErrSelectionMismatch{})
+			}
+		}
+	}
+	if len(rows) == 1 {
+		cmd := rows[0]
+		const maxCmdDetailsLength = 50
+		cmdDetails := cmd.GetSingleLineDescription(maxCmdDetailsLength)
+		confirmMessage := fmt.Sprintf(
+			"Delete command #%d: %s?",
+			cmd.GetID(),
+			cmdDetails,
+		)
+		return tui.YesNoPrompt(
+			confirmMessage,
+			keys.GetFormKeyMap(),
+			func() tea.Cmd {
+				return m.deleteOneCommand(cmd)
+			},
+		)
+	}
 
-	// Pass our wrapper function as the action to YesNoPrompt
+	confirmMessage := fmt.Sprintf("Delete %d commands?", len(rows))
 	return tui.YesNoPrompt(
 		confirmMessage,
 		keys.GetFormKeyMap(),
 		func() tea.Cmd {
-			nextRowID := m.Model.GetNextRowIDRelativeToCurrentRow()
-			// Mark the command as deleted in the database
-			originalStatus := cmd.Status
-			cmd.Status = dbmodels.CommandStatusDeleted
-			err := m.DBService.UpdateCommand(cmd)
-			if err != nil {
-				slog.Error("Error marking command as deleted", "error", err, "id", cmd.GetID())
-				// Revert status change if update fails
-				cmd.Status = originalStatus
-				return tui.ReportError(fmt.Errorf("failed to mark command as deleted: %w", err))
-			}
-
-			// Return a message that will trigger the reload
-			infoMsg := tui.InfoMsg(fmt.Sprintf(
-				"Command #%d marked as deleted", cmd.GetID(),
-			))
-			return tui.CmdHandler(table.ReloadMsg[*dbmodels.Command]{
-				RowID:   nextRowID,
-				InfoMsg: &infoMsg,
-			})
+			return m.deleteCommands(rows)
 		},
 	)
+}
+
+func (m *commandsList) deleteOneCommand(cmd *dbmodels.Command) tea.Cmd {
+	nextRowID := m.Model.GetNextRowIDRelativeToCurrentRow()
+	// Mark the command as deleted in the database
+	originalStatus := cmd.Status
+	cmd.Status = dbmodels.CommandStatusDeleted
+	err := m.DBService.UpdateCommand(cmd)
+	if err != nil {
+		slog.Error("Error marking command as deleted", "error", err, "id", cmd.GetID())
+		// Revert status change if update fails
+		cmd.Status = originalStatus
+		return tui.ReportError(fmt.Errorf("failed to mark command as deleted: %w", err))
+	}
+
+	// Return a message that will trigger the reload
+	infoMsg := tui.InfoMsg(fmt.Sprintf(
+		"Command #%d marked as deleted", cmd.GetID(),
+	))
+	return tui.CmdHandler(table.ReloadMsg[*dbmodels.Command]{
+		RowID:   nextRowID,
+		InfoMsg: &infoMsg,
+	})
+}
+
+func (m *commandsList) deleteCommands(cmds []*dbmodels.Command) tea.Cmd {
+	nextRowID := m.Model.GetNextRowIDRelativeToCurrentSelection()
+	for _, cmd := range cmds {
+		// Mark the commands as deleted in the database
+		originalStatus := cmd.Status
+		cmd.Status = dbmodels.CommandStatusDeleted
+		err := m.DBService.UpdateCommand(cmd)
+		if err != nil {
+			slog.Error("Error marking one of the commands as deleted", "error", err, "id", cmd.GetID())
+			// Revert status change if update fails
+			cmd.Status = originalStatus
+			return tui.ReportError(fmt.Errorf("failed to mark command as deleted: %w", err))
+		}
+	}
+
+	// Return a message that will trigger the reload
+	infoMsg := tui.InfoMsg(fmt.Sprintf(
+		"%d commands marked as deleted", len(cmds),
+	))
+	return tui.CmdHandler(table.ReloadMsg[*dbmodels.Command]{
+		RowID:   nextRowID,
+		InfoMsg: &infoMsg,
+	})
 }
 
 func (m *commandsList) handleKeyMsg(msg tea.KeyMsg) (cmd tea.Cmd, forward bool) {

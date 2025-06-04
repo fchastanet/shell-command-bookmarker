@@ -731,6 +731,35 @@ func (m *Model[V]) GetNextRowIDRelativeToCurrentRow() resource.ID {
 	return m.rows[m.currentRowIndex+1].GetID()
 }
 
+// GetNextRowIDRelativeToCurrentSelection returns the ID of the next row relative to the current selection.
+// If there are no selected rows, it returns the next row relative to the current row.
+// If the current selection is the last row, it returns the previous row ID.
+// If the current selection is the first row, it returns the next row ID.
+// If there are no rows, it returns 0.
+func (m *Model[V]) GetNextRowIDRelativeToCurrentSelection() resource.ID {
+	if len(m.selected) == 0 {
+		return m.GetNextRowIDRelativeToCurrentRow()
+	}
+	// Get the first selected row
+	selectedRows := maps.Values(m.selected)
+	if len(selectedRows) == 0 {
+		return resource.ID(0)
+	}
+	firstSelectedRow := selectedRows[0]
+	for i, row := range m.rows {
+		if row.GetID() == firstSelectedRow.GetID() {
+			if i+1 < len(m.rows) {
+				return m.rows[i+1].GetID()
+			}
+			if i-1 >= 0 {
+				return m.rows[i-1].GetID()
+			}
+			return resource.ID(0)
+		}
+	}
+	return resource.ID(0)
+}
+
 func (m *Model[V]) headersView() string {
 	s := make([]string, 0, len(m.cols))
 	// TODO: use index and don't use append below
