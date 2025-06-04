@@ -71,9 +71,9 @@ func NewCommand(
 }
 
 func (c *Command) IsEditable() bool {
-	return c.Status != CommandStatusDeleted &&
-		c.Status != CommandStatusObsolete &&
-		c.Status != CommandStatusArchived
+	return c.Status == CommandStatusImported ||
+		c.Status == CommandStatusSaved ||
+		c.Status == CommandStatusBookmarked
 }
 
 // getLintIssues parses the JSON lint issues and returns them as structured data

@@ -430,6 +430,9 @@ func (m *commandsList) handleKeyMsg(msg tea.KeyMsg) (cmd tea.Cmd, forward bool) 
 	if key.Matches(msg, *m.tableCustomActionKeyMap.ComposeCommand) {
 		return m.handleComposeCommand(), false
 	}
+	if key.Matches(msg, *m.tableCustomActionKeyMap.RestoreCommand) {
+		return m.handleRestoreCommand(), false
+	}
 	if key.Matches(msg, *m.tableCustomActionKeyMap.CopyToClipboard) {
 		return m.handleCopyToClipboard(), false
 	}
@@ -439,12 +442,43 @@ func (m *commandsList) handleKeyMsg(msg tea.KeyMsg) (cmd tea.Cmd, forward bool) 
 	return nil, true
 }
 
+func (m *commandsList) handleRestoreCommand() tea.Cmd {
+	rows := m.Model.SelectedOrCurrent()
+	if len(rows) == 0 {
+		return func() tea.Msg {
+			return tui.ErrorMsg(&ErrNoCommandsSelected{})
+		}
+	}
+	for _, row := range rows {
+		if row.Status != dbmodels.CommandStatusDeleted {
+			return func() tea.Msg {
+				return tui.ErrorMsg(&ErrSelectionMismatch{})
+			}
+		}
+	}
+	err := m.HistoryService.RestoreCommand(rows)
+	if err != nil {
+		return func() tea.Msg {
+			return tui.ErrorMsg(&ErrRestoreCommand{Err: err})
+		}
+	}
+	m.Model.DeselectAll()
+
+	infoMsg := tui.InfoMsg(fmt.Sprintf("Restored %d command(s)", len(rows)))
+	return func() tea.Msg {
+		return table.ReloadMsg[*dbmodels.Command]{
+			RowID:   rows[0].GetID(),
+			InfoMsg: &infoMsg,
+		}
+	}
+}
+
 func (m *commandsList) handleComposeCommand() tea.Cmd {
 	rows := m.Model.SelectedOrCurrent()
 	newCmd, err := m.HistoryService.ComposeCommand(rows)
 	if err != nil {
 		return func() tea.Msg {
-			return tui.ErrorMsg(&ComposeCommandError{Err: err})
+			return tui.ErrorMsg(&ErrComposeCommand{Err: err})
 		}
 	}
 	m.Model.DeselectAll()

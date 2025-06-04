@@ -286,6 +286,23 @@ func matchOneOfRegexp(line string, regexps []*regexp.Regexp) bool {
 	return false
 }
 
+func (s *HistoryService) RestoreCommand(commands []*models.Command) error {
+	if len(commands) < 1 {
+		return &ComposeInsufficientCommandsProvidedError{nil}
+	}
+	for _, cmd := range commands {
+		cmd.Status = models.CommandStatusSaved
+		cmd.ModificationDatetime = time.Now()
+		s.lintService.LintCommand(cmd)
+		err := s.dbService.UpdateCommand(cmd)
+		if err != nil {
+			slog.Error("Error restoring command", "id", cmd.ID, "error", err)
+			return err
+		}
+	}
+	return nil
+}
+
 func (s *HistoryService) ComposeCommand(commands []*models.Command) (*models.Command, error) {
 	if len(commands) < 1 {
 		return nil, &ComposeInsufficientCommandsProvidedError{nil}

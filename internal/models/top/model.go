@@ -124,8 +124,8 @@ func NewModel(
 		global:            keys.GetGlobalKeyMap(),
 		pane:              keys.GetPaneNavigationKeyMap(),
 		tableNavigation:   keys.GetTableNavigationKeyMap(),
-		tableAction:       keys.GetTableActionKeyMap(appService.IsShellSelectionMode()),
-		tableCustomAction: keys.GetTableCustomActionKeyMap(appService.IsShellSelectionMode()),
+		tableAction:       keys.GetTableActionKeyMap(),
+		tableCustomAction: keys.GetTableCustomActionKeyMap(),
 		form:              keys.GetFormKeyMap(),
 	}
 
@@ -507,18 +507,16 @@ func (m *Model) updateHelpBindings() {
 			if m.FocusedPosition() == structure.TopPane {
 				m.helpModel.AddBindingSet("Filter Controls", keys.KeyMapToSlice(*m.keyMaps.filter))
 				m.helpModel.AddBindingSet("Table Nav", keys.KeyMapToSlice(*m.keyMaps.tableNavigation))
-				if m.selectedCommand != nil && m.selectedCommand.Status != dbmodels.CommandStatusObsolete {
-					tableActions := m.keyMaps.tableAction
-					tableActions.Delete.SetEnabled(m.selectedCommand.Status != dbmodels.CommandStatusDeleted)
-
-					m.helpModel.AddBindingSet("Table Actions", keys.KeyMapToSlice(*tableActions))
-					tableCustomAction := m.keyMaps.tableCustomAction
-					tableCustomAction.ComposeCommand.SetEnabled(
-						m.selectedCommand.Status != dbmodels.CommandStatusDeleted &&
-							m.selectedCommand.Status != dbmodels.CommandStatusObsolete,
-					)
-					m.helpModel.AddBindingSet("Command Actions", keys.KeyMapToSlice(*tableCustomAction))
-				}
+				tableActions := m.keyMaps.tableAction
+				tableCustomActions := m.keyMaps.tableCustomAction
+				keys.UpdateBindings(
+					tableActions,
+					tableCustomActions,
+					m.appService.IsShellSelectionMode(),
+					m.selectedCommand,
+				)
+				m.helpModel.AddBindingSet("Table Actions", keys.KeyMapToSlice(*tableActions))
+				m.helpModel.AddBindingSet("Command Actions", keys.KeyMapToSlice(*tableCustomActions))
 			}
 		}
 	}
