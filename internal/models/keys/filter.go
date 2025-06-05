@@ -24,7 +24,10 @@ func GetFilterKeyMap() *pkgTabs.FilterKeyMap {
 		key.WithHelp("⏎", "exit filter"),
 	)
 	closeKey := key.NewBinding(
-		key.WithKeys("esc", "ctrl+c"),
+		key.WithKeys(
+			"esc", "ctrl+c",
+			"up", "down", "pgup", "pgdown", "ctrl+pgup", "ctrl+pgdown",
+		),
 		key.WithHelp("␛/Ctrl+c", "clear filter"),
 	)
 	return &pkgTabs.FilterKeyMap{

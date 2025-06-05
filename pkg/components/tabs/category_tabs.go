@@ -159,6 +159,7 @@ func (ct *CategoryTabs[V, CommandStatus]) handleKeyMsg(keyMsg tea.KeyMsg) tea.Cm
 		return ct.nextCategory()
 	case key.Matches(keyMsg, *ct.keyMaps.Validate):
 		if ct.inputModel.Focused() {
+			ct.inputModel.Blur()
 			return ct.handleValidate()
 		}
 	case key.Matches(keyMsg, *ct.keyMaps.Close):
@@ -169,7 +170,8 @@ func (ct *CategoryTabs[V, CommandStatus]) handleKeyMsg(keyMsg tea.KeyMsg) tea.Cm
 	default:
 		// If the filter is visible, pass the key message to the filter model
 		if ct.inputModel.Focused() {
-			return ct.inputModel.Update(keyMsg)
+			cmd := ct.inputModel.Update(keyMsg)
+			return tea.Batch(cmd, ct.handleValidate())
 		}
 	}
 	return nil
@@ -179,7 +181,6 @@ func (ct *CategoryTabs[V, CommandStatus]) handleValidate() tea.Cmd {
 	activeTabType := ct.tabs[ct.activeTabIdx].Type
 	filterValue := ct.inputModel.GetFilterValue()
 	ct.tabs[ct.activeTabIdx].FilterState.FilterValue = filterValue
-	ct.inputModel.Blur()
 	return func() tea.Msg {
 		return CategoryTabChangedMsg{
 			PrevTab:    activeTabType,
