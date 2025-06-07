@@ -91,7 +91,7 @@ type commandEditor struct {
 }
 
 func (m *commandEditor) BeforeSwitchPane() tea.Cmd {
-	return m.confirmAbandonChanges()
+	return m.confirmAbandonChanges(false)
 }
 
 func (m *commandEditor) getCommand(commandID resource.ID) (*dbmodels.Command, error) {
@@ -261,7 +261,7 @@ func (m *commandEditor) handleKeyMsg(msg tea.KeyMsg) tea.Cmd {
 	case key.Matches(msg, *editorK.Save) && editorK.Save.Enabled():
 		return m.save()
 	case key.Matches(msg, *editorK.Cancel) && editorK.Cancel.Enabled():
-		return m.confirmAbandonChanges()
+		return m.confirmAbandonChanges(true)
 	}
 
 	return tea.Batch(cmds...)
@@ -424,12 +424,15 @@ func (m *commandEditor) generateScrollbar(contentStr, visibleContent string) str
 	)
 }
 
-func (m *commandEditor) confirmAbandonChanges() tea.Cmd {
+func (m *commandEditor) confirmAbandonChanges(cancel bool) tea.Cmd {
 	// If no changes are made, just return
 	if !m.EditionInProgress() {
-		return tea.Cmd(func() tea.Msg {
-			return EditorCancelledMsg{}
-		})
+		if cancel {
+			return tea.Cmd(func() tea.Msg {
+				return EditorCancelledMsg{}
+			})
+		}
+		return nil
 	}
 
 	// Prompt the user for confirmation
@@ -450,7 +453,7 @@ func (m *commandEditor) nextField() tea.Cmd {
 	if m.focused == len(m.inputs)-1 {
 		m.focused = -1
 		m.initInputs()
-		return m.confirmAbandonChanges()
+		return m.confirmAbandonChanges(false)
 	}
 
 	m.focused = (m.focused + 1) % len(m.inputs)
@@ -468,7 +471,7 @@ func (m *commandEditor) prevField() tea.Cmd {
 	case -1:
 		m.focused = len(m.inputs) - 1
 		m.initInputs()
-		return m.confirmAbandonChanges()
+		return m.confirmAbandonChanges(false)
 	case 0:
 		m.focused = -1
 	default:
