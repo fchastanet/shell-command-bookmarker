@@ -171,8 +171,6 @@ func formatStatus(
 		return editorStyle.ReadonlyValue.Render(string(cmd.Status))
 	case dbmodels.CommandStatusObsolete:
 		return editorStyle.StatusDisabled.Render(string(cmd.Status))
-	case dbmodels.CommandStatusArchived:
-		return editorStyle.StatusDisabled.Render(string(cmd.Status))
 	case dbmodels.CommandStatusDeleted:
 		return editorStyle.StatusWarning.Render(string(cmd.Status))
 	default:

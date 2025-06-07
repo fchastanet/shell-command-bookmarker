@@ -7,8 +7,10 @@ import (
 )
 
 const (
+	// AvailableCommands represents commands that are available for use
+	AvailableCommands pkgTabs.CategoryType = iota
 	// BookmarkedCommands represents commands that have been bookmarked(saved status)
-	BookmarkedCommands pkgTabs.CategoryType = iota
+	BookmarkedCommands
 	// NewCommands represents commands that have been imported but not yet saved
 	NewCommands
 	// DeletedCommands represents commands that have been marked as deleted
@@ -31,6 +33,17 @@ func NewCategoryAdapter(historyService *services.HistoryService) *CategoryAdapte
 
 func (ca *CategoryAdapter) GetCategoryTabs() []pkgTabs.CategoryTab[models.CommandStatus] {
 	return []pkgTabs.CategoryTab[models.CommandStatus]{
+		{
+			Title:       "Available",
+			Type:        AvailableCommands,
+			Count:       0,
+			FilterState: pkgTabs.FilterState{FilterValue: ""},
+			CommandTypes: []models.CommandStatus{
+				models.CommandStatusSaved,
+				models.CommandStatusBookmarked,
+				models.CommandStatusImported,
+			},
+		},
 		{
 			Title:        "Bookmarked",
 			Type:         BookmarkedCommands,
@@ -63,7 +76,6 @@ func (ca *CategoryAdapter) GetCategoryTabs() []pkgTabs.CategoryTab[models.Comman
 				models.CommandStatusImported,
 				models.CommandStatusDeleted,
 				models.CommandStatusObsolete,
-				models.CommandStatusArchived,
 			},
 		},
 	}
@@ -86,6 +98,7 @@ func (ca *CategoryAdapter) GetCategoryCounts() (map[pkgTabs.CategoryType]int, er
 
 	// Map service categories to UI categories
 	uiCounts := make(map[pkgTabs.CategoryType]int)
+	uiCounts[AvailableCommands] = serviceCounts[services.CommandCategoryAvailable]
 	uiCounts[BookmarkedCommands] = serviceCounts[services.CommandCategoryBookmarked]
 	uiCounts[NewCommands] = serviceCounts[services.CommandCategoryNew]
 	uiCounts[DeletedCommands] = serviceCounts[services.CommandCategoryDeleted]

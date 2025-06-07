@@ -32,6 +32,8 @@ type HistoryIngestor interface {
 type CommandCategory string
 
 const (
+	// CommandCategoryAvailable represents commands that are available for use
+	CommandCategoryAvailable CommandCategory = "available"
 	// CommandCategoryBookmarked represents commands that have been saved
 	CommandCategoryBookmarked CommandCategory = "bookmarked"
 	// CommandCategoryNew represents commands that have been imported but not yet saved
@@ -352,6 +354,10 @@ func (s *HistoryService) GetCommandCountsByCategory() (map[CommandCategory]int, 
 
 	// Map database status counts to category counts
 	categoryCounts := make(map[CommandCategory]int)
+
+	// Available commands (showing Imported status)
+	categoryCounts[CommandCategoryAvailable] = statusCounts[models.CommandStatusImported] +
+		statusCounts[models.CommandStatusSaved] + statusCounts[models.CommandStatusBookmarked]
 
 	// Bookmarked commands (showing Saved status)
 	categoryCounts[CommandCategoryBookmarked] = statusCounts[models.CommandStatusSaved]

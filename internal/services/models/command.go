@@ -16,7 +16,6 @@ const (
 	CommandStatusDeleted    CommandStatus = "DELETED"
 	CommandStatusObsolete   CommandStatus = "OBSOLETE"
 	CommandStatusBookmarked CommandStatus = "BOOKMARKED"
-	CommandStatusArchived   CommandStatus = "ARCHIVED"
 )
 
 type Command struct {
