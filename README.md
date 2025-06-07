@@ -58,7 +58,7 @@ organizing shell commands. It allows users to:
 - Save frequently used shell commands as bookmarks
 - Categorize commands with tags
 - Search through saved commands quickly
-- Execute bookmarked commands directly from the interface
+- Execute saved commands directly from the interface
 
 The application uses the Bubbletea framework to create an interactive terminal
 UI with features like:
@@ -79,8 +79,7 @@ enhance shell workflows and command management.
 - **Bookmark Commands**: Save frequently used shell commands for quick access.
 - **Tagging System**: Organize commands with tags for easy categorization.
 - **Search Functionality**: Quickly find commands using a search bar.
-- **Command Execution**: Execute bookmarked commands directly from the
-  interface.
+- **Command Execution**: Execute saved commands directly from the interface.
 - **Keyboard Shortcuts**: Use keyboard shortcuts for efficient navigation and
   command execution.
 - **Persistent Storage**: Save bookmarks and tags to a SQLite database for

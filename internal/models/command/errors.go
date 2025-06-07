@@ -6,19 +6,35 @@ import (
 	"github.com/fchastanet/shell-command-bookmarker/pkg/resource"
 )
 
-// ComposeCommandError represents an error when composing a command fails
-type ComposeCommandError struct {
+// ErrComposeCommand represents an error when composing a command fails
+type ErrComposeCommand struct {
 	Err error
 }
 
-func (e *ComposeCommandError) Error() string {
+func (e *ErrComposeCommand) Error() string {
 	return fmt.Sprintf("failed to compose command: %v", e.Err)
+}
+
+// ErrRestoreCommand represents an error when restoring a command fails
+type ErrRestoreCommand struct {
+	Err error
+}
+
+func (e *ErrRestoreCommand) Error() string {
+	return fmt.Sprintf("failed to restore command: %v", e.Err)
+}
+
+// ErrSelectionMismatch is returned when selection is not compatible with the operation
+type ErrSelectionMismatch struct{}
+
+func (*ErrSelectionMismatch) Error() string {
+	return "selection mismatch: the selected commands do not match the expected criteria for this operation"
 }
 
 // ErrNoCommandsSelected is returned when no commands are selected for an operation
 type ErrNoCommandsSelected struct{}
 
-func (e *ErrNoCommandsSelected) Error() string {
+func (*ErrNoCommandsSelected) Error() string {
 	return "no commands selected to copy"
 }
 
