@@ -35,7 +35,7 @@ const (
 	// CommandCategoryAvailable represents commands that are available for use
 	CommandCategoryAvailable CommandCategory = "available"
 	// CommandCategoryBookmarked represents commands that have been saved
-	CommandCategoryBookmarked CommandCategory = "bookmarked"
+	CommandCategorySaved CommandCategory = "saved"
 	// CommandCategoryNew represents commands that have been imported but not yet saved
 	CommandCategoryNew CommandCategory = "new"
 	// CommandCategoryDeleted represents commands that have been marked as deleted
@@ -357,10 +357,10 @@ func (s *HistoryService) GetCommandCountsByCategory() (map[CommandCategory]int, 
 
 	// Available commands (showing Imported status)
 	categoryCounts[CommandCategoryAvailable] = statusCounts[models.CommandStatusImported] +
-		statusCounts[models.CommandStatusSaved] + statusCounts[models.CommandStatusBookmarked]
+		statusCounts[models.CommandStatusSaved]
 
-	// Bookmarked commands (showing Saved status)
-	categoryCounts[CommandCategoryBookmarked] = statusCounts[models.CommandStatusSaved]
+	// Saved commands (showing Saved status)
+	categoryCounts[CommandCategorySaved] = statusCounts[models.CommandStatusSaved]
 
 	// New commands (showing Imported status)
 	categoryCounts[CommandCategoryNew] = statusCounts[models.CommandStatusImported]

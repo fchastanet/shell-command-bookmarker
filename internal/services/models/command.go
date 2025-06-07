@@ -11,11 +11,10 @@ import (
 type CommandStatus string
 
 const (
-	CommandStatusImported   CommandStatus = "IMPORTED"
-	CommandStatusSaved      CommandStatus = "SAVED"
-	CommandStatusDeleted    CommandStatus = "DELETED"
-	CommandStatusObsolete   CommandStatus = "OBSOLETE"
-	CommandStatusBookmarked CommandStatus = "BOOKMARKED"
+	CommandStatusImported CommandStatus = "IMPORTED"
+	CommandStatusSaved    CommandStatus = "SAVED"
+	CommandStatusDeleted  CommandStatus = "DELETED"
+	CommandStatusObsolete CommandStatus = "OBSOLETE"
 )
 
 type Command struct {
@@ -71,8 +70,7 @@ func NewCommand(
 
 func (c *Command) IsEditable() bool {
 	return c.Status == CommandStatusImported ||
-		c.Status == CommandStatusSaved ||
-		c.Status == CommandStatusBookmarked
+		c.Status == CommandStatusSaved
 }
 
 // getLintIssues parses the JSON lint issues and returns them as structured data

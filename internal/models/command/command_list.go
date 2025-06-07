@@ -163,8 +163,6 @@ func formatStatus(
 	editorStyle *styles.EditorStyle,
 ) string {
 	switch cmd.Status {
-	case dbmodels.CommandStatusBookmarked:
-		return editorStyle.StatusOK.Render(string(cmd.Status))
 	case dbmodels.CommandStatusSaved:
 		return editorStyle.StatusOK.Render(string(cmd.Status))
 	case dbmodels.CommandStatusImported:

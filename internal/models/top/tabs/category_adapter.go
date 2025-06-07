@@ -9,8 +9,8 @@ import (
 const (
 	// AvailableCommands represents commands that are available for use
 	AvailableCommands pkgTabs.CategoryType = iota
-	// BookmarkedCommands represents commands that have been bookmarked(saved status)
-	BookmarkedCommands
+	// SavedCommands represents commands that have been saved
+	SavedCommands
 	// NewCommands represents commands that have been imported but not yet saved
 	NewCommands
 	// DeletedCommands represents commands that have been marked as deleted
@@ -40,13 +40,12 @@ func (ca *CategoryAdapter) GetCategoryTabs() []pkgTabs.CategoryTab[models.Comman
 			FilterState: pkgTabs.FilterState{FilterValue: ""},
 			CommandTypes: []models.CommandStatus{
 				models.CommandStatusSaved,
-				models.CommandStatusBookmarked,
 				models.CommandStatusImported,
 			},
 		},
 		{
-			Title:        "Bookmarked",
-			Type:         BookmarkedCommands,
+			Title:        "Saved",
+			Type:         SavedCommands,
 			Count:        0,
 			FilterState:  pkgTabs.FilterState{FilterValue: ""},
 			CommandTypes: []models.CommandStatus{models.CommandStatusSaved},
@@ -72,7 +71,6 @@ func (ca *CategoryAdapter) GetCategoryTabs() []pkgTabs.CategoryTab[models.Comman
 			FilterState: pkgTabs.FilterState{FilterValue: ""},
 			CommandTypes: []models.CommandStatus{
 				models.CommandStatusSaved,
-				models.CommandStatusBookmarked,
 				models.CommandStatusImported,
 				models.CommandStatusDeleted,
 				models.CommandStatusObsolete,
@@ -99,7 +97,7 @@ func (ca *CategoryAdapter) GetCategoryCounts() (map[pkgTabs.CategoryType]int, er
 	// Map service categories to UI categories
 	uiCounts := make(map[pkgTabs.CategoryType]int)
 	uiCounts[AvailableCommands] = serviceCounts[services.CommandCategoryAvailable]
-	uiCounts[BookmarkedCommands] = serviceCounts[services.CommandCategoryBookmarked]
+	uiCounts[SavedCommands] = serviceCounts[services.CommandCategorySaved]
 	uiCounts[NewCommands] = serviceCounts[services.CommandCategoryNew]
 	uiCounts[DeletedCommands] = serviceCounts[services.CommandCategoryDeleted]
 	uiCounts[AllCommands] = serviceCounts[services.CommandCategoryAll]
