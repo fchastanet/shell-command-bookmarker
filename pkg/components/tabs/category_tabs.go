@@ -75,6 +75,20 @@ type CategoryTabChangedMsg struct {
 	CurrentTab CategoryType
 }
 
+type ChangeCategoryTabMsg struct {
+	Filter string
+	NewTab CategoryType
+}
+
+// ErrCategoryTabNotFound is returned when no commands are selected for an operation
+type ErrCategoryTabNotFound struct {
+	tab CategoryType
+}
+
+func (e *ErrCategoryTabNotFound) Error() string {
+	return fmt.Sprintf("no category tab found for type %d", e.tab)
+}
+
 // InputModel is an interface that represents any filtering component
 type InputModel interface {
 	GetFilterValue() string
@@ -136,12 +150,39 @@ func (ct *CategoryTabs[V, CommandStatus]) Update(msg tea.Msg) tea.Cmd {
 		ct.focused = false
 	case table.BulkInsertMsg[V]:
 		ct.filteredCount = len(msg.Items)
+	case ChangeCategoryTabMsg:
+		return ct.changeCategoryTab(msg.NewTab, msg.Filter)
 	}
 
 	// Update filter model
 	cmds = append(cmds, ct.inputModel.Update(msg))
 
 	return tea.Batch(cmds...)
+}
+
+func (ct *CategoryTabs[V, CommandStatus]) changeCategoryTab(newTab CategoryType, filter string) tea.Cmd {
+	// Find the index of the new tab
+	for i, tab := range ct.tabs {
+		if tab.Type == newTab {
+			ct.activeTabIdx = i
+			// Set the filter value for the new tab
+			ct.inputModel.SetFilterValue(filter)
+			// Save the filter value in the tab's filter state
+			ct.tabs[ct.activeTabIdx].FilterState.FilterValue = filter
+			// Return a command to notify about the tab change
+			return func() tea.Msg {
+				return CategoryTabChangedMsg{
+					PrevTab:    ct.tabs[ct.activeTabIdx].Type,
+					CurrentTab: newTab,
+					Filter:     filter,
+				}
+			}
+		}
+	}
+	// If the new tab is not found, return error command
+	return func() tea.Msg {
+		return tui.ErrorMsg(&ErrCategoryTabNotFound{tab: newTab})
+	}
 }
 
 //nolint:cyclop // not really complex

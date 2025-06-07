@@ -89,8 +89,9 @@ type SortFunc[V any] func(V, V) int
 
 // BulkInsertMsg performs a bulk insertion of entities into a table
 type BulkInsertMsg[T any] struct {
-	InfoMsg string
-	Items   []T
+	InfoMsg     string
+	Items       []T
+	SelectRowID resource.ID
 }
 
 // New creates a new model for the table widget.
@@ -261,6 +262,14 @@ func (m *Model[V]) Update(msg tea.Msg) tea.Cmd {
 
 func (m *Model[V]) handleBulkInsert(msg BulkInsertMsg[V]) tea.Cmd {
 	m.SetItems(msg.Items...)
+	if msg.SelectRowID != resource.ID(0) {
+		// If a specific row ID is provided, select that row.
+		cmd := m.GotoID(msg.SelectRowID)
+		if cmd != nil {
+			return cmd
+		}
+		// row ID is not found, keep previous selection if possible
+	}
 	var rowCmd tea.Cmd
 	if len(msg.Items) == 0 {
 		m.currentRowIndex = -1
@@ -691,9 +700,9 @@ func (m *Model[V]) setStart() {
 }
 
 // GotoTop makes the top row the current row.
-func (m *Model[V]) GotoID(id resource.ID) {
+func (m *Model[V]) GotoID(id resource.ID) tea.Cmd {
 	if id == m.currentRowID {
-		return
+		return nil
 	}
 	if _, ok := m.items[id]; ok {
 		m.currentRowID = id
@@ -706,6 +715,12 @@ func (m *Model[V]) GotoID(id resource.ID) {
 		}
 	}
 	m.setStart()
+	item := m.items[m.currentRowID]
+
+	return tui.CmdHandler(RowSelectedActionMsg[V]{
+		Row:   item,
+		RowID: item.GetID(),
+	})
 }
 
 // GotoTop makes the top row the current row.

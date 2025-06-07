@@ -252,7 +252,7 @@ func (m *commandsList) Update(msg tea.Msg) tea.Cmd {
 
 	switch msg := msg.(type) {
 	case table.ReloadMsg[*dbmodels.Command]:
-		return m.loadCommandsForCurrentCategory()
+		return m.loadCommandsForCurrentCategory(msg.RowID)
 	case tea.WindowSizeMsg:
 		return m.handleWindowSize(msg)
 	case tea.BlurMsg:
@@ -273,7 +273,7 @@ func (m *commandsList) Update(msg tea.Msg) tea.Cmd {
 	case table.RowDeleteActionMsg[*dbmodels.Command]:
 		return m.handleDeleteRows()
 	case pkgTabs.CategoryTabChangedMsg:
-		return m.loadCommandsForCurrentCategory()
+		return m.loadCommandsForCurrentCategory(-1)
 	}
 
 	// First update category tabs
@@ -290,7 +290,7 @@ func (m *commandsList) Update(msg tea.Msg) tea.Cmd {
 }
 
 // loadCommandsForCurrentCategory loads commands for the current category
-func (m *commandsList) loadCommandsForCurrentCategory() tea.Cmd {
+func (m *commandsList) loadCommandsForCurrentCategory(selectRowID resource.ID) tea.Cmd {
 	return func() tea.Msg {
 		// Get status types from current category
 		statuses := m.categoryTabs.GetCommandTypes()
@@ -334,8 +334,9 @@ func (m *commandsList) loadCommandsForCurrentCategory() tea.Cmd {
 			info += fmt.Sprintf(" (filter: %s)", m.categoryTabs.GetActiveFilter())
 		}
 		return table.BulkInsertMsg[*dbmodels.Command]{
-			Items:   rows,
-			InfoMsg: info,
+			Items:       rows,
+			InfoMsg:     info,
+			SelectRowID: selectRowID,
 		}
 	}
 }
@@ -377,7 +378,7 @@ func (m *commandsList) handleFocus() tea.Cmd {
 	m.Model.SetColumns(m.getColumns(m.width))
 
 	// When focused, load commands for the current category
-	return m.loadCommandsForCurrentCategory()
+	return m.loadCommandsForCurrentCategory(-1)
 }
 
 func (m *commandsList) handleDeleteRows() tea.Cmd {
@@ -527,10 +528,15 @@ func (m *commandsList) handleComposeCommand() tea.Cmd {
 		}
 	}
 	m.Model.DeselectAll()
-	// Return a message that will trigger the reload
 	infoMsg := tui.InfoMsg(fmt.Sprintf(
 		"New Command #%d created from %d selected commands", newCmd.GetID(), len(rows),
 	))
+	// change the category tab to "Available Commands" immediately
+	// so the user can see the new command right away
+	m.categoryTabs.Update(pkgTabs.ChangeCategoryTabMsg{
+		NewTab: tabs.AvailableCommands,
+		Filter: "",
+	})
 	return tea.Batch(
 		func() tea.Msg {
 			return table.ReloadMsg[*dbmodels.Command]{
@@ -538,10 +544,6 @@ func (m *commandsList) handleComposeCommand() tea.Cmd {
 				InfoMsg: &infoMsg,
 			}
 		},
-		tui.CmdHandler(table.RowSelectedActionMsg[*dbmodels.Command]{
-			Row:   newCmd,
-			RowID: newCmd.ID,
-		}),
 	)
 }
 
