@@ -127,7 +127,7 @@ func NewCategoryTabs[V resource.Identifiable, CommandStatus any](
 }
 
 // Init initializes the CategoryTabs component (implementation of tea.Model interface)
-func (ct *CategoryTabs[V, CommandStatus]) Init() tea.Cmd {
+func (*CategoryTabs[V, CommandStatus]) Init() tea.Cmd {
 	return nil
 }
 
@@ -251,21 +251,7 @@ func (ct *CategoryTabs[V, CommandStatus]) prevCategory() tea.Cmd {
 		ct.activeTabIdx--
 	}
 
-	// Save current filter value
-	ct.tabs[prevTabIdx].FilterState.FilterValue = ct.inputModel.GetFilterValue()
-
-	// Restore the filter value for the newly selected tab
-	ct.inputModel.SetFilterValue(ct.tabs[ct.activeTabIdx].FilterState.FilterValue)
-
-	currentTabType := ct.tabs[ct.activeTabIdx].Type
-
-	return func() tea.Msg {
-		return CategoryTabChangedMsg{
-			PrevTab:    prevTabType,
-			CurrentTab: currentTabType,
-			Filter:     ct.inputModel.GetFilterValue(),
-		}
-	}
+	return ct.categoryChangedMsg(prevTabIdx, prevTabType)
 }
 
 // nextCategory selects the next category tab
@@ -279,6 +265,13 @@ func (ct *CategoryTabs[V, CommandStatus]) nextCategory() tea.Cmd {
 		ct.activeTabIdx++
 	}
 
+	return ct.categoryChangedMsg(prevTabIdx, prevTabType)
+}
+
+func (ct *CategoryTabs[V, CommandStatus]) categoryChangedMsg(
+	prevTabIdx int,
+	prevTabType CategoryType,
+) tea.Cmd {
 	// Save current filter value
 	ct.tabs[prevTabIdx].FilterState.FilterValue = ct.inputModel.GetFilterValue()
 

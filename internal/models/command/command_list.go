@@ -223,13 +223,14 @@ func (*commandsList) BeforeSwitchPane() tea.Cmd {
 func (m *commandsList) getColumns(width int) []table.Column {
 	slog.Debug("getColumns", "width", width)
 	const columnsCount = 5
+	const roundedAdaptation = 1
 	w := width -
 		columnsCount*m.styles.TableStyle.Cell.GetHorizontalPadding()*sidesCount
-	m.idColumn.Width = idColumnPercentWidth*w/percent + 1
-	m.titleColumn.Width = titleColumnPercentWidth*w/percent + 1
-	m.scriptColumn.Width = scriptColumnPercentWidth*w/percent + 1
-	m.statusColumn.Width = statusColumnPercentWidth*w/percent + 1
-	m.lintStatusColumn.Width = lintStatusColumnPercentWidth*w/percent + 1
+	m.idColumn.Width = idColumnPercentWidth*w/percent + roundedAdaptation
+	m.titleColumn.Width = titleColumnPercentWidth*w/percent + roundedAdaptation
+	m.scriptColumn.Width = scriptColumnPercentWidth*w/percent + roundedAdaptation
+	m.statusColumn.Width = statusColumnPercentWidth*w/percent + roundedAdaptation
+	m.lintStatusColumn.Width = lintStatusColumnPercentWidth*w/percent + roundedAdaptation
 	return []table.Column{
 		*m.idColumn,
 		*m.titleColumn,

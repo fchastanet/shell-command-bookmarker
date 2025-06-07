@@ -31,7 +31,7 @@ func NewCategoryAdapter(historyService *services.HistoryService) *CategoryAdapte
 	}
 }
 
-func (ca *CategoryAdapter) GetCategoryTabs() []pkgTabs.CategoryTab[models.CommandStatus] {
+func (*CategoryAdapter) GetCategoryTabs() []pkgTabs.CategoryTab[models.CommandStatus] {
 	return []pkgTabs.CategoryTab[models.CommandStatus]{
 		{
 			Title:       "Available",

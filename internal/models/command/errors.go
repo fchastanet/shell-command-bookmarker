@@ -34,7 +34,7 @@ func (e *ErrSelectionMismatch) Error() string {
 // ErrNoCommandsSelected is returned when no commands are selected for an operation
 type ErrNoCommandsSelected struct{}
 
-func (e *ErrNoCommandsSelected) Error() string {
+func (*ErrNoCommandsSelected) Error() string {
 	return "no commands selected to copy"
 }
 

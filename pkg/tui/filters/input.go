@@ -34,7 +34,7 @@ func NewInput() *Input {
 }
 
 // Init implements the tea.Model interface
-func (f *Input) Init() tea.Cmd {
+func (*Input) Init() tea.Cmd {
 	return nil
 }
 
