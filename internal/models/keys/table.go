@@ -54,7 +54,11 @@ func UpdateBindings(
 	shellSelectionMode bool,
 	selectedCommand *dbmodels.Command,
 ) {
-	tableCustomActions.SelectForShell.SetEnabled(shellSelectionMode)
+	tableCustomActions.SelectForShell.SetEnabled(
+		selectedCommand != nil &&
+			shellSelectionMode &&
+			selectedCommand.Status != dbmodels.CommandStatusDeleted,
+	)
 	tableCustomActions.ComposeCommand.SetEnabled(
 		!shellSelectionMode && selectedCommand != nil && selectedCommand.IsEditable(),
 	)
@@ -75,5 +79,5 @@ func UpdateBindings(
 	tableActions.SelectAll.SetEnabled(selectedCommand != nil)
 	tableActions.SelectClear.SetEnabled(selectedCommand != nil)
 	tableActions.SelectRange.SetEnabled(selectedCommand != nil)
-	tableActions.Enter.SetEnabled(selectedCommand != nil)
+	tableActions.Enter.SetEnabled(selectedCommand != nil && !shellSelectionMode)
 }

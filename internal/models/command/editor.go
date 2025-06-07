@@ -245,21 +245,22 @@ func (m *commandEditor) initInputs() {
 	}
 }
 
+//nolint:cyclop // not really complex
 func (m *commandEditor) handleKeyMsg(msg tea.KeyMsg) tea.Cmd {
 	var cmds []tea.Cmd
-
+	editorK := m.EditorKeyMap
 	switch {
-	case key.Matches(msg, *m.EditorKeyMap.PreviousField):
+	case key.Matches(msg, *editorK.PreviousField) && editorK.PreviousField.Enabled():
 		cmds = append(cmds, m.prevField())
-	case key.Matches(msg, *m.EditorKeyMap.NextField):
+	case key.Matches(msg, *editorK.NextField) && editorK.NextField.Enabled():
 		cmds = append(cmds, m.nextField())
-	case key.Matches(msg, *m.EditorKeyMap.PreviousPage):
+	case key.Matches(msg, *editorK.PreviousPage) && editorK.PreviousPage.Enabled():
 		m.prevPage()
-	case key.Matches(msg, *m.EditorKeyMap.NextPage):
+	case key.Matches(msg, *editorK.NextPage) && editorK.NextPage.Enabled():
 		m.nextPage()
-	case key.Matches(msg, *m.EditorKeyMap.Save):
+	case key.Matches(msg, *editorK.Save) && editorK.Save.Enabled():
 		return m.save()
-	case key.Matches(msg, *m.EditorKeyMap.Cancel):
+	case key.Matches(msg, *editorK.Cancel) && editorK.Cancel.Enabled():
 		return m.confirmAbandonChanges()
 	}
 

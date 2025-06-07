@@ -146,23 +146,24 @@ func (ct *CategoryTabs[V, CommandStatus]) Update(msg tea.Msg) tea.Cmd {
 
 //nolint:cyclop // not really complex
 func (ct *CategoryTabs[V, CommandStatus]) handleKeyMsg(keyMsg tea.KeyMsg) tea.Cmd {
+	keys := ct.keyMaps
 	switch {
-	case key.Matches(keyMsg, *ct.keyMaps.Filter):
+	case key.Matches(keyMsg, *keys.Filter) && keys.Filter.Enabled():
 		if !ct.inputModel.Focused() {
 			ct.inputModel.Focus()
 		}
-	case key.Matches(keyMsg, *ct.keyMaps.PreviousTab):
+	case key.Matches(keyMsg, *keys.PreviousTab) && keys.PreviousTab.Enabled():
 		// Switch to the previous category tab
 		return ct.prevCategory()
-	case key.Matches(keyMsg, *ct.keyMaps.NextTab):
+	case key.Matches(keyMsg, *keys.NextTab) && keys.NextTab.Enabled():
 		// Switch to the next category tab
 		return ct.nextCategory()
-	case key.Matches(keyMsg, *ct.keyMaps.Validate):
+	case key.Matches(keyMsg, *keys.Validate) && keys.Validate.Enabled():
 		if ct.inputModel.Focused() {
 			ct.inputModel.Blur()
 			return ct.handleValidate()
 		}
-	case key.Matches(keyMsg, *ct.keyMaps.Close):
+	case key.Matches(keyMsg, *keys.Close) && keys.Close.Enabled():
 		if ct.inputModel.Focused() {
 			ct.inputModel.Blur()
 			return tui.GetDummyCmd()

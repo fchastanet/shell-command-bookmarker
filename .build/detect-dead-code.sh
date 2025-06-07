@@ -23,8 +23,8 @@ sed -i -E \
   -e '/^pkg\/components\/tabs\/tabs.go:97:16: unreachable func: Tabs.Init$/d' \
   -e '/^pkg\/components\/tabs\/tabs.go:108:16: unreachable func: Tabs.Update$/d' \
   -e '/^pkg\/components\/tabs\/tabs.go:137:16: unreachable func: Tabs.updateActiveTab$/d' \
-  -e '/^pkg\/components\/tabs\/tabs.go:167:17: unreachable func: Tab.View$/d' \
-  -e '/^pkg\/components\/tabs\/tabs.go:181:16: unreachable func: Tabs.View$/d' \
+  -e '/^pkg\/components\/tabs\/tabs.go:168:17: unreachable func: Tab.View$/d' \
+  -e '/^pkg\/components\/tabs\/tabs.go:182:16: unreachable func: Tabs.View$/d' \
   "${tempFile}"
 
 if [[ -s "${tempFile}" ]]; then

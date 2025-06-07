@@ -475,16 +475,17 @@ func (m *commandsList) deleteCommands(cmds []*dbmodels.Command) tea.Cmd {
 }
 
 func (m *commandsList) handleKeyMsg(msg tea.KeyMsg) (cmd tea.Cmd, forward bool) {
-	if key.Matches(msg, *m.tableCustomActionKeyMap.ComposeCommand) {
+	customK := m.tableCustomActionKeyMap
+	if key.Matches(msg, *customK.ComposeCommand) && customK.ComposeCommand.Enabled() {
 		return m.handleComposeCommand(), false
 	}
-	if key.Matches(msg, *m.tableCustomActionKeyMap.RestoreCommand) {
+	if key.Matches(msg, *customK.RestoreCommand) && customK.RestoreCommand.Enabled() {
 		return m.handleRestoreCommand(), false
 	}
-	if key.Matches(msg, *m.tableCustomActionKeyMap.CopyToClipboard) {
+	if key.Matches(msg, *customK.CopyToClipboard) && customK.CopyToClipboard.Enabled() {
 		return m.handleCopyToClipboard(), false
 	}
-	if key.Matches(msg, *m.tableCustomActionKeyMap.SelectForShell) {
+	if key.Matches(msg, *customK.SelectForShell) && customK.SelectForShell.Enabled() {
 		return m.handleSelectForShell(), false
 	}
 	return nil, true

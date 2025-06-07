@@ -317,7 +317,7 @@ func (m *Model[V]) handleKeyMsg(msg tea.KeyMsg) tea.Cmd {
 func (m *Model[V]) handleActionKey(msg tea.KeyMsg) tea.Cmd {
 	actions := m.actionKeyMap
 	switch {
-	case key.Matches(msg, *actions.Enter):
+	case key.Matches(msg, *actions.Enter) && actions.Enter.Enabled():
 		row, ok := m.CurrentRow()
 		if !ok {
 			return nil
@@ -327,11 +327,11 @@ func (m *Model[V]) handleActionKey(msg tea.KeyMsg) tea.Cmd {
 			RowID: row.GetID(),
 			Kind:  m.previewKind,
 		})
-	case key.Matches(msg, *actions.Reload):
+	case key.Matches(msg, *actions.Reload) && actions.Reload.Enabled():
 		return tui.CmdHandler(ReloadMsg[V]{
 			RowID: -1, InfoMsg: nil,
 		})
-	case key.Matches(msg, *actions.Delete):
+	case key.Matches(msg, *actions.Delete) && actions.Delete.Enabled():
 		row, ok := m.CurrentRow()
 		if !ok {
 			return nil
@@ -345,24 +345,26 @@ func (m *Model[V]) handleActionKey(msg tea.KeyMsg) tea.Cmd {
 }
 
 // handleNavigationKey handles all navigation key presses
+//
+//nolint:cyclop // not really complex
 func (m *Model[V]) handleNavigationKey(msg tea.KeyMsg) tea.Cmd {
 	nav := m.navigationKeyMap
 	switch {
-	case key.Matches(msg, *nav.LineUp):
+	case key.Matches(msg, *nav.LineUp) && nav.LineUp.Enabled():
 		m.MoveUp(1)
-	case key.Matches(msg, *nav.LineDown):
+	case key.Matches(msg, *nav.LineDown) && nav.LineDown.Enabled():
 		m.MoveDown(1)
-	case key.Matches(msg, *nav.PageUp):
+	case key.Matches(msg, *nav.PageUp) && nav.PageUp.Enabled():
 		m.MoveUp(m.rowAreaHeight())
-	case key.Matches(msg, *nav.PageDown):
+	case key.Matches(msg, *nav.PageDown) && nav.PageDown.Enabled():
 		m.MoveDown(m.rowAreaHeight())
-	case key.Matches(msg, *nav.HalfPageUp):
+	case key.Matches(msg, *nav.HalfPageUp) && nav.HalfPageUp.Enabled():
 		m.MoveUp(m.rowAreaHeight() / HalfPageMultiplier)
-	case key.Matches(msg, *nav.HalfPageDown):
+	case key.Matches(msg, *nav.HalfPageDown) && nav.HalfPageDown.Enabled():
 		m.MoveDown(m.rowAreaHeight() / HalfPageMultiplier)
-	case key.Matches(msg, *nav.GotoTop):
+	case key.Matches(msg, *nav.GotoTop) && nav.GotoTop.Enabled():
 		m.GotoTop()
-	case key.Matches(msg, *nav.GotoBottom):
+	case key.Matches(msg, *nav.GotoBottom) && nav.GotoBottom.Enabled():
 		m.GotoBottom()
 	default:
 		return nil
@@ -378,13 +380,13 @@ func (m *Model[V]) handleNavigationKey(msg tea.KeyMsg) tea.Cmd {
 func (m *Model[V]) handleSelectionKey(msg tea.KeyMsg) bool {
 	nav := m.actionKeyMap
 	switch {
-	case key.Matches(msg, *nav.Select):
+	case key.Matches(msg, *nav.Select) && nav.Select.Enabled():
 		m.ToggleSelection()
-	case key.Matches(msg, *nav.SelectAll):
+	case key.Matches(msg, *nav.SelectAll) && nav.SelectAll.Enabled():
 		m.SelectAll()
-	case key.Matches(msg, *nav.SelectClear):
+	case key.Matches(msg, *nav.SelectClear) && nav.SelectClear.Enabled():
 		m.DeselectAll()
-	case key.Matches(msg, *nav.SelectRange):
+	case key.Matches(msg, *nav.SelectRange) && nav.SelectRange.Enabled():
 		m.SelectRange()
 	default:
 		return false

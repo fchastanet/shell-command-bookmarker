@@ -235,8 +235,9 @@ func (m *Model) dispatchMessage(msg tea.Msg) tea.Cmd {
 }
 
 func (m *Model) handlePromptMode(msg tea.Msg) tea.Cmd {
+	gKeys := m.keyMaps.global
 	if keyMsg, ok := msg.(tea.KeyMsg); ok {
-		if key.Matches(keyMsg, *m.keyMaps.global.Help) {
+		if key.Matches(keyMsg, *gKeys.Help) && gKeys.Help.Enabled() {
 			m.displayHelp()
 			return nil
 		}
@@ -410,39 +411,44 @@ func (m *Model) handleYesNoPrompt(promptMsg tui.YesNoPromptMsg) tea.Cmd {
 	return tea.Batch(cmds...)
 }
 
+//nolint:cyclop // not really complex
 func (m *Model) manageKey(msg tea.KeyMsg) tea.Cmd {
+	globalKeys := m.keyMaps.global
 	switch {
-	case key.Matches(msg, *m.keyMaps.global.Quit):
-		// In shell selection mode (with output-file parameter), Ctrl+C should exit immediately without confirmation
-		if m.appService.IsShellSelectionMode() {
-			m.quitting = true
-			return QuitWithClearScreen()
-		}
-
-		// In normal mode, Ctrl+C prompts for confirmation before quitting
-		cmd := tui.YesNoPrompt(
-			"Quit Shell Command Bookmarker?",
-			keys.GetFormKeyMap(),
-			func() tea.Cmd {
-				m.quitting = true
-				m.mode = normalMode
-				return QuitWithClearScreen()
-			},
-		)
-		return cmd
-	case key.Matches(msg, *m.keyMaps.global.Help):
+	case key.Matches(msg, *globalKeys.Quit) && globalKeys.Quit.Enabled():
+		return m.handleQuit()
+	case key.Matches(msg, *globalKeys.Help) && globalKeys.Help.Enabled():
 		m.displayHelp()
-	case key.Matches(msg, *m.keyMaps.global.Debug):
+	case key.Matches(msg, *globalKeys.Debug) && globalKeys.Debug.Enabled():
 		// ctrl+d shows memory stats for debugging performance
 		if m.perfMonitorActive {
 			return tui.StopPerformanceMonitor()
 		}
 		return tui.StartPerformanceMonitor(performanceMonitorInterval)
-	case key.Matches(msg, *m.keyMaps.global.Search):
+	case key.Matches(msg, *globalKeys.Search) && globalKeys.Search.Enabled():
 		return models.NavigateTo(structure.SearchKind, structure.WithPosition(structure.LeftPane))
 	default:
 	}
 	return nil
+}
+
+func (m *Model) handleQuit() tea.Cmd {
+	// In shell selection mode (with output-file parameter), Ctrl+C should exit immediately without confirmation
+	if m.appService.IsShellSelectionMode() {
+		m.quitting = true
+		return QuitWithClearScreen()
+	}
+
+	// In normal mode, Ctrl+C prompts for confirmation before quitting
+	return tui.YesNoPrompt(
+		"Quit Shell Command Bookmarker?",
+		keys.GetFormKeyMap(),
+		func() tea.Cmd {
+			m.quitting = true
+			m.mode = normalMode
+			return QuitWithClearScreen()
+		},
+	)
 }
 
 func (m *Model) displayHelp() {
