@@ -34,7 +34,7 @@ type CommandCategory string
 const (
 	// CommandCategoryAvailable represents commands that are available for use
 	CommandCategoryAvailable CommandCategory = "available"
-	// CommandCategoryBookmarked represents commands that have been saved
+	// CommandCategorySaved represents commands that have been saved
 	CommandCategorySaved CommandCategory = "saved"
 	// CommandCategoryNew represents commands that have been imported but not yet saved
 	CommandCategoryNew CommandCategory = "new"

@@ -31,13 +31,6 @@ type Command struct {
 	Elapsed              int
 }
 
-type CommandStatusEnum struct {
-	Imported   CommandStatus
-	Saved      CommandStatus
-	Obsolete   CommandStatus
-	Bookmarked CommandStatus
-}
-
 type LintStatus string
 
 const (
