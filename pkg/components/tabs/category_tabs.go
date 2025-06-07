@@ -185,36 +185,50 @@ func (ct *CategoryTabs[V, CommandStatus]) changeCategoryTab(newTab CategoryType,
 	}
 }
 
-//nolint:cyclop // not really complex
+func checkKey(msg tea.KeyMsg, binding *key.Binding) bool {
+	if binding == nil {
+		return false
+	}
+	if binding.Enabled() && key.Matches(msg, *binding) {
+		return true
+	}
+	return false
+}
+
 func (ct *CategoryTabs[V, CommandStatus]) handleKeyMsg(keyMsg tea.KeyMsg) tea.Cmd {
 	keys := ct.keyMaps
 	switch {
-	case key.Matches(keyMsg, *keys.Filter) && keys.Filter.Enabled():
+	case checkKey(keyMsg, keys.Filter):
 		if !ct.inputModel.Focused() {
-			ct.inputModel.Focus()
+			return ct.inputModel.Focus()
 		}
-	case key.Matches(keyMsg, *keys.PreviousTab) && keys.PreviousTab.Enabled():
+	case checkKey(keyMsg, keys.PreviousTab):
 		// Switch to the previous category tab
 		return ct.prevCategory()
-	case key.Matches(keyMsg, *keys.NextTab) && keys.NextTab.Enabled():
+	case checkKey(keyMsg, keys.NextTab):
 		// Switch to the next category tab
 		return ct.nextCategory()
-	case key.Matches(keyMsg, *keys.Validate) && keys.Validate.Enabled():
+	case checkKey(keyMsg, keys.Validate):
 		if ct.inputModel.Focused() {
 			ct.inputModel.Blur()
 			return ct.handleValidate()
 		}
-	case key.Matches(keyMsg, *keys.Close) && keys.Close.Enabled():
+	case checkKey(keyMsg, keys.Close):
 		if ct.inputModel.Focused() {
 			ct.inputModel.Blur()
 			return tui.GetDummyCmd()
 		}
-	default:
-		// If the filter is visible, pass the key message to the filter model
-		if ct.inputModel.Focused() {
-			cmd := ct.inputModel.Update(keyMsg)
-			return tea.Batch(cmd, ct.handleValidate())
-		}
+	}
+
+	return ct.handleFilterInput(keyMsg)
+}
+
+// handleFilterInput handles passing keystrokes to the filter when it's focused
+func (ct *CategoryTabs[V, CommandStatus]) handleFilterInput(keyMsg tea.KeyMsg) tea.Cmd {
+	// If the filter is visible, pass the key message to the filter model
+	if ct.inputModel.Focused() {
+		cmd := ct.inputModel.Update(keyMsg)
+		return tea.Batch(cmd, ct.handleValidate())
 	}
 	return nil
 }

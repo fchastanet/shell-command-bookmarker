@@ -179,44 +179,46 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	// Use enhanced logging for better debugging
 	m.appService.LoggerService.EnhancedLogTeaMsg(msg)
 
+	// First handle performance monitoring messages
+	if cmd := m.handlePerformanceMessages(msg); cmd != nil {
+		return m, cmd
+	}
+
+	if cmd, cmdHandled := m.handleCommandMsg(msg); cmdHandled {
+		return m, cmd
+	}
+
 	cmd := m.dispatchMessage(msg)
 	return m, cmd
 }
 
-// dispatchMessage routes messages to their appropriate handlers
-//
-//nolint:cyclop // not really complex
-func (m *Model) dispatchMessage(msg tea.Msg) tea.Cmd {
-	// First handle performance monitoring messages
-	if cmd := m.handlePerformanceMessages(msg); cmd != nil {
-		return cmd
-	}
-
-	// Then handle other specific message types
+func (m *Model) handleCommandMsg(msg tea.Msg) (tea.Cmd, bool) {
 	switch msg := msg.(type) {
 	case QuitClearScreenMsg:
-		m.quitting = true
-		return tea.Quit
+		return m.handleQuitClearScreenMsg(), true
 	case spinner.TickMsg:
-		return m.handleSpinnerTick(msg)
+		return m.handleSpinnerTick(msg), true
 	case tui.YesNoPromptMsg:
-		return m.handleYesNoPrompt(msg)
+		return m.handleYesNoPrompt(msg), true
 	case tui.ErrorMsg, tui.InfoMsg, MessageClearTickMsg:
-		return m.handleStatusMsg(msg)
+		return m.handleStatusMsg(msg), true
 	case tea.WindowSizeMsg:
-		return m.handleWindowSize(msg)
+		return m.handleWindowSize(msg), true
 	case structure.FocusedPaneChangedMsg:
-		return m.handleFocusPaneChangedMsg(msg)
+		return m.handleFocusPaneChangedMsg(msg), true
 	case cursor.BlinkMsg:
-		return m.handleBlink(msg)
+		return m.handleBlink(msg), true
 	case tui.MemoryStatsMsg:
-		m.handleMemoryStats(msg)
-		return tui.PerformanceMonitorTick(performanceMonitorInterval)
+		return m.handleMemoryStats(msg), true
 	case structure.CommandSelectedForShellMsg:
-		return m.handleCommandSelectedForShellMsg(msg)
-	case table.RowSelectedActionMsg[*dbmodels.Command]:
-		m.selectedCommand = msg.Row
-		m.updateHelpBindings()
+		return m.handleCommandSelectedForShellMsg(msg), true
+	}
+	return nil, false
+}
+
+func (m *Model) dispatchMessage(msg tea.Msg) tea.Cmd {
+	if rowMsg, ok := msg.(table.RowSelectedActionMsg[*dbmodels.Command]); ok {
+		m.handleSelectedCommand(rowMsg)
 	}
 
 	if m.prompt != nil && m.mode == promptMode {
@@ -226,11 +228,18 @@ func (m *Model) dispatchMessage(msg tea.Msg) tea.Cmd {
 	if keyMsg, ok := msg.(tea.KeyMsg); ok {
 		return m.handleKeyMsg(keyMsg)
 	}
-	cmd := m.PaneManager.Update(msg)
-	if cmd != nil {
-		return cmd
-	}
-	return nil
+
+	return m.PaneManager.Update(msg)
+}
+
+func (m *Model) handleSelectedCommand(msg table.RowSelectedActionMsg[*dbmodels.Command]) {
+	m.selectedCommand = msg.Row
+	m.updateHelpBindings()
+}
+
+func (m *Model) handleQuitClearScreenMsg() tea.Cmd {
+	m.quitting = true
+	return tea.Quit
 }
 
 func (m *Model) handlePromptMode(msg tea.Msg) tea.Cmd {
@@ -275,8 +284,8 @@ func (m *Model) handleFocusPaneChangedMsg(msg tea.Msg) tea.Cmd {
 		Height: m.viewHeight(),
 		Width:  m.viewWidth(),
 	})
-	m.PaneManager.Update(msg)
-	return nil
+
+	return m.PaneManager.Update(msg)
 }
 
 // handlePerformanceMessages handles performance monitoring related messages
@@ -364,11 +373,12 @@ func (m *Model) handleBlink(msg cursor.BlinkMsg) tea.Cmd {
 }
 
 // handleMemoryStats processes and displays memory statistics
-func (m *Model) handleMemoryStats(msg tui.MemoryStatsMsg) {
+func (m *Model) handleMemoryStats(msg tui.MemoryStatsMsg) tea.Cmd {
 	statsInfo := fmt.Sprintf("Memory: %d MB in use | %d MB total | %d MB sys | GC runs: %d",
 		msg.Alloc/bytesInMegabyte, msg.TotalAlloc/bytesInMegabyte, msg.Sys/bytesInMegabyte, msg.NumGC)
 
 	m.footerModel.SetInfo(statsInfo)
+	return tui.PerformanceMonitorTick(performanceMonitorInterval)
 }
 
 // handleKeyMsg processes key messages

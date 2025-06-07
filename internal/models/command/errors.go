@@ -27,7 +27,7 @@ func (e *ErrRestoreCommand) Error() string {
 // ErrSelectionMismatch is returned when selection is not compatible with the operation
 type ErrSelectionMismatch struct{}
 
-func (e *ErrSelectionMismatch) Error() string {
+func (*ErrSelectionMismatch) Error() string {
 	return "selection mismatch: the selected commands do not match the expected criteria for this operation"
 }
 

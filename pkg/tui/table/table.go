@@ -353,27 +353,35 @@ func (m *Model[V]) handleActionKey(msg tea.KeyMsg) tea.Cmd {
 	return nil
 }
 
+func checkKey(msg tea.KeyMsg, binding *key.Binding) bool {
+	if binding == nil {
+		return false
+	}
+	if binding.Enabled() && key.Matches(msg, *binding) {
+		return true
+	}
+	return false
+}
+
 // handleNavigationKey handles all navigation key presses
-//
-//nolint:cyclop // not really complex
 func (m *Model[V]) handleNavigationKey(msg tea.KeyMsg) tea.Cmd {
 	nav := m.navigationKeyMap
 	switch {
-	case key.Matches(msg, *nav.LineUp) && nav.LineUp.Enabled():
+	case checkKey(msg, nav.LineUp):
 		m.MoveUp(1)
-	case key.Matches(msg, *nav.LineDown) && nav.LineDown.Enabled():
+	case checkKey(msg, nav.LineDown):
 		m.MoveDown(1)
-	case key.Matches(msg, *nav.PageUp) && nav.PageUp.Enabled():
+	case checkKey(msg, nav.PageUp):
 		m.MoveUp(m.rowAreaHeight())
-	case key.Matches(msg, *nav.PageDown) && nav.PageDown.Enabled():
+	case checkKey(msg, nav.PageDown):
 		m.MoveDown(m.rowAreaHeight())
-	case key.Matches(msg, *nav.HalfPageUp) && nav.HalfPageUp.Enabled():
+	case checkKey(msg, nav.HalfPageUp):
 		m.MoveUp(m.rowAreaHeight() / HalfPageMultiplier)
-	case key.Matches(msg, *nav.HalfPageDown) && nav.HalfPageDown.Enabled():
+	case checkKey(msg, nav.HalfPageDown):
 		m.MoveDown(m.rowAreaHeight() / HalfPageMultiplier)
-	case key.Matches(msg, *nav.GotoTop) && nav.GotoTop.Enabled():
+	case checkKey(msg, nav.GotoTop):
 		m.GotoTop()
-	case key.Matches(msg, *nav.GotoBottom) && nav.GotoBottom.Enabled():
+	case checkKey(msg, nav.GotoBottom):
 		m.GotoBottom()
 	default:
 		return nil
