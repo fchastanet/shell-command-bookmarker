@@ -213,8 +213,7 @@ func (m *Model) dispatchMessage(msg tea.Msg) tea.Cmd {
 		m.handleMemoryStats(msg)
 		return tui.PerformanceMonitorTick(performanceMonitorInterval)
 	case structure.CommandSelectedForShellMsg:
-		cmd := m.handleCommandSelectedForShellMsg(msg)
-		return cmd
+		return m.handleCommandSelectedForShellMsg(msg)
 	case table.RowSelectedActionMsg[*dbmodels.Command]:
 		m.selectedCommand = msg.Row
 		m.updateHelpBindings()
@@ -501,29 +500,27 @@ func (m *Model) View() string {
 func (m *Model) updateHelpBindings() {
 	// Clear previous binding sets
 	m.helpModel.ClearBindingSets()
-	if m.helpModel.IsVisible() {
-		switch m.mode {
-		case promptMode:
-			// For prompt mode, just use a single set
-			m.helpModel.AddBindingSet("Prompt Controls", keys.GetFormBindings())
-		case normalMode:
-			// For normal mode, organize bindings into logical groups
-			m.helpModel.AddBindingSet("Global", keys.KeyMapToSlice(*m.keyMaps.global))
-			m.helpModel.AddBindingSet("Pane Navigation", m.HelpBindings())
-			if m.FocusedPosition() == structure.TopPane {
-				m.helpModel.AddBindingSet("Filter Controls", keys.KeyMapToSlice(*m.keyMaps.filter))
-				m.helpModel.AddBindingSet("Table Nav", keys.KeyMapToSlice(*m.keyMaps.tableNavigation))
-				tableActions := m.keyMaps.tableAction
-				tableCustomActions := m.keyMaps.tableCustomAction
-				keys.UpdateBindings(
-					tableActions,
-					tableCustomActions,
-					m.appService.IsShellSelectionMode(),
-					m.selectedCommand,
-				)
-				m.helpModel.AddBindingSet("Table Actions", keys.KeyMapToSlice(*tableActions))
-				m.helpModel.AddBindingSet("Command Actions", keys.KeyMapToSlice(*tableCustomActions))
-			}
+	switch m.mode {
+	case promptMode:
+		// For prompt mode, just use a single set
+		m.helpModel.AddBindingSet("Prompt Controls", keys.GetFormBindings())
+	case normalMode:
+		// For normal mode, organize bindings into logical groups
+		m.helpModel.AddBindingSet("Global", keys.KeyMapToSlice(*m.keyMaps.global))
+		m.helpModel.AddBindingSet("Pane Navigation", m.HelpBindings())
+		if m.FocusedPosition() == structure.TopPane {
+			m.helpModel.AddBindingSet("Filter Controls", keys.KeyMapToSlice(*m.keyMaps.filter))
+			m.helpModel.AddBindingSet("Table Nav", keys.KeyMapToSlice(*m.keyMaps.tableNavigation))
+			tableActions := m.keyMaps.tableAction
+			tableCustomActions := m.keyMaps.tableCustomAction
+			keys.UpdateBindings(
+				tableActions,
+				tableCustomActions,
+				m.appService.IsShellSelectionMode(),
+				m.selectedCommand,
+			)
+			m.helpModel.AddBindingSet("Table Actions", keys.KeyMapToSlice(*tableActions))
+			m.helpModel.AddBindingSet("Command Actions", keys.KeyMapToSlice(*tableCustomActions))
 		}
 	}
 }

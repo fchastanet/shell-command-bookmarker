@@ -249,8 +249,6 @@ func (p *PaneManager) handleNavigationKeys(keyMsg tea.KeyMsg) tea.Cmd {
 }
 
 // handleResizeKeys handles key bindings for resizing panes
-//
-
 func (p *PaneManager) handleResizeKeys(keyMsg tea.KeyMsg) tea.Cmd {
 	pk := p.paneKeyMap
 	switch {
