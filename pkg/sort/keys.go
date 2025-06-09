@@ -13,8 +13,8 @@ type KeyMap struct {
 	PreviousComboValue *key.Binding
 }
 
-// DefaultKeyMap returns the default sort key mapping
-func DefaultKeyMap() *KeyMap {
+// GetDefaultKeyMap returns the default sort key mapping
+func GetDefaultKeyMap() *KeyMap {
 	sort := key.NewBinding(
 		key.WithKeys("s", "S"),
 		key.WithHelp("s", "sort"),

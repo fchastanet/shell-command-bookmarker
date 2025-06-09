@@ -4,7 +4,6 @@ import (
 	"log/slog"
 	"strings"
 
-	"github.com/charmbracelet/bubbles/key"
 	"github.com/fchastanet/shell-command-bookmarker/internal/models/structure"
 	"github.com/fchastanet/shell-command-bookmarker/internal/services/models"
 	"github.com/fchastanet/shell-command-bookmarker/pkg/sort"
@@ -14,16 +13,6 @@ import (
 func (m *commandsList) IsSortModeActive() bool {
 	sortState := m.categoryTabs.GetActiveSortState()
 	return sortState != nil && sortState.IsEditActive
-}
-
-// GetSortKeyBindings returns the key bindings for sort mode
-func (m *commandsList) GetSortKeyBindings() []*key.Binding {
-	return []*key.Binding{
-		m.sortKeyMap.Apply,
-		m.sortKeyMap.Cancel,
-		m.sortKeyMap.PreviousField,
-		m.sortKeyMap.NextField,
-	}
 }
 
 // compareBySortField compares two commands by the given field

@@ -24,6 +24,7 @@ import (
 	dbmodels "github.com/fchastanet/shell-command-bookmarker/internal/services/models"
 	"github.com/fchastanet/shell-command-bookmarker/internal/version"
 	"github.com/fchastanet/shell-command-bookmarker/pkg/components/tabs"
+	"github.com/fchastanet/shell-command-bookmarker/pkg/sort"
 	"github.com/fchastanet/shell-command-bookmarker/pkg/tui"
 	"github.com/fchastanet/shell-command-bookmarker/pkg/tui/table"
 )
@@ -67,6 +68,7 @@ const (
 type MessageClearTickMsg struct{}
 
 type KeyMaps struct {
+	sort              *sort.KeyMap
 	filter            *tabs.FilterKeyMap
 	global            *keys.GlobalKeyMap
 	pane              *keys.PaneNavigationKeyMap
@@ -120,6 +122,7 @@ func NewModel(
 
 	keyMaps := &KeyMaps{
 		editor:            keys.GetDefaultEditorKeyMap(),
+		sort:              sort.GetDefaultKeyMap(),
 		filter:            keys.GetFilterKeyMap(),
 		global:            keys.GetGlobalKeyMap(),
 		pane:              keys.GetPaneNavigationKeyMap(),

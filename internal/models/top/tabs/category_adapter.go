@@ -26,16 +26,19 @@ const (
 type CategoryAdapter struct {
 	historyService *services.HistoryService
 	sortStyles     sort.EditorSortStyles
+	sortKeyMap     *sort.KeyMap
 }
 
 // NewCategoryAdapter creates a new adapter for category conversions
 func NewCategoryAdapter(
 	historyService *services.HistoryService,
 	sortStyles sort.EditorSortStyles,
+	sortKeyMap *sort.KeyMap,
 ) *CategoryAdapter {
 	return &CategoryAdapter{
 		historyService: historyService,
 		sortStyles:     sortStyles,
+		sortKeyMap:     sortKeyMap,
 	}
 }
 
@@ -62,6 +65,7 @@ func (ca *CategoryAdapter) GetCategoryTabs(
 			ca.sortStyles,
 			structure.FieldID,
 			sortFields,
+			ca.sortKeyMap,
 			compareBySortFieldFunc,
 		)
 	}

@@ -72,7 +72,7 @@ type CategoryTabs[
 	styles        CategoryTabStyles
 	inputModel    InputModel
 	adapter       CategoryAdapterInterface[ElementType, CommandStatus, FieldType] // Adapter for category-specific logic
-	keyMaps       *FilterKeyMap
+	filterKeyMap  *FilterKeyMap
 	tabs          []CategoryTab[ElementType, CommandStatus, FieldType]
 	activeTabIdx  int
 	width         int
@@ -125,10 +125,12 @@ func NewCategoryTabs[
 	styles CategoryTabStyles,
 	inputModel InputModel,
 	adapter CategoryAdapterInterface[ElementType, CommandStatus, FieldType],
-	keyMaps *FilterKeyMap,
+	filterKeyMap *FilterKeyMap,
 	compareBySortFieldFunc sort.CompareBySortFieldFunc[ElementType, FieldType],
 ) *CategoryTabs[ElementType, CommandStatus, FieldType] {
-	tabs := adapter.GetCategoryTabs(compareBySortFieldFunc)
+	tabs := adapter.GetCategoryTabs(
+		compareBySortFieldFunc,
+	)
 
 	return &CategoryTabs[ElementType, CommandStatus, FieldType]{
 		styles:        styles,
@@ -138,7 +140,7 @@ func NewCategoryTabs[
 		inputModel:    inputModel,
 		focused:       false,
 		adapter:       adapter,
-		keyMaps:       keyMaps,
+		filterKeyMap:  filterKeyMap,
 		filteredCount: 0,
 	}
 }
@@ -203,7 +205,7 @@ func (ct *CategoryTabs[ElementType, CommandStatus, FieldType]) changeCategoryTab
 }
 
 func (ct *CategoryTabs[ElementType, CommandStatus, FieldType]) handleKeyMsg(keyMsg tea.KeyMsg) tea.Cmd {
-	keys := ct.keyMaps
+	keys := ct.filterKeyMap
 	switch {
 	case tui.CheckKey(keyMsg, keys.Filter):
 		if !ct.inputModel.Focused() {
