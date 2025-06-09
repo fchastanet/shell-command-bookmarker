@@ -9,6 +9,14 @@ import (
 	"github.com/fchastanet/shell-command-bookmarker/pkg/tui"
 )
 
+func (state *State[ElementType, FieldType]) Init() tea.Cmd {
+	return func() tea.Msg {
+		return MsgSortEditModeChanged[ElementType, FieldType]{
+			State: state,
+		}
+	}
+}
+
 func (state *State[ElementType, FieldType]) Update(msg tea.Msg) (cmd tea.Cmd, forward bool) {
 	// Handle sorting key pressed when sort mode is active
 
@@ -82,9 +90,16 @@ func (state *State[ElementType, FieldType]) handleActivateSort() tea.Cmd {
 	state.SelectedField = 0 // Start with primary field selected
 
 	// Return an info message
-	return func() tea.Msg {
-		return tui.InfoMsg("Sort mode activated - use Tab/Shift+Tab to navigate, Enter to apply, Esc to cancel")
-	}
+	return tea.Batch(
+		func() tea.Msg {
+			return tui.InfoMsg("Sort mode activated - use Tab/Shift+Tab to navigate, Enter to apply, Esc to cancel")
+		},
+		func() tea.Msg {
+			return MsgSortEditModeChanged[ElementType, FieldType]{
+				State: state,
+			}
+		},
+	)
 }
 
 // handleApplySort applies the current sort settings
@@ -111,9 +126,16 @@ func (state *State[ElementType, FieldType]) handleApplySort() tea.Cmd {
 func (state *State[ElementType, FieldType]) handleCancelSort() tea.Cmd {
 	state.IsEditActive = false
 
-	return func() tea.Msg {
-		return tui.InfoMsg("Sort operation cancelled")
-	}
+	return tea.Batch(
+		func() tea.Msg {
+			return tui.InfoMsg("Sort operation cancelled")
+		},
+		func() tea.Msg {
+			return MsgSortEditModeChanged[ElementType, FieldType]{
+				State: state,
+			}
+		},
+	)
 }
 
 func (state *State[ElementType, FieldType]) UpdateSortField(

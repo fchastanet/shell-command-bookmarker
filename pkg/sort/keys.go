@@ -1,6 +1,9 @@
 package sort
 
-import "github.com/charmbracelet/bubbles/key"
+import (
+	"github.com/charmbracelet/bubbles/key"
+	"github.com/fchastanet/shell-command-bookmarker/pkg/resource"
+)
 
 // KeyMap contains keybindings for sort mode
 type KeyMap struct {
@@ -28,12 +31,12 @@ func GetDefaultKeyMap() *KeyMap {
 		key.WithHelp("esc", "cancel sort"),
 	)
 	nextField := key.NewBinding(
-		key.WithKeys("tab", "right"),
-		key.WithHelp("tab/→", "next field"),
+		key.WithKeys("right"),
+		key.WithHelp("→", "next field"),
 	)
 	previousField := key.NewBinding(
-		key.WithKeys("shift+tab", "left"),
-		key.WithHelp("shift+tab/←", "previous field"),
+		key.WithKeys("left"),
+		key.WithHelp("←", "previous field"),
 	)
 	nextComboValue := key.NewBinding(
 		key.WithKeys("down"),
@@ -52,4 +55,20 @@ func GetDefaultKeyMap() *KeyMap {
 		NextComboValue:     &nextComboValue,
 		PreviousComboValue: &previousComboValue,
 	}
+}
+
+func UpdateBindings[ElementType resource.Identifiable, FieldType string](
+	k *KeyMap,
+	state *State[ElementType, FieldType],
+) {
+	if k == nil {
+		return
+	}
+	k.Sort.SetEnabled(state == nil || !state.IsEditActive)
+	k.Apply.SetEnabled(state != nil && state.IsEditActive)
+	k.Cancel.SetEnabled(state != nil && state.IsEditActive)
+	k.NextField.SetEnabled(state != nil && state.IsEditActive)
+	k.PreviousField.SetEnabled(state != nil && state.IsEditActive)
+	k.NextComboValue.SetEnabled(state != nil && state.IsEditActive)
+	k.PreviousComboValue.SetEnabled(state != nil && state.IsEditActive)
 }

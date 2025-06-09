@@ -55,6 +55,10 @@ type Msg[ElementType resource.Identifiable, FieldType string] struct {
 	InfoMsg *tui.InfoMsg
 }
 
+type MsgSortEditModeChanged[ElementType resource.Identifiable, FieldType string] struct {
+	State *State[ElementType, FieldType]
+}
+
 // NewDefaultState creates a new default sort state
 func NewDefaultState[ElementType resource.Identifiable, FieldType string](
 	editorStyles EditorSortStyles,

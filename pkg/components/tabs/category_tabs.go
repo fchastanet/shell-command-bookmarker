@@ -81,15 +81,20 @@ type CategoryTabs[
 }
 
 // Message types for CategoryTabs events
-type CategoryTabChangedMsg struct {
-	Filter     string
-	PrevTab    CategoryType
-	CurrentTab CategoryType
+type CategoryTabChangedMsg[
+	ElementType resource.Identifiable,
+	CommandStatus any,
+	FieldType string,
+] struct {
+	NewTab *CategoryTab[ElementType, CommandStatus, FieldType]
 }
 
-type ChangeCategoryTabMsg struct {
-	Filter string
-	NewTab CategoryType
+type ChangeCategoryTabMsg[
+	ElementType resource.Identifiable,
+	CommandStatus any,
+	FieldType string,
+] struct {
+	NewTab *CategoryTab[ElementType, CommandStatus, FieldType]
 }
 
 // ErrCategoryTabNotFound is returned when no commands are selected for an operation
@@ -146,8 +151,12 @@ func NewCategoryTabs[
 }
 
 // Init initializes the CategoryTabs component (implementation of tea.Model interface)
-func (*CategoryTabs[ElementType, CommandStatus, FieldType]) Init() tea.Cmd {
-	return nil
+func (ct *CategoryTabs[ElementType, CommandStatus, FieldType]) Init() tea.Cmd {
+	return func() tea.Msg {
+		return CategoryTabChangedMsg[ElementType, CommandStatus, FieldType]{
+			NewTab: &ct.tabs[ct.activeTabIdx],
+		}
+	}
 }
 
 // Update handles messages and events
@@ -169,8 +178,8 @@ func (ct *CategoryTabs[ElementType, CommandStatus, FieldType]) Update(msg tea.Ms
 		ct.focused = false
 	case table.BulkInsertMsg[ElementType]:
 		ct.filteredCount = len(msg.Items)
-	case ChangeCategoryTabMsg:
-		return ct.changeCategoryTab(msg.NewTab, msg.Filter)
+	case ChangeCategoryTabMsg[ElementType, CommandStatus, FieldType]:
+		return ct.changeCategoryTab(msg.NewTab)
 	}
 
 	// Update filter model
@@ -179,28 +188,28 @@ func (ct *CategoryTabs[ElementType, CommandStatus, FieldType]) Update(msg tea.Ms
 	return tea.Batch(cmds...)
 }
 
-func (ct *CategoryTabs[ElementType, CommandStatus, FieldType]) changeCategoryTab(newTab CategoryType, filter string) tea.Cmd {
+func (ct *CategoryTabs[ElementType, CommandStatus, FieldType]) changeCategoryTab(
+	newTab *CategoryTab[ElementType, CommandStatus, FieldType],
+) tea.Cmd {
 	// Find the index of the new tab
 	for i, tab := range ct.tabs {
-		if tab.Type == newTab {
+		if tab.Type == newTab.Type {
 			ct.activeTabIdx = i
 			// Set the filter value for the new tab
-			ct.inputModel.SetFilterValue(filter)
+			ct.inputModel.SetFilterValue(newTab.FilterState.FilterValue)
 			// Save the filter value in the tab's filter state
-			ct.tabs[ct.activeTabIdx].FilterState.FilterValue = filter
+			ct.tabs[ct.activeTabIdx].FilterState.FilterValue = newTab.FilterState.FilterValue
 			// Return a command to notify about the tab change
 			return func() tea.Msg {
-				return CategoryTabChangedMsg{
-					PrevTab:    ct.tabs[ct.activeTabIdx].Type,
-					CurrentTab: newTab,
-					Filter:     filter,
+				return CategoryTabChangedMsg[ElementType, CommandStatus, FieldType]{
+					NewTab: &ct.tabs[ct.activeTabIdx],
 				}
 			}
 		}
 	}
 	// If the new tab is not found, return error command
 	return func() tea.Msg {
-		return tui.ErrorMsg(&ErrCategoryTabNotFound{tab: newTab})
+		return tui.ErrorMsg(&ErrCategoryTabNotFound{tab: newTab.Type})
 	}
 }
 
@@ -243,20 +252,21 @@ func (ct *CategoryTabs[ElementType, CommandStatus, FieldType]) handleFilterInput
 }
 
 func (ct *CategoryTabs[ElementType, CommandStatus, FieldType]) handleValidate() tea.Cmd {
-	activeTabType := ct.tabs[ct.activeTabIdx].Type
 	filterValue := ct.inputModel.GetFilterValue()
 	ct.tabs[ct.activeTabIdx].FilterState.FilterValue = filterValue
 	return func() tea.Msg {
-		return CategoryTabChangedMsg{
-			PrevTab:    activeTabType,
-			CurrentTab: activeTabType,
-			Filter:     filterValue,
+		return CategoryTabChangedMsg[ElementType, CommandStatus, FieldType]{
+			NewTab: &ct.tabs[ct.activeTabIdx],
 		}
 	}
 }
 
 func (ct *CategoryTabs[ElementType, CommandStatus, FieldType]) FilterActive() bool {
 	return ct.inputModel.Focused()
+}
+
+func (ct *CategoryTabs[ElementType, CommandStatus, FieldType]) GetActiveTab() *CategoryTab[ElementType, CommandStatus, FieldType] {
+	return &ct.tabs[ct.activeTabIdx]
 }
 
 func (ct *CategoryTabs[ElementType, CommandStatus, FieldType]) GetActiveTabTitle() string {
@@ -266,7 +276,6 @@ func (ct *CategoryTabs[ElementType, CommandStatus, FieldType]) GetActiveTabTitle
 // prevCategory selects the previous category tab
 func (ct *CategoryTabs[ElementType, CommandStatus, FieldType]) prevCategory() tea.Cmd {
 	prevTabIdx := ct.activeTabIdx
-	prevTabType := ct.tabs[prevTabIdx].Type
 
 	if ct.activeTabIdx == 0 {
 		ct.activeTabIdx = len(ct.tabs) - 1
@@ -274,13 +283,12 @@ func (ct *CategoryTabs[ElementType, CommandStatus, FieldType]) prevCategory() te
 		ct.activeTabIdx--
 	}
 
-	return ct.categoryChangedMsg(prevTabIdx, prevTabType)
+	return ct.categoryChangedMsg(prevTabIdx)
 }
 
 // nextCategory selects the next category tab
 func (ct *CategoryTabs[ElementType, CommandStatus, FieldType]) nextCategory() tea.Cmd {
 	prevTabIdx := ct.activeTabIdx
-	prevTabType := ct.tabs[prevTabIdx].Type
 
 	if ct.activeTabIdx == len(ct.tabs)-1 {
 		ct.activeTabIdx = 0
@@ -288,12 +296,11 @@ func (ct *CategoryTabs[ElementType, CommandStatus, FieldType]) nextCategory() te
 		ct.activeTabIdx++
 	}
 
-	return ct.categoryChangedMsg(prevTabIdx, prevTabType)
+	return ct.categoryChangedMsg(prevTabIdx)
 }
 
 func (ct *CategoryTabs[ElementType, CommandStatus, FieldType]) categoryChangedMsg(
 	prevTabIdx int,
-	prevTabType CategoryType,
 ) tea.Cmd {
 	// Save current filter value
 	ct.tabs[prevTabIdx].FilterState.FilterValue = ct.inputModel.GetFilterValue()
@@ -301,13 +308,9 @@ func (ct *CategoryTabs[ElementType, CommandStatus, FieldType]) categoryChangedMs
 	// Restore the filter value for the newly selected tab
 	ct.inputModel.SetFilterValue(ct.tabs[ct.activeTabIdx].FilterState.FilterValue)
 
-	currentTabType := ct.tabs[ct.activeTabIdx].Type
-
 	return func() tea.Msg {
-		return CategoryTabChangedMsg{
-			PrevTab:    prevTabType,
-			CurrentTab: currentTabType,
-			Filter:     ct.inputModel.GetFilterValue(),
+		return CategoryTabChangedMsg[ElementType, CommandStatus, FieldType]{
+			NewTab: &ct.tabs[ct.activeTabIdx],
 		}
 	}
 }

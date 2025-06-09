@@ -235,10 +235,15 @@ func (m *commandsList) getColumns(width int) []table.Column {
 	}
 }
 
-func (*commandsList) Init() tea.Cmd {
-	return func() tea.Msg {
-		return tea.FocusMsg{}
-	}
+func (m *commandsList) Init() tea.Cmd {
+	activeSortState := m.categoryTabs.GetActiveSortState()
+
+	return tea.Batch(
+		activeSortState.Init(),
+		func() tea.Msg {
+			return tea.FocusMsg{}
+		},
+	)
 }
 
 //nolint:cyclop // not really complex
@@ -285,7 +290,11 @@ func (m *commandsList) Update(msg tea.Msg) tea.Cmd {
 		cmds = append(cmds, cmd)
 	case table.RowDeleteActionMsg[*dbmodels.Command]:
 		return m.handleDeleteRows()
-	case pkgTabs.CategoryTabChangedMsg:
+	case pkgTabs.CategoryTabChangedMsg[
+		*dbmodels.Command,
+		dbmodels.CommandStatus,
+		string,
+	]:
 		return m.loadCommandsForCurrentCategory(-1)
 	}
 
@@ -578,9 +587,8 @@ func (m *commandsList) handleComposeCommand() tea.Cmd {
 	// change the category tab to "Available Commands" immediately
 	// so the user can see the new command right away
 	// The sort state will be automatically loaded from the target category tab
-	m.categoryTabs.Update(pkgTabs.ChangeCategoryTabMsg{
-		NewTab: tabs.AvailableCommands,
-		Filter: "",
+	m.categoryTabs.Update(pkgTabs.ChangeCategoryTabMsg[*dbmodels.Command, dbmodels.CommandStatus, string]{
+		NewTab: m.categoryTabs.GetActiveTab(),
 	})
 	return tea.Batch(
 		func() tea.Msg {
