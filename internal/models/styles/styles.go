@@ -5,6 +5,7 @@ import (
 
 	"github.com/charmbracelet/lipgloss"
 	"github.com/fchastanet/shell-command-bookmarker/pkg/components/tabs"
+	"github.com/fchastanet/shell-command-bookmarker/pkg/sort"
 	"github.com/fchastanet/shell-command-bookmarker/pkg/tui"
 	"github.com/fchastanet/shell-command-bookmarker/pkg/tui/colors"
 	"github.com/fchastanet/shell-command-bookmarker/pkg/tui/table"
@@ -23,6 +24,7 @@ type Styles struct {
 	// ColorTheme is the color theme used in the application.
 	ColorTheme        *ColorTheme
 	CategoryTabStyles tabs.CategoryTabStyles
+	SortStyles        sort.EditorSortStyles
 }
 
 type FooterStyle struct {
@@ -112,6 +114,7 @@ func NewStyles() *Styles {
 		ColorTheme:        nil,
 		PlaceHolder:       nil,
 		CategoryTabStyles: nil,
+		SortStyles:        nil,
 	}
 
 	// Initialize color theme
@@ -257,6 +260,8 @@ func (s *Styles) initComponentStyles(colorTheme *ColorTheme) {
 		StatusDisabled: &statusDisabledStyle,
 		ScrollbarStyle: s.ScrollbarStyle,
 	}
+
+	s.SortStyles = sort.GetDefaultEditorSortStyles()
 }
 
 func (s *Styles) Init() {

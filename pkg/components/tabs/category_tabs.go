@@ -8,13 +8,15 @@ import (
 	"github.com/charmbracelet/bubbles/key"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/fchastanet/shell-command-bookmarker/pkg/category"
 	"github.com/fchastanet/shell-command-bookmarker/pkg/resource"
+	"github.com/fchastanet/shell-command-bookmarker/pkg/sort"
 	"github.com/fchastanet/shell-command-bookmarker/pkg/tui"
 	"github.com/fchastanet/shell-command-bookmarker/pkg/tui/table"
 )
 
-// CategoryType defines the type of command category
-type CategoryType int
+// CategoryType is an alias for category.Type
+type CategoryType = category.Type
 
 // CategoryTabStyles is an interface for styling category tabs
 type CategoryTabStyles interface {
@@ -24,20 +26,16 @@ type CategoryTabStyles interface {
 	GetTabCountStyle() lipgloss.Style
 }
 
-// FilterState holds the current filter value
-type FilterState struct {
-	FilterValue string
-}
-
 // CategoryTab represents a command category tab
 type CategoryTab[CommandStatus any] struct {
 	Title        string
-	FilterState  FilterState
+	FilterState  category.FilterSortState
 	CommandTypes []CommandStatus
 	Type         CategoryType
 	Count        int
 }
 
+// CategoryAdapterInterface defines methods for category tab operations
 type CategoryAdapterInterface[V resource.Identifiable, CommandStatus any] interface {
 	// GetCategoryTabs returns the list of category tabs
 	GetCategoryTabs() []CategoryTab[CommandStatus]
@@ -185,35 +183,25 @@ func (ct *CategoryTabs[V, CommandStatus]) changeCategoryTab(newTab CategoryType,
 	}
 }
 
-func checkKey(msg tea.KeyMsg, binding *key.Binding) bool {
-	if binding == nil {
-		return false
-	}
-	if binding.Enabled() && key.Matches(msg, *binding) {
-		return true
-	}
-	return false
-}
-
 func (ct *CategoryTabs[V, CommandStatus]) handleKeyMsg(keyMsg tea.KeyMsg) tea.Cmd {
 	keys := ct.keyMaps
 	switch {
-	case checkKey(keyMsg, keys.Filter):
+	case tui.CheckKey(keyMsg, keys.Filter):
 		if !ct.inputModel.Focused() {
 			return ct.inputModel.Focus()
 		}
-	case checkKey(keyMsg, keys.PreviousTab):
+	case tui.CheckKey(keyMsg, keys.PreviousTab):
 		// Switch to the previous category tab
 		return ct.prevCategory()
-	case checkKey(keyMsg, keys.NextTab):
+	case tui.CheckKey(keyMsg, keys.NextTab):
 		// Switch to the next category tab
 		return ct.nextCategory()
-	case checkKey(keyMsg, keys.Validate):
+	case tui.CheckKey(keyMsg, keys.Validate):
 		if ct.inputModel.Focused() {
 			ct.inputModel.Blur()
 			return ct.handleValidate()
 		}
-	case checkKey(keyMsg, keys.Close):
+	case tui.CheckKey(keyMsg, keys.Close):
 		if ct.inputModel.Focused() {
 			ct.inputModel.Blur()
 			return tui.GetDummyCmd()
@@ -312,6 +300,18 @@ func (ct *CategoryTabs[V, CommandStatus]) GetActiveFilter() string {
 	return ct.tabs[ct.activeTabIdx].FilterState.FilterValue
 }
 
+// GetActiveSortState returns the currently active sort state
+func (ct *CategoryTabs[V, CommandStatus]) GetActiveSortState() *sort.State {
+	return ct.tabs[ct.activeTabIdx].FilterState.SortState
+}
+
+// SetActiveSortState sets the sort state for the active tab
+func (ct *CategoryTabs[V, CommandStatus]) SetActiveSortState(state *sort.State) {
+	if ct.activeTabIdx >= 0 && ct.activeTabIdx < len(ct.tabs) {
+		ct.tabs[ct.activeTabIdx].FilterState.SortState = state
+	}
+}
+
 // GetCommandTypes returns the command status types for the active category
 func (ct *CategoryTabs[V, CommandStatus]) GetCommandTypes() []CommandStatus {
 	return ct.adapter.GetCategoryTabConfiguration(ct.tabs[ct.activeTabIdx].Type).CommandTypes
@@ -404,10 +404,23 @@ func (ct *CategoryTabs[V, CommandStatus]) View() string {
 	}
 	builder.WriteString("\n")
 
-	if ct.inputModel.Focused() || ct.inputModel.GetFilterValue() != "" {
-		filterView := ct.inputModel.View() + " Filter items count:" + strconv.Itoa(ct.filteredCount)
-		builder.WriteString(filterView)
+	// In sort active mode, we show sort UI, otherwise, we show the regular filter UI
+	activeSortState := ct.GetActiveSortState()
+	sortView := ""
+	if activeSortState != nil {
+		// Render the sort UI
+		sortView = activeSortState.View()
+		sortView += "    "
 	}
+
+	filterView := ""
+	if ct.inputModel.Focused() || ct.inputModel.GetFilterValue() != "" {
+		filterView = ct.inputModel.View() + " Filter items count:" + strconv.Itoa(ct.filteredCount)
+	}
+
+	builder.WriteString(
+		lipgloss.JoinHorizontal(lipgloss.Left, sortView, filterView),
+	)
 
 	return builder.String()
 }

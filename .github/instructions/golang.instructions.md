@@ -9,6 +9,8 @@ applyTo: '**/*.go'
 - Use `go build` to compile the application.
 - avoid using `fmt.Println` for logging but prefer `slog.Info`, `slog.Error`, etc.
 - Use `slog` for structured logging.
+- Take into consideration the rules defined in `.golangci.yml`, particularly the `depguard` rules.
+- Take into consideration supported go version by reading `go.mod`
 - Follow Go's idiomatic error handling pattern:
   - Check for errors immediately after calling a function that returns an error.
   - Use `if err != nil { return err }` to propagate errors.

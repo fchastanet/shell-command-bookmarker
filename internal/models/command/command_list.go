@@ -3,9 +3,9 @@ package command
 import (
 	"fmt"
 	"log/slog"
+	"strings"
 
 	"github.com/atotto/clipboard"
-	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/bubbles/spinner"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
@@ -18,6 +18,7 @@ import (
 	dbmodels "github.com/fchastanet/shell-command-bookmarker/internal/services/models"
 	pkgTabs "github.com/fchastanet/shell-command-bookmarker/pkg/components/tabs"
 	"github.com/fchastanet/shell-command-bookmarker/pkg/resource"
+	"github.com/fchastanet/shell-command-bookmarker/pkg/sort"
 	"github.com/fchastanet/shell-command-bookmarker/pkg/tui"
 	"github.com/fchastanet/shell-command-bookmarker/pkg/tui/filters"
 	"github.com/fchastanet/shell-command-bookmarker/pkg/tui/table"
@@ -92,13 +93,19 @@ func (mm *ListMaker) Make(_ resource.ID, width, height int) (structure.ChildMode
 	// set filter
 	filter := filters.NewInput()
 	// Initialize the category tabs component
-	categoryAdapter := tabs.NewCategoryAdapter(mm.App.GetHistoryService())
+	categoryAdapter := tabs.NewCategoryAdapter(
+		mm.App.GetHistoryService(),
+		mm.Styles.SortStyles,
+	)
 	categoryTabs := pkgTabs.NewCategoryTabs[*dbmodels.Command](
 		mm.Styles.CategoryTabStyles,
 		filter,
 		categoryAdapter,
 		mm.FilterKeyMap,
 	)
+
+	// Initialize sort keymap
+	sortKeyMap := sort.DefaultKeyMap()
 
 	m := &commandsList{
 		AppService:              mm.App.Self(),
@@ -116,6 +123,7 @@ func (mm *ListMaker) Make(_ resource.ID, width, height int) (structure.ChildMode
 		statusColumn:            &statusColumn,
 		lintStatusColumn:        &lintStatusColumn,
 		categoryTabs:            categoryTabs,
+		sortKeyMap:              sortKeyMap,
 	}
 	renderer := func(cmd *dbmodels.Command) table.RenderedRow {
 		return mm.renderRow(cmd, m)
@@ -126,6 +134,11 @@ func (mm *ListMaker) Make(_ resource.ID, width, height int) (structure.ChildMode
 		}
 		return cellContent
 	}
+	// Create a dynamic sort function that always uses the current active category tab's sort state
+	customSortFunc := sort.CommandSortFuncDynamic(func() *sort.State {
+		return categoryTabs.GetActiveSortState()
+	})
+
 	tbl := table.New(
 		mm.EditorsCache,
 		mm.Styles.TableStyle,
@@ -134,7 +147,7 @@ func (mm *ListMaker) Make(_ resource.ID, width, height int) (structure.ChildMode
 		cellRenderer,
 		width,
 		height,
-		table.WithSortFunc(dbmodels.CommandSorter),
+		table.WithSortFunc(customSortFunc),
 		table.WithPreview[*dbmodels.Command](structure.CommandKind),
 		table.WithNavigation[*dbmodels.Command](mm.NavigationKeyMap),
 		table.WithAction[*dbmodels.Command](mm.ActionKeyMap),
@@ -214,6 +227,9 @@ type commandsList struct {
 	reloading bool
 	height    int
 	width     int
+
+	// Sort functionality
+	sortKeyMap *sort.KeyMap
 }
 
 func (*commandsList) BeforeSwitchPane() tea.Cmd {
@@ -252,6 +268,25 @@ func (m *commandsList) Update(msg tea.Msg) tea.Cmd {
 	keyMsg := false
 
 	switch msg := msg.(type) {
+	case sort.Msg:
+		// Update the sort state in the active category tab
+		m.categoryTabs.SetActiveSortState(msg.State)
+
+		// Reload the table with the new sort function
+		reload := m.loadCommandsForCurrentCategory(-1)
+
+		// If there's an info message, return it as well
+		if msg.InfoMsg != nil {
+			infoMsg := *msg.InfoMsg
+			return tea.Batch(
+				reload,
+				func() tea.Msg {
+					return infoMsg
+				},
+			)
+		}
+		return reload
+
 	case table.ReloadMsg[*dbmodels.Command]:
 		return m.loadCommandsForCurrentCategory(msg.RowID)
 	case tea.WindowSizeMsg:
@@ -264,13 +299,11 @@ func (m *commandsList) Update(msg tea.Msg) tea.Cmd {
 		return m.handleFocus()
 	case tea.KeyMsg:
 		keyMsg = true
-		if !m.categoryTabs.FilterActive() {
-			cmd, forward := m.handleKeyMsg(msg)
-			if !forward {
-				return cmd
-			}
-			cmds = append(cmds, cmd)
+		cmd, forward := m.handleKeyMsg(msg)
+		if !forward {
+			return cmd
 		}
+		cmds = append(cmds, cmd)
 	case table.RowDeleteActionMsg[*dbmodels.Command]:
 		return m.handleDeleteRows()
 	case pkgTabs.CategoryTabChangedMsg:
@@ -322,6 +355,20 @@ func (m *commandsList) loadCommandsForCurrentCategory(selectRowID resource.ID) t
 		// Update category counts
 		m.updateCategoryCounts()
 
+		// Get the sort state from the active category tab
+		activeSortState := m.categoryTabs.GetActiveSortState()
+
+		// We don't need to manually sort the rows here because the table component
+		// will handle sorting using the dynamic sort function provided via table.WithSortFunc
+		// during table initialization.
+
+		// Update column headers with sort indicators
+		if m.Model != nil {
+			columns := m.getColumns(m.width)
+			updatedColumns := updateColumnHeadersWithSortIndicators(columns, activeSortState)
+			m.Model.SetColumns(updatedColumns)
+		}
+
 		// Log the number of loaded commands
 		slog.Debug("Loaded commands", "count", len(rows), "statuses", statuses)
 
@@ -362,9 +409,10 @@ func (m *commandsList) handleWindowSize(msg tea.WindowSizeMsg) tea.Cmd {
 
 	// Reserve space for category tabs (3 lines: tabs row, separator, filter status)
 	const categoryTabsHeight = 3
+	const filterHeight = 1
 
 	// Adjust table height to make room for category tabs
-	tableHeight := max(m.height-categoryTabsHeight, 1)
+	tableHeight := max(m.height-categoryTabsHeight-filterHeight, 1)
 
 	m.Model.SetHeight(tableHeight)
 
@@ -473,17 +521,30 @@ func (m *commandsList) deleteCommands(cmds []*dbmodels.Command) tea.Cmd {
 }
 
 func (m *commandsList) handleKeyMsg(msg tea.KeyMsg) (cmd tea.Cmd, forward bool) {
+	if m.categoryTabs.FilterActive() {
+		return nil, true
+	}
+
+	// Handle sorting keypresses when sort mode is active
+	activeSortState := m.categoryTabs.GetActiveSortState()
+	if activeSortState != nil && activeSortState.IsEditActive {
+		return m.handleSortKeyMsg(msg), false
+	}
+	if tui.CheckKey(msg, m.sortKeyMap.Sort) {
+		return m.handleActivateSort(), false
+	}
+
 	customK := m.tableCustomActionKeyMap
-	if key.Matches(msg, *customK.ComposeCommand) && customK.ComposeCommand.Enabled() {
+	if tui.CheckKey(msg, customK.ComposeCommand) {
 		return m.handleComposeCommand(), false
 	}
-	if key.Matches(msg, *customK.RestoreCommand) && customK.RestoreCommand.Enabled() {
+	if tui.CheckKey(msg, customK.RestoreCommand) {
 		return m.handleRestoreCommand(), false
 	}
-	if key.Matches(msg, *customK.CopyToClipboard) && customK.CopyToClipboard.Enabled() {
+	if tui.CheckKey(msg, customK.CopyToClipboard) {
 		return m.handleCopyToClipboard(), false
 	}
-	if key.Matches(msg, *customK.SelectForShell) && customK.SelectForShell.Enabled() {
+	if tui.CheckKey(msg, customK.SelectForShell) {
 		return m.handleSelectForShell(), false
 	}
 	return nil, true
@@ -534,6 +595,7 @@ func (m *commandsList) handleComposeCommand() tea.Cmd {
 	))
 	// change the category tab to "Available Commands" immediately
 	// so the user can see the new command right away
+	// The sort state will be automatically loaded from the target category tab
 	m.categoryTabs.Update(pkgTabs.ChangeCategoryTabMsg{
 		NewTab: tabs.AvailableCommands,
 		Filter: "",
@@ -596,9 +658,147 @@ func (m *commandsList) View() string {
 		return "Waiting for proper window dimensions..."
 	}
 
-	// Render category tabs and table in a vertical layout
+	// Render category tabs
 	categoryTabsView := m.categoryTabs.View()
+
+	// Add a horizontal line as separator
+	separator := strings.Repeat("-", m.width)
+
+	// Display table view
 	tableView := m.Model.View()
 
-	return lipgloss.JoinVertical(lipgloss.Left, categoryTabsView, tableView)
+	return lipgloss.JoinVertical(lipgloss.Left,
+		categoryTabsView,
+		separator,
+		tableView,
+	)
+}
+
+// handleActivateSort activates the sort mode
+func (m *commandsList) handleActivateSort() tea.Cmd {
+	sortState := m.categoryTabs.GetActiveSortState()
+	sortState.IsEditActive = true
+	sortState.SelectedField = 0 // Start with primary field selected
+
+	// Update the category tab's sort state
+	m.categoryTabs.SetActiveSortState(sortState)
+
+	// Return an info message
+	return func() tea.Msg {
+		return tui.InfoMsg("Sort mode activated - use Tab/Shift+Tab to navigate, Enter to apply, Esc to cancel")
+	}
+}
+
+// handleApplySort applies the current sort settings
+func (m *commandsList) handleApplySort() tea.Cmd {
+	sortState := m.categoryTabs.GetActiveSortState()
+	sortState.FixDuplicateSortKey()
+	sortState.IsEditActive = false
+
+	// Save the updated sort state back to the active category tab
+	m.categoryTabs.SetActiveSortState(sortState)
+
+	// Return a reload message with sort state included
+	message := fmt.Sprintf("Applied sort: %s %s", sortState.PrimarySort.Field, sortState.PrimarySort.Direction)
+	if sortState.SecondarySort != nil {
+		message += fmt.Sprintf(", %s %s", sortState.SecondarySort.Field, sortState.SecondarySort.Direction)
+	}
+
+	infoMsg := tui.InfoMsg(message)
+	return func() tea.Msg {
+		return sort.Msg{
+			State:   sortState,
+			InfoMsg: &infoMsg,
+		}
+	}
+}
+
+// handleCancelSort cancels the current sort operation
+func (m *commandsList) handleCancelSort() tea.Cmd {
+	sortState := m.categoryTabs.GetActiveSortState()
+	sortState.IsEditActive = false
+
+	// Even though we're cancelling the sort operation, we need to ensure
+	// the category tab has the updated state (with IsActive=false)
+	m.categoryTabs.SetActiveSortState(sortState)
+
+	return func() tea.Msg {
+		return tui.InfoMsg("Sort operation cancelled")
+	}
+}
+
+// handleSortKeyMsg handles keypresses when in sort mode
+func (m *commandsList) handleSortKeyMsg(msg tea.KeyMsg) tea.Cmd {
+	switch {
+	case tui.CheckKey(msg, m.sortKeyMap.Apply):
+		return m.handleApplySort()
+
+	case tui.CheckKey(msg, m.sortKeyMap.Cancel):
+		return m.handleCancelSort()
+
+	case tui.CheckKey(msg, m.sortKeyMap.NextField):
+		sortState := m.categoryTabs.GetActiveSortState()
+		sort.HandleTabNavigation(sortState, true)
+		// Update the category's sort state immediately for responsive UI
+		m.categoryTabs.SetActiveSortState(sortState)
+		return nil
+
+	case tui.CheckKey(msg, m.sortKeyMap.PreviousField):
+		sortState := m.categoryTabs.GetActiveSortState()
+		sort.HandleTabNavigation(sortState, false)
+		// Update the category's sort state immediately for responsive UI
+		m.categoryTabs.SetActiveSortState(sortState)
+		return nil
+
+	case tui.CheckKey(msg, m.sortKeyMap.NextComboValue):
+		// When down is pressed, cycle through next combo options for the selected field
+		sortState := m.categoryTabs.GetActiveSortState()
+		handleNextComboOption(sortState, sort.DirectionAsc)
+		// Update the category's sort state immediately for responsive UI
+		m.categoryTabs.SetActiveSortState(sortState)
+		return nil
+
+	case tui.CheckKey(msg, m.sortKeyMap.PreviousComboValue):
+		// When up is pressed, cycle through previous combo options for the selected field
+		sortState := m.categoryTabs.GetActiveSortState()
+		handleNextComboOption(sortState, sort.DirectionDesc)
+		// Update the category's sort state immediately for responsive UI
+		m.categoryTabs.SetActiveSortState(sortState)
+		return nil
+	}
+
+	return nil
+}
+
+// SelectNextOption cycles through the available options for the currently selected field
+func handleNextComboOption(state *sort.State, comboDirection sort.Direction) {
+	if !state.IsEditActive {
+		return
+	}
+
+	switch state.SelectedField {
+	case sort.SelectedFieldPrimaryField:
+		state.UpdateSortField(state.PrimarySort, comboDirection)
+
+		// If primary field is changed from ID, initialize secondary sort
+		if state.PrimarySort.Field != sort.FieldID && state.SecondarySort == nil {
+			state.SecondarySort = &sort.Option{
+				Field:     sort.FieldID,
+				Direction: sort.DirectionAsc,
+			}
+		}
+	case sort.SelectedFieldPrimaryDirection:
+		state.UpdateDirectionField(state.PrimarySort, comboDirection)
+
+	case sort.SelectedFieldSecondaryField:
+		if state.SecondarySort == nil {
+			return
+		}
+		state.UpdateSortField(state.SecondarySort, comboDirection)
+	case sort.SelectedFieldSecondaryDirection:
+		if state.SecondarySort == nil {
+			return
+		}
+		state.UpdateDirectionField(state.SecondarySort, comboDirection)
+	}
 }

@@ -3,7 +3,9 @@ package tabs
 import (
 	"github.com/fchastanet/shell-command-bookmarker/internal/services"
 	"github.com/fchastanet/shell-command-bookmarker/internal/services/models"
+	"github.com/fchastanet/shell-command-bookmarker/pkg/category"
 	pkgTabs "github.com/fchastanet/shell-command-bookmarker/pkg/components/tabs"
+	"github.com/fchastanet/shell-command-bookmarker/pkg/sort"
 )
 
 const (
@@ -22,53 +24,73 @@ const (
 // CategoryAdapter helps translate between UI category types and service-level categories
 type CategoryAdapter struct {
 	historyService *services.HistoryService
+	sortStyles     sort.EditorSortStyles
 }
 
 // NewCategoryAdapter creates a new adapter for category conversions
-func NewCategoryAdapter(historyService *services.HistoryService) *CategoryAdapter {
+func NewCategoryAdapter(
+	historyService *services.HistoryService,
+	sortStyles sort.EditorSortStyles,
+) *CategoryAdapter {
 	return &CategoryAdapter{
 		historyService: historyService,
+		sortStyles:     sortStyles,
 	}
 }
 
-func (*CategoryAdapter) GetCategoryTabs() []pkgTabs.CategoryTab[models.CommandStatus] {
+func (ca *CategoryAdapter) GetCategoryTabs() []pkgTabs.CategoryTab[models.CommandStatus] {
 	return []pkgTabs.CategoryTab[models.CommandStatus]{
 		{
-			Title:       "Available",
-			Type:        AvailableCommands,
-			Count:       0,
-			FilterState: pkgTabs.FilterState{FilterValue: ""},
+			Title: "Available",
+			Type:  AvailableCommands,
+			Count: 0,
+			FilterState: category.FilterSortState{
+				FilterValue: "",
+				SortState:   sort.NewDefaultState(ca.sortStyles),
+			},
 			CommandTypes: []models.CommandStatus{
 				models.CommandStatusSaved,
 				models.CommandStatusImported,
 			},
 		},
 		{
-			Title:        "Saved",
-			Type:         SavedCommands,
-			Count:        0,
-			FilterState:  pkgTabs.FilterState{FilterValue: ""},
+			Title: "Saved",
+			Type:  SavedCommands,
+			Count: 0,
+			FilterState: category.FilterSortState{
+				FilterValue: "",
+				SortState:   sort.NewDefaultState(ca.sortStyles),
+			},
 			CommandTypes: []models.CommandStatus{models.CommandStatusSaved},
 		},
 		{
-			Title:        "New",
-			Type:         NewCommands,
-			Count:        0,
-			FilterState:  pkgTabs.FilterState{FilterValue: ""},
+			Title: "New",
+			Type:  NewCommands,
+			Count: 0,
+			FilterState: category.FilterSortState{
+				FilterValue: "",
+				SortState:   sort.NewDefaultState(ca.sortStyles),
+			},
 			CommandTypes: []models.CommandStatus{models.CommandStatusImported},
 		},
 		{
-			Title:        "Deleted",
-			Type:         DeletedCommands,
-			Count:        0,
-			FilterState:  pkgTabs.FilterState{FilterValue: ""},
+			Title: "Deleted",
+			Type:  DeletedCommands,
+			Count: 0,
+			FilterState: category.FilterSortState{
+				FilterValue: "",
+				SortState:   sort.NewDefaultState(ca.sortStyles),
+			},
 			CommandTypes: []models.CommandStatus{models.CommandStatusDeleted},
 		},
 		{
-			Title:       "All",
-			Type:        AllCommands,
-			Count:       0,
-			FilterState: pkgTabs.FilterState{FilterValue: ""},
+			Title: "All",
+			Type:  AllCommands,
+			Count: 0,
+			FilterState: category.FilterSortState{
+				FilterValue: "",
+				SortState:   sort.NewDefaultState(ca.sortStyles),
+			},
 			CommandTypes: []models.CommandStatus{
 				models.CommandStatusSaved,
 				models.CommandStatusImported,
