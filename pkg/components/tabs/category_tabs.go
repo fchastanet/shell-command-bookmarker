@@ -27,20 +27,30 @@ type CategoryTabStyles interface {
 }
 
 // CategoryTab represents a command category tab
-type CategoryTab[CommandStatus any] struct {
+type CategoryTab[ElementType resource.Identifiable, CommandStatus any, FieldType string] struct {
 	Title        string
-	FilterState  category.FilterSortState
+	FilterState  *category.FilterSortState[ElementType, FieldType]
 	CommandTypes []CommandStatus
 	Type         CategoryType
 	Count        int
 }
 
 // CategoryAdapterInterface defines methods for category tab operations
-type CategoryAdapterInterface[V resource.Identifiable, CommandStatus any] interface {
+type CategoryAdapterInterface[
+	ElementType resource.Identifiable,
+	CommandStatus any,
+	FieldType string,
+] interface {
 	// GetCategoryTabs returns the list of category tabs
-	GetCategoryTabs() []CategoryTab[CommandStatus]
+	GetCategoryTabs(
+		compareBySortFieldFunc sort.CompareBySortFieldFunc[ElementType, FieldType],
+	) []CategoryTab[ElementType, CommandStatus, FieldType]
+
 	// GetCategoryTabConfiguration returns the full category tab configuration
-	GetCategoryTabConfiguration(category CategoryType) CategoryTab[CommandStatus]
+	GetCategoryTabConfiguration(
+		category CategoryType,
+		compareBySortFieldFunc sort.CompareBySortFieldFunc[ElementType, FieldType],
+	) CategoryTab[ElementType, CommandStatus, FieldType]
 	// GetCategoryCounts returns the counts of commands in each category
 	GetCategoryCounts() (map[CategoryType]int, error)
 }
@@ -54,12 +64,16 @@ type FilterKeyMap struct {
 }
 
 // CategoryTabs is the component that manages the navigation between different command categories
-type CategoryTabs[V resource.Identifiable, CommandStatus any] struct {
+type CategoryTabs[
+	ElementType resource.Identifiable,
+	CommandStatus any,
+	FieldType string,
+] struct {
 	styles        CategoryTabStyles
 	inputModel    InputModel
-	adapter       CategoryAdapterInterface[V, CommandStatus] // Adapter for category-specific logic
+	adapter       CategoryAdapterInterface[ElementType, CommandStatus, FieldType] // Adapter for category-specific logic
 	keyMaps       *FilterKeyMap
-	tabs          []CategoryTab[CommandStatus]
+	tabs          []CategoryTab[ElementType, CommandStatus, FieldType]
 	activeTabIdx  int
 	width         int
 	filteredCount int // Count of filtered items, if applicable
@@ -103,15 +117,20 @@ type InputModel interface {
 const halfWidth = 2 // Used to divide the width for filter input
 
 // NewCategoryTabs creates a new CategoryTabs component
-func NewCategoryTabs[V resource.Identifiable, CommandStatus any](
+func NewCategoryTabs[
+	ElementType resource.Identifiable,
+	CommandStatus any,
+	FieldType string,
+](
 	styles CategoryTabStyles,
 	inputModel InputModel,
-	adapter CategoryAdapterInterface[V, CommandStatus],
+	adapter CategoryAdapterInterface[ElementType, CommandStatus, FieldType],
 	keyMaps *FilterKeyMap,
-) *CategoryTabs[V, CommandStatus] {
-	tabs := adapter.GetCategoryTabs()
+	compareBySortFieldFunc sort.CompareBySortFieldFunc[ElementType, FieldType],
+) *CategoryTabs[ElementType, CommandStatus, FieldType] {
+	tabs := adapter.GetCategoryTabs(compareBySortFieldFunc)
 
-	return &CategoryTabs[V, CommandStatus]{
+	return &CategoryTabs[ElementType, CommandStatus, FieldType]{
 		styles:        styles,
 		tabs:          tabs,
 		activeTabIdx:  0,
@@ -125,12 +144,12 @@ func NewCategoryTabs[V resource.Identifiable, CommandStatus any](
 }
 
 // Init initializes the CategoryTabs component (implementation of tea.Model interface)
-func (*CategoryTabs[V, CommandStatus]) Init() tea.Cmd {
+func (*CategoryTabs[ElementType, CommandStatus, FieldType]) Init() tea.Cmd {
 	return nil
 }
 
 // Update handles messages and events
-func (ct *CategoryTabs[V, CommandStatus]) Update(msg tea.Msg) tea.Cmd {
+func (ct *CategoryTabs[ElementType, CommandStatus, FieldType]) Update(msg tea.Msg) tea.Cmd {
 	var cmds []tea.Cmd
 
 	switch msg := msg.(type) {
@@ -146,7 +165,7 @@ func (ct *CategoryTabs[V, CommandStatus]) Update(msg tea.Msg) tea.Cmd {
 		ct.focused = true
 	case tea.BlurMsg:
 		ct.focused = false
-	case table.BulkInsertMsg[V]:
+	case table.BulkInsertMsg[ElementType]:
 		ct.filteredCount = len(msg.Items)
 	case ChangeCategoryTabMsg:
 		return ct.changeCategoryTab(msg.NewTab, msg.Filter)
@@ -158,7 +177,7 @@ func (ct *CategoryTabs[V, CommandStatus]) Update(msg tea.Msg) tea.Cmd {
 	return tea.Batch(cmds...)
 }
 
-func (ct *CategoryTabs[V, CommandStatus]) changeCategoryTab(newTab CategoryType, filter string) tea.Cmd {
+func (ct *CategoryTabs[ElementType, CommandStatus, FieldType]) changeCategoryTab(newTab CategoryType, filter string) tea.Cmd {
 	// Find the index of the new tab
 	for i, tab := range ct.tabs {
 		if tab.Type == newTab {
@@ -183,7 +202,7 @@ func (ct *CategoryTabs[V, CommandStatus]) changeCategoryTab(newTab CategoryType,
 	}
 }
 
-func (ct *CategoryTabs[V, CommandStatus]) handleKeyMsg(keyMsg tea.KeyMsg) tea.Cmd {
+func (ct *CategoryTabs[ElementType, CommandStatus, FieldType]) handleKeyMsg(keyMsg tea.KeyMsg) tea.Cmd {
 	keys := ct.keyMaps
 	switch {
 	case tui.CheckKey(keyMsg, keys.Filter):
@@ -212,7 +231,7 @@ func (ct *CategoryTabs[V, CommandStatus]) handleKeyMsg(keyMsg tea.KeyMsg) tea.Cm
 }
 
 // handleFilterInput handles passing keystrokes to the filter when it's focused
-func (ct *CategoryTabs[V, CommandStatus]) handleFilterInput(keyMsg tea.KeyMsg) tea.Cmd {
+func (ct *CategoryTabs[ElementType, CommandStatus, FieldType]) handleFilterInput(keyMsg tea.KeyMsg) tea.Cmd {
 	// If the filter is visible, pass the key message to the filter model
 	if ct.inputModel.Focused() {
 		cmd := ct.inputModel.Update(keyMsg)
@@ -221,7 +240,7 @@ func (ct *CategoryTabs[V, CommandStatus]) handleFilterInput(keyMsg tea.KeyMsg) t
 	return nil
 }
 
-func (ct *CategoryTabs[V, CommandStatus]) handleValidate() tea.Cmd {
+func (ct *CategoryTabs[ElementType, CommandStatus, FieldType]) handleValidate() tea.Cmd {
 	activeTabType := ct.tabs[ct.activeTabIdx].Type
 	filterValue := ct.inputModel.GetFilterValue()
 	ct.tabs[ct.activeTabIdx].FilterState.FilterValue = filterValue
@@ -234,16 +253,16 @@ func (ct *CategoryTabs[V, CommandStatus]) handleValidate() tea.Cmd {
 	}
 }
 
-func (ct *CategoryTabs[V, CommandStatus]) FilterActive() bool {
+func (ct *CategoryTabs[ElementType, CommandStatus, FieldType]) FilterActive() bool {
 	return ct.inputModel.Focused()
 }
 
-func (ct *CategoryTabs[V, CommandStatus]) GetActiveTabTitle() string {
+func (ct *CategoryTabs[ElementType, CommandStatus, FieldType]) GetActiveTabTitle() string {
 	return ct.tabs[ct.activeTabIdx].Title
 }
 
 // prevCategory selects the previous category tab
-func (ct *CategoryTabs[V, CommandStatus]) prevCategory() tea.Cmd {
+func (ct *CategoryTabs[ElementType, CommandStatus, FieldType]) prevCategory() tea.Cmd {
 	prevTabIdx := ct.activeTabIdx
 	prevTabType := ct.tabs[prevTabIdx].Type
 
@@ -257,7 +276,7 @@ func (ct *CategoryTabs[V, CommandStatus]) prevCategory() tea.Cmd {
 }
 
 // nextCategory selects the next category tab
-func (ct *CategoryTabs[V, CommandStatus]) nextCategory() tea.Cmd {
+func (ct *CategoryTabs[ElementType, CommandStatus, FieldType]) nextCategory() tea.Cmd {
 	prevTabIdx := ct.activeTabIdx
 	prevTabType := ct.tabs[prevTabIdx].Type
 
@@ -270,7 +289,7 @@ func (ct *CategoryTabs[V, CommandStatus]) nextCategory() tea.Cmd {
 	return ct.categoryChangedMsg(prevTabIdx, prevTabType)
 }
 
-func (ct *CategoryTabs[V, CommandStatus]) categoryChangedMsg(
+func (ct *CategoryTabs[ElementType, CommandStatus, FieldType]) categoryChangedMsg(
 	prevTabIdx int,
 	prevTabType CategoryType,
 ) tea.Cmd {
@@ -292,33 +311,40 @@ func (ct *CategoryTabs[V, CommandStatus]) categoryChangedMsg(
 }
 
 // GetActiveCategory returns the currently active category
-func (ct *CategoryTabs[V, CommandStatus]) GetActiveCategory() CategoryType {
+func (ct *CategoryTabs[ElementType, CommandStatus, FieldType]) GetActiveCategory() CategoryType {
 	return ct.tabs[ct.activeTabIdx].Type
 }
 
-func (ct *CategoryTabs[V, CommandStatus]) GetActiveFilter() string {
+func (ct *CategoryTabs[ElementType, CommandStatus, FieldType]) GetActiveFilter() string {
 	return ct.tabs[ct.activeTabIdx].FilterState.FilterValue
 }
 
 // GetActiveSortState returns the currently active sort state
-func (ct *CategoryTabs[V, CommandStatus]) GetActiveSortState() *sort.State {
+func (ct *CategoryTabs[ElementType, CommandStatus, FieldType]) GetActiveSortState() *sort.State[ElementType, FieldType] {
 	return ct.tabs[ct.activeTabIdx].FilterState.SortState
 }
 
 // SetActiveSortState sets the sort state for the active tab
-func (ct *CategoryTabs[V, CommandStatus]) SetActiveSortState(state *sort.State) {
+func (ct *CategoryTabs[ElementType, CommandStatus, FieldType]) SetActiveSortState(
+	state *sort.State[ElementType, FieldType],
+) {
 	if ct.activeTabIdx >= 0 && ct.activeTabIdx < len(ct.tabs) {
 		ct.tabs[ct.activeTabIdx].FilterState.SortState = state
 	}
 }
 
 // GetCommandTypes returns the command status types for the active category
-func (ct *CategoryTabs[V, CommandStatus]) GetCommandTypes() []CommandStatus {
-	return ct.adapter.GetCategoryTabConfiguration(ct.tabs[ct.activeTabIdx].Type).CommandTypes
+func (ct *CategoryTabs[ElementType, CommandStatus, FieldType]) GetCommandTypes(
+	compareBySortFieldFunc sort.CompareBySortFieldFunc[ElementType, FieldType],
+) []CommandStatus {
+	return ct.adapter.GetCategoryTabConfiguration(
+		ct.tabs[ct.activeTabIdx].Type,
+		compareBySortFieldFunc,
+	).CommandTypes
 }
 
 // SetCounts updates the counts for each category
-func (ct *CategoryTabs[V, CommandStatus]) SetCounts(counts map[CategoryType]int) {
+func (ct *CategoryTabs[ElementType, CommandStatus, FieldType]) SetCounts(counts map[CategoryType]int) {
 	for i := range ct.tabs {
 		if count, ok := counts[ct.tabs[i].Type]; ok {
 			ct.tabs[i].Count = count
@@ -327,7 +353,7 @@ func (ct *CategoryTabs[V, CommandStatus]) SetCounts(counts map[CategoryType]int)
 }
 
 // UpdateCategoryCounts fetches and updates counts from the service
-func (ct *CategoryTabs[V, CommandStatus]) UpdateCategoryCounts() error {
+func (ct *CategoryTabs[ElementType, CommandStatus, FieldType]) UpdateCategoryCounts() error {
 	if ct.adapter == nil {
 		return nil // No adapter, no updates
 	}
@@ -342,19 +368,19 @@ func (ct *CategoryTabs[V, CommandStatus]) UpdateCategoryCounts() error {
 }
 
 // Focus gives focus to the component
-func (ct *CategoryTabs[V, CommandStatus]) Focus() tea.Cmd {
+func (ct *CategoryTabs[ElementType, CommandStatus, FieldType]) Focus() tea.Cmd {
 	ct.focused = true
 	return nil
 }
 
 // Blur removes focus from the component
-func (ct *CategoryTabs[V, CommandStatus]) Blur() {
+func (ct *CategoryTabs[ElementType, CommandStatus, FieldType]) Blur() {
 	ct.focused = false
 	ct.inputModel.Blur()
 }
 
 // View renders the component
-func (ct *CategoryTabs[V, CommandStatus]) View() string {
+func (ct *CategoryTabs[ElementType, CommandStatus, FieldType]) View() string {
 	if ct.width == 0 {
 		return ""
 	}

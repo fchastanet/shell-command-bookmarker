@@ -1,6 +1,7 @@
 package sort
 
 import (
+	"github.com/fchastanet/shell-command-bookmarker/pkg/resource"
 	"github.com/fchastanet/shell-command-bookmarker/pkg/tui"
 )
 
@@ -11,34 +12,32 @@ type Field string
 type Direction string
 
 const (
-	// Sort fields
-	FieldID               Field = "ID"
-	FieldTitle            Field = "Title"
-	FieldScript           Field = "Script"
-	FieldStatus           Field = "Status"
-	FieldLintStatus       Field = "Lint Status"
-	FieldCreationDate     Field = "Creation Date"
-	FieldModificationDate Field = "Modification Date"
-
 	// Sort directions
 	DirectionAsc  Direction = "▲"
 	DirectionDesc Direction = "▼"
 )
 
 // Option represents a sort option (field and direction)
-type Option struct {
-	Field     Field
+type Option[FieldType string] struct {
+	Field     FieldType
 	Direction Direction
 }
 
 // State contains the current sort configuration
-type State struct {
-	PrimarySort      *Option
-	SecondarySort    *Option
-	IsEditActive     bool          // Whether sort edit mode is active
-	SelectedField    SelectedField // Currently selected field
-	EditorSortStyles EditorSortStyles
+type State[ElementType resource.Identifiable, FieldType string] struct {
+	EditorSortStyles   EditorSortStyles
+	IDField            FieldType
+	PrimarySort        *Option[FieldType]
+	SecondarySort      *Option[FieldType]
+	CompareBySortField CompareBySortFieldFunc[ElementType, FieldType]
+	Fields             []FieldType
+	SelectedField      SelectedField // Currently selected field
+	IsEditActive       bool          // Whether sort edit mode is active
 }
+
+type CompareBySortFieldFunc[ElementType resource.Identifiable, FieldType string] func(
+	i, j ElementType, field FieldType,
+) int
 
 type SelectedField int
 
@@ -50,35 +49,30 @@ const (
 )
 
 // Msg is sent when sorting is applied
-type Msg struct {
-	State   *State
+type Msg[ElementType resource.Identifiable, FieldType string] struct {
+	State   *State[ElementType, FieldType]
 	InfoMsg *tui.InfoMsg
 }
 
 // NewDefaultState creates a new default sort state
-func NewDefaultState(editorStyles EditorSortStyles) *State {
-	return &State{
-		PrimarySort: &Option{
-			Field:     FieldID,
+func NewDefaultState[ElementType resource.Identifiable, FieldType string](
+	editorStyles EditorSortStyles,
+	idField FieldType,
+	fields []FieldType,
+	compareBySortFieldFunc CompareBySortFieldFunc[ElementType, FieldType],
+) *State[ElementType, FieldType] {
+	return &State[ElementType, FieldType]{
+		PrimarySort: &Option[FieldType]{
+			Field:     idField,
 			Direction: DirectionAsc,
 		},
-		SecondarySort:    nil,
-		IsEditActive:     false,
-		SelectedField:    0,
-		EditorSortStyles: editorStyles,
-	}
-}
-
-// GetFieldOptions returns the available sort field options
-func GetFieldOptions() []Field {
-	return []Field{
-		FieldID,
-		FieldTitle,
-		FieldScript,
-		FieldStatus,
-		FieldLintStatus,
-		FieldCreationDate,
-		FieldModificationDate,
+		SecondarySort:      nil,
+		IsEditActive:       false,
+		SelectedField:      0,
+		EditorSortStyles:   editorStyles,
+		Fields:             fields,
+		IDField:            idField,
+		CompareBySortField: compareBySortFieldFunc,
 	}
 }
 
@@ -90,17 +84,17 @@ func GetDirectionOptions() []Direction {
 	}
 }
 
-func (state *State) FixDuplicateSortKey() {
-	if state.PrimarySort.Field == state.SecondarySort.Field {
+func (state *State[ElementType, FieldType]) FixDuplicateSortKey() {
+	if state.SecondarySort != nil && state.PrimarySort.Field == state.SecondarySort.Field {
 		state.SecondarySort = nil
 	}
 
 	// Secondary selector (if primary is not ID)
-	if state.PrimarySort.Field != FieldID {
+	if state.PrimarySort.Field != state.IDField {
 		// Initialize secondary sort if needed
 		if state.SecondarySort == nil {
-			state.SecondarySort = &Option{
-				Field:     FieldID,
+			state.SecondarySort = &Option[FieldType]{
+				Field:     state.IDField,
 				Direction: DirectionAsc,
 			}
 		}
@@ -108,13 +102,16 @@ func (state *State) FixDuplicateSortKey() {
 }
 
 // HandleTabNavigation handles tab and shift+tab navigation between sort options
-func HandleTabNavigation(state *State, forward bool) {
+func HandleTabNavigation[ElementType resource.Identifiable, FieldType string](
+	state *State[ElementType, FieldType],
+	forward bool,
+) {
 	if !state.IsEditActive {
 		return
 	}
 
 	maxFields := 2 // Primary field and direction
-	if state.PrimarySort.Field != FieldID && state.SecondarySort != nil {
+	if state.PrimarySort.Field != state.IDField && state.SecondarySort != nil {
 		maxFields = 4 // Include secondary field and direction
 	}
 
@@ -127,18 +124,23 @@ func HandleTabNavigation(state *State, forward bool) {
 	}
 }
 
-func (state *State) UpdateSortField(option *Option, direction Direction) {
-	fields := GetFieldOptions()
-	for i, field := range fields {
+func (state *State[ElementType, FieldType]) UpdateSortField(
+	option *Option[FieldType],
+	direction Direction,
+) {
+	for i, field := range state.Fields {
 		if field == option.Field {
-			newIndex := computeNextIndex(i, len(fields), direction)
-			option.Field = fields[newIndex]
+			newIndex := computeNextIndex(i, len(state.Fields), direction)
+			option.Field = state.Fields[newIndex]
 			break
 		}
 	}
 }
 
-func (state *State) UpdateDirectionField(option *Option, direction Direction) {
+func (state *State[ElementType, FieldType]) UpdateDirectionField(
+	option *Option[FieldType],
+	direction Direction,
+) {
 	directions := GetDirectionOptions()
 	for i, dir := range directions {
 		if dir == option.Direction {

@@ -24,6 +24,7 @@ func GetDefaultEditorSortStyles() EditorSortStyles {
 func (s Style) GetActiveStyle() *lipgloss.Style {
 	return s.ActiveStyle
 }
+
 func (s Style) GetInactiveStyle() *lipgloss.Style {
 	return s.InactiveStyle
 }

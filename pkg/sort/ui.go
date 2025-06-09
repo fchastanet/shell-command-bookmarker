@@ -6,7 +6,7 @@ import (
 	"github.com/charmbracelet/lipgloss"
 )
 
-func (state *State) View() string {
+func (state *State[ElementType, FieldType]) View() string {
 	if state.IsEditActive {
 		return state.renderStateEditMode()
 	}
@@ -14,7 +14,7 @@ func (state *State) View() string {
 	return state.renderStateReadOnly()
 }
 
-func (state *State) renderStateReadOnly() string {
+func (state *State[ElementType, FieldType]) renderStateReadOnly() string {
 	var sb strings.Builder
 	sb.WriteString("Sort By: ")
 	sb.WriteString(string(state.PrimarySort.Field))
@@ -31,7 +31,7 @@ func (state *State) renderStateReadOnly() string {
 	return sb.String()
 }
 
-func (state *State) renderStateEditMode() string {
+func (state *State[ElementType, FieldType]) renderStateEditMode() string {
 	// Render active sort interface
 	var sb strings.Builder
 	sb.WriteString("Sort By: ")
@@ -56,7 +56,7 @@ func (state *State) renderStateEditMode() string {
 	))
 
 	// Secondary selectors (if primary is not ID)
-	if state.PrimarySort.Field != FieldID {
+	if state.SecondarySort != nil {
 		sb.WriteString(renderField(
 			string(state.SecondarySort.Field),
 			state.SelectedField == SelectedFieldSecondaryField,

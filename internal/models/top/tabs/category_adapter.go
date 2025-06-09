@@ -1,8 +1,9 @@
 package tabs
 
 import (
+	"github.com/fchastanet/shell-command-bookmarker/internal/models/structure"
 	"github.com/fchastanet/shell-command-bookmarker/internal/services"
-	"github.com/fchastanet/shell-command-bookmarker/internal/services/models"
+	dbmodels "github.com/fchastanet/shell-command-bookmarker/internal/services/models"
 	"github.com/fchastanet/shell-command-bookmarker/pkg/category"
 	pkgTabs "github.com/fchastanet/shell-command-bookmarker/pkg/components/tabs"
 	"github.com/fchastanet/shell-command-bookmarker/pkg/sort"
@@ -38,74 +39,117 @@ func NewCategoryAdapter(
 	}
 }
 
-func (ca *CategoryAdapter) GetCategoryTabs() []pkgTabs.CategoryTab[models.CommandStatus] {
-	return []pkgTabs.CategoryTab[models.CommandStatus]{
-		{
-			Title: "Available",
-			Type:  AvailableCommands,
-			Count: 0,
-			FilterState: category.FilterSortState{
-				FilterValue: "",
-				SortState:   sort.NewDefaultState(ca.sortStyles),
+func (ca *CategoryAdapter) GetCategoryTabs(
+	compareBySortFieldFunc sort.CompareBySortFieldFunc[*dbmodels.Command, string],
+) []pkgTabs.CategoryTab[
+	*dbmodels.Command,
+	dbmodels.CommandStatus,
+	string,
+] {
+	sortFields := []string{
+		structure.FieldID,
+		structure.FieldTitle,
+		structure.FieldScript,
+		structure.FieldStatus,
+		structure.FieldLintStatus,
+		structure.FieldCreationDate,
+		structure.FieldModificationDate,
+	}
+
+	// Create a function that returns a new sort state for each tab
+	createNewSortState := func() *sort.State[*dbmodels.Command, string] {
+		return sort.NewDefaultState(
+			ca.sortStyles,
+			structure.FieldID,
+			sortFields,
+			compareBySortFieldFunc,
+		)
+	}
+
+	return []pkgTabs.CategoryTab[
+		*dbmodels.Command,
+		dbmodels.CommandStatus,
+		string,
+	]{
+		NewCategoryTab(
+			"Available",
+			createNewSortState(),
+			AvailableCommands,
+			[]dbmodels.CommandStatus{
+				dbmodels.CommandStatusSaved,
+				dbmodels.CommandStatusImported,
 			},
-			CommandTypes: []models.CommandStatus{
-				models.CommandStatusSaved,
-				models.CommandStatusImported,
+		),
+		NewCategoryTab(
+			"Saved",
+			createNewSortState(),
+			SavedCommands,
+			[]dbmodels.CommandStatus{
+				dbmodels.CommandStatusSaved,
 			},
+		),
+		NewCategoryTab(
+			"New",
+			createNewSortState(),
+			NewCommands,
+			[]dbmodels.CommandStatus{
+				dbmodels.CommandStatusImported,
+			},
+		),
+		NewCategoryTab(
+			"Deleted",
+			createNewSortState(),
+			DeletedCommands,
+			[]dbmodels.CommandStatus{
+				dbmodels.CommandStatusDeleted,
+			},
+		),
+		NewCategoryTab(
+			"All",
+			createNewSortState(),
+			AllCommands,
+			[]dbmodels.CommandStatus{
+				dbmodels.CommandStatusSaved,
+				dbmodels.CommandStatusImported,
+				dbmodels.CommandStatusDeleted,
+				dbmodels.CommandStatusObsolete,
+			},
+		),
+	}
+}
+
+func NewCategoryTab(
+	title string,
+	sortState *sort.State[*dbmodels.Command, string],
+	categoryType pkgTabs.CategoryType,
+	commandTypes []dbmodels.CommandStatus,
+) pkgTabs.CategoryTab[
+	*dbmodels.Command,
+	dbmodels.CommandStatus,
+	string,
+] {
+	return pkgTabs.CategoryTab[
+		*dbmodels.Command,
+		dbmodels.CommandStatus,
+		string,
+	]{
+		Title: title,
+		Type:  categoryType,
+		Count: 0,
+		FilterState: &category.FilterSortState[*dbmodels.Command, string]{
+			FilterValue: "",
+			SortState:   sortState,
 		},
-		{
-			Title: "Saved",
-			Type:  SavedCommands,
-			Count: 0,
-			FilterState: category.FilterSortState{
-				FilterValue: "",
-				SortState:   sort.NewDefaultState(ca.sortStyles),
-			},
-			CommandTypes: []models.CommandStatus{models.CommandStatusSaved},
-		},
-		{
-			Title: "New",
-			Type:  NewCommands,
-			Count: 0,
-			FilterState: category.FilterSortState{
-				FilterValue: "",
-				SortState:   sort.NewDefaultState(ca.sortStyles),
-			},
-			CommandTypes: []models.CommandStatus{models.CommandStatusImported},
-		},
-		{
-			Title: "Deleted",
-			Type:  DeletedCommands,
-			Count: 0,
-			FilterState: category.FilterSortState{
-				FilterValue: "",
-				SortState:   sort.NewDefaultState(ca.sortStyles),
-			},
-			CommandTypes: []models.CommandStatus{models.CommandStatusDeleted},
-		},
-		{
-			Title: "All",
-			Type:  AllCommands,
-			Count: 0,
-			FilterState: category.FilterSortState{
-				FilterValue: "",
-				SortState:   sort.NewDefaultState(ca.sortStyles),
-			},
-			CommandTypes: []models.CommandStatus{
-				models.CommandStatusSaved,
-				models.CommandStatusImported,
-				models.CommandStatusDeleted,
-				models.CommandStatusObsolete,
-			},
-		},
+		CommandTypes: commandTypes,
 	}
 }
 
 // GetCommandTypesByCategory returns command statuses for a UI category type
 func (ca *CategoryAdapter) GetCategoryTabConfiguration(
-	category pkgTabs.CategoryType,
-) pkgTabs.CategoryTab[models.CommandStatus] {
-	return ca.GetCategoryTabs()[category]
+	cat pkgTabs.CategoryType,
+	compareBySortFieldFunc sort.CompareBySortFieldFunc[*dbmodels.Command, string],
+) pkgTabs.CategoryTab[*dbmodels.Command, dbmodels.CommandStatus, string] {
+	return ca.GetCategoryTabs(compareBySortFieldFunc)[cat]
 }
 
 // GetCategoryCounts maps service-level category counts to UI category types

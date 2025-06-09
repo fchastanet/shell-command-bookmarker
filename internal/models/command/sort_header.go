@@ -3,30 +3,16 @@ package command
 import (
 	"strings"
 
+	dbmodels "github.com/fchastanet/shell-command-bookmarker/internal/services/models"
 	"github.com/fchastanet/shell-command-bookmarker/pkg/sort"
 	"github.com/fchastanet/shell-command-bookmarker/pkg/tui/table"
 )
 
-// getSortFieldByColumnKey maps column keys to sort fields
-func getSortFieldByColumnKey(columnKey table.ColumnKey) sort.Field {
-	switch columnKey {
-	case "id":
-		return sort.FieldID
-	case "title":
-		return sort.FieldTitle
-	case "script":
-		return sort.FieldScript
-	case "status":
-		return sort.FieldStatus
-	case "lintStatus":
-		return sort.FieldLintStatus
-	default:
-		return ""
-	}
-}
-
 // updateColumnHeadersWithSortIndicators updates table column headers to display sort indicators
-func updateColumnHeadersWithSortIndicators(columns []table.Column, sortState *sort.State) []table.Column {
+func updateColumnHeadersWithSortIndicators(
+	columns []table.Column,
+	sortState *sort.State[*dbmodels.Command, string],
+) []table.Column {
 	if sortState == nil {
 		return columns
 	}
@@ -45,9 +31,9 @@ func updateColumnHeadersWithSortIndicators(columns []table.Column, sortState *so
 	}
 
 	// Apply primary sort indicator
-	primaryField := getSortFieldByColumnKey(getPrimaryColumnKey(sortState))
+	primaryField := table.ColumnKey(sortState.PrimarySort.Field)
 	for i := range updatedColumns {
-		columnField := getSortFieldByColumnKey(updatedColumns[i].Key)
+		columnField := updatedColumns[i].Key
 		if columnField == primaryField {
 			updatedColumns[i].Title += " 1" + string(sortState.PrimarySort.Direction)
 			break
@@ -56,9 +42,9 @@ func updateColumnHeadersWithSortIndicators(columns []table.Column, sortState *so
 
 	// Apply secondary sort indicator if applicable
 	if sortState.SecondarySort != nil {
-		secondaryField := getSortFieldByColumnKey(getSecondaryColumnKey(sortState))
+		secondaryField := table.ColumnKey(sortState.SecondarySort.Field)
 		for i := range updatedColumns {
-			columnField := getSortFieldByColumnKey(updatedColumns[i].Key)
+			columnField := updatedColumns[i].Key
 			if columnField == secondaryField {
 				updatedColumns[i].Title += " 2" + string(sortState.SecondarySort.Direction)
 				break
@@ -67,44 +53,4 @@ func updateColumnHeadersWithSortIndicators(columns []table.Column, sortState *so
 	}
 
 	return updatedColumns
-}
-
-// getPrimaryColumnKey returns the column key for the primary sort field
-func getPrimaryColumnKey(sortState *sort.State) table.ColumnKey {
-	switch sortState.PrimarySort.Field {
-	case sort.FieldID:
-		return "id"
-	case sort.FieldTitle:
-		return "title"
-	case sort.FieldScript:
-		return "script"
-	case sort.FieldStatus:
-		return "status"
-	case sort.FieldLintStatus:
-		return "lintStatus"
-	default:
-		return ""
-	}
-}
-
-// getSecondaryColumnKey returns the column key for the secondary sort field
-func getSecondaryColumnKey(sortState *sort.State) table.ColumnKey {
-	if sortState.SecondarySort == nil {
-		return ""
-	}
-
-	switch sortState.SecondarySort.Field {
-	case sort.FieldID:
-		return "id"
-	case sort.FieldTitle:
-		return "title"
-	case sort.FieldScript:
-		return "script"
-	case sort.FieldStatus:
-		return "status"
-	case sort.FieldLintStatus:
-		return "lintStatus"
-	default:
-		return ""
-	}
 }

@@ -49,46 +49,11 @@ const (
 )
 
 func (mm *ListMaker) Make(_ resource.ID, width, height int) (structure.ChildModel, error) {
-	idColumn := table.Column{
-		Key:            "id",
-		Title:          "Id",
-		FlexFactor:     0,
-		Width:          0,
-		TruncationFunc: table.NoTruncate,
-		RightAlign:     false,
-	}
-	titleColumn := table.Column{
-		Key:            "title",
-		Title:          "Title",
-		FlexFactor:     0,
-		Width:          0,
-		TruncationFunc: table.GetDefaultTruncationFunc(),
-		RightAlign:     false,
-	}
-	scriptColumn := table.Column{
-		Key:            "script",
-		Title:          "Script",
-		FlexFactor:     0,
-		Width:          0,
-		TruncationFunc: table.GetDefaultTruncationFunc(),
-		RightAlign:     false,
-	}
-	statusColumn := table.Column{
-		Key:            "status",
-		Title:          "Status",
-		FlexFactor:     0,
-		Width:          0,
-		TruncationFunc: table.GetDefaultTruncationFunc(),
-		RightAlign:     false,
-	}
-	lintStatusColumn := table.Column{
-		Key:            "lintStatus",
-		Title:          "Lint",
-		FlexFactor:     0,
-		Width:          0,
-		TruncationFunc: table.GetDefaultTruncationFunc(),
-		RightAlign:     false,
-	}
+	idColumn := newColumn(table.ColumnKey(structure.FieldID), "Id", table.NoTruncate)
+	titleColumn := newColumn(table.ColumnKey(structure.FieldTitle), "Title", table.GetDefaultTruncationFunc())
+	scriptColumn := newColumn(table.ColumnKey(structure.FieldScript), "Script", table.GetDefaultTruncationFunc())
+	statusColumn := newColumn(table.ColumnKey(structure.FieldStatus), "Status", table.GetDefaultTruncationFunc())
+	lintStatusColumn := newColumn(table.ColumnKey(structure.FieldLintStatus), "Lint", table.GetDefaultTruncationFunc())
 
 	// set filter
 	filter := filters.NewInput()
@@ -97,14 +62,15 @@ func (mm *ListMaker) Make(_ resource.ID, width, height int) (structure.ChildMode
 		mm.App.GetHistoryService(),
 		mm.Styles.SortStyles,
 	)
-	categoryTabs := pkgTabs.NewCategoryTabs[*dbmodels.Command](
+	categoryTabs := pkgTabs.NewCategoryTabs(
 		mm.Styles.CategoryTabStyles,
 		filter,
 		categoryAdapter,
 		mm.FilterKeyMap,
+		compareBySortField,
 	)
 
-	// Initialize sort keymap
+	// Initialize sort keyMap
 	sortKeyMap := sort.DefaultKeyMap()
 
 	m := &commandsList{
@@ -135,9 +101,11 @@ func (mm *ListMaker) Make(_ resource.ID, width, height int) (structure.ChildMode
 		return cellContent
 	}
 	// Create a dynamic sort function that always uses the current active category tab's sort state
-	customSortFunc := sort.CommandSortFuncDynamic(func() *sort.State {
-		return categoryTabs.GetActiveSortState()
-	})
+	customSortFunc := sort.CommandSortFuncDynamic(
+		func() *sort.State[*dbmodels.Command, string] {
+			return categoryTabs.GetActiveSortState()
+		},
+	)
 
 	tbl := table.New(
 		mm.EditorsCache,
@@ -156,6 +124,17 @@ func (mm *ListMaker) Make(_ resource.ID, width, height int) (structure.ChildMode
 	m.Model = &tbl
 
 	return m, nil
+}
+
+func newColumn(key table.ColumnKey, title string, truncationFunc table.TruncationFunc) table.Column {
+	return table.Column{
+		Key:            key,
+		Title:          title,
+		FlexFactor:     0,
+		Width:          0,
+		TruncationFunc: truncationFunc,
+		RightAlign:     false,
+	}
 }
 
 func (*ListMaker) renderRow(
@@ -210,13 +189,17 @@ func formatLintStatus(
 }
 
 type commandsList struct {
-	Model *table.Model[*dbmodels.Command]
+	editorsCache table.EditorsCacheInterface
+	Model        *table.Model[*dbmodels.Command]
 	*services.AppService
 	styles                  *styles.Styles
 	spinner                 *spinner.Model
-	editorsCache            table.EditorsCacheInterface
 	tableCustomActionKeyMap *keys.TableCustomActionKeyMap
-	categoryTabs            *pkgTabs.CategoryTabs[*dbmodels.Command, dbmodels.CommandStatus]
+	categoryTabs            *pkgTabs.CategoryTabs[
+		*dbmodels.Command,
+		dbmodels.CommandStatus,
+		string,
+	]
 
 	idColumn         *table.Column
 	titleColumn      *table.Column
@@ -224,12 +207,12 @@ type commandsList struct {
 	statusColumn     *table.Column
 	lintStatusColumn *table.Column
 
-	reloading bool
-	height    int
-	width     int
-
 	// Sort functionality
 	sortKeyMap *sort.KeyMap
+	height     int
+	width      int
+
+	reloading bool
 }
 
 func (*commandsList) BeforeSwitchPane() tea.Cmd {
@@ -268,7 +251,7 @@ func (m *commandsList) Update(msg tea.Msg) tea.Cmd {
 	keyMsg := false
 
 	switch msg := msg.(type) {
-	case sort.Msg:
+	case sort.Msg[*dbmodels.Command, string]:
 		// Update the sort state in the active category tab
 		m.categoryTabs.SetActiveSortState(msg.State)
 
@@ -327,7 +310,7 @@ func (m *commandsList) Update(msg tea.Msg) tea.Cmd {
 func (m *commandsList) loadCommandsForCurrentCategory(selectRowID resource.ID) tea.Cmd {
 	return func() tea.Msg {
 		// Get status types from current category
-		statuses := m.categoryTabs.GetCommandTypes()
+		statuses := m.categoryTabs.GetCommandTypes(compareBySortField)
 
 		// Log the current category and statuses for debugging
 		slog.Debug("Loading commands for category",
@@ -525,7 +508,7 @@ func (m *commandsList) handleKeyMsg(msg tea.KeyMsg) (cmd tea.Cmd, forward bool) 
 		return nil, true
 	}
 
-	// Handle sorting keypresses when sort mode is active
+	// Handle sorting key pressed when sort mode is active
 	activeSortState := m.categoryTabs.GetActiveSortState()
 	if activeSortState != nil && activeSortState.IsEditActive {
 		return m.handleSortKeyMsg(msg), false
@@ -706,7 +689,7 @@ func (m *commandsList) handleApplySort() tea.Cmd {
 
 	infoMsg := tui.InfoMsg(message)
 	return func() tea.Msg {
-		return sort.Msg{
+		return sort.Msg[*dbmodels.Command, string]{
 			State:   sortState,
 			InfoMsg: &infoMsg,
 		}
@@ -727,7 +710,7 @@ func (m *commandsList) handleCancelSort() tea.Cmd {
 	}
 }
 
-// handleSortKeyMsg handles keypresses when in sort mode
+// handleSortKeyMsg handles key pressed when in sort mode
 func (m *commandsList) handleSortKeyMsg(msg tea.KeyMsg) tea.Cmd {
 	switch {
 	case tui.CheckKey(msg, m.sortKeyMap.Apply):
@@ -771,7 +754,10 @@ func (m *commandsList) handleSortKeyMsg(msg tea.KeyMsg) tea.Cmd {
 }
 
 // SelectNextOption cycles through the available options for the currently selected field
-func handleNextComboOption(state *sort.State, comboDirection sort.Direction) {
+func handleNextComboOption(
+	state *sort.State[*dbmodels.Command, string],
+	comboDirection sort.Direction,
+) {
 	if !state.IsEditActive {
 		return
 	}
@@ -781,9 +767,9 @@ func handleNextComboOption(state *sort.State, comboDirection sort.Direction) {
 		state.UpdateSortField(state.PrimarySort, comboDirection)
 
 		// If primary field is changed from ID, initialize secondary sort
-		if state.PrimarySort.Field != sort.FieldID && state.SecondarySort == nil {
-			state.SecondarySort = &sort.Option{
-				Field:     sort.FieldID,
+		if state.PrimarySort.Field != structure.FieldID && state.SecondarySort == nil {
+			state.SecondarySort = &sort.Option[string]{
+				Field:     structure.FieldID,
 				Direction: sort.DirectionAsc,
 			}
 		}
