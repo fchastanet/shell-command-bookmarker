@@ -92,6 +92,30 @@ func (mm *ListMaker) Make(_ resource.ID, width, height int) (structure.ChildMode
 	renderer := func(cmd *dbmodels.Command) table.RenderedRow {
 		return mm.renderRow(cmd, m)
 	}
+	headerCellRenderer := func(cellContent string, colIndex int) string {
+		// Get the sort state from the active category tab
+		sortState := m.categoryTabs.GetActiveSortState()
+
+		columns := m.getColumns()
+		column := columns[colIndex]
+
+		// Apply primary sort indicator
+		primaryField := table.ColumnKey(sortState.PrimarySort.Field)
+		if column.Key == primaryField {
+			cellContent += " 1" + string(sortState.PrimarySort.Direction)
+		}
+
+		// Apply secondary sort indicator if applicable
+		if sortState.SecondarySort != nil {
+			secondaryField := table.ColumnKey(sortState.SecondarySort.Field)
+			if column.Key == secondaryField {
+				cellContent += " 2" + string(sortState.SecondarySort.Direction)
+			}
+		}
+
+		return cellContent
+	}
+
 	cellRenderer := func(_ *dbmodels.Command, cellContent string, colIndex int, rowEdited bool) string {
 		if rowEdited && colIndex == indexColumnStatus {
 			cellContent = m.styles.TableStyle.CellEdited.Render("Edited")
@@ -108,9 +132,10 @@ func (mm *ListMaker) Make(_ resource.ID, width, height int) (structure.ChildMode
 	tbl := table.New(
 		mm.EditorsCache,
 		mm.Styles.TableStyle,
-		m.getColumns(0),
+		m.getColumns(),
 		renderer,
 		cellRenderer,
+		headerCellRenderer,
 		width,
 		height,
 		table.WithSortFunc(customSortFunc),
@@ -215,8 +240,17 @@ func (*commandsList) BeforeSwitchPane() tea.Cmd {
 	return nil
 }
 
-func (m *commandsList) getColumns(width int) []table.Column {
-	slog.Debug("getColumns", "width", width)
+func (m *commandsList) getColumns() []table.Column {
+	return []table.Column{
+		*m.idColumn,
+		*m.titleColumn,
+		*m.scriptColumn,
+		*m.statusColumn,
+		*m.lintStatusColumn,
+	}
+}
+
+func (m *commandsList) computeColumnsWidth(width int) {
 	const columnsCount = 5
 	const roundedAdaptation = 1
 	w := width -
@@ -226,13 +260,6 @@ func (m *commandsList) getColumns(width int) []table.Column {
 	m.scriptColumn.Width = scriptColumnPercentWidth*w/percent + roundedAdaptation
 	m.statusColumn.Width = statusColumnPercentWidth*w/percent + roundedAdaptation
 	m.lintStatusColumn.Width = lintStatusColumnPercentWidth*w/percent + roundedAdaptation
-	return []table.Column{
-		*m.idColumn,
-		*m.titleColumn,
-		*m.scriptColumn,
-		*m.statusColumn,
-		*m.lintStatusColumn,
-	}
 }
 
 func (m *commandsList) Init() tea.Cmd {
@@ -252,25 +279,10 @@ func (m *commandsList) Update(msg tea.Msg) tea.Cmd {
 	keyMsg := false
 
 	switch msg := msg.(type) {
+	case sort.MsgSortEditModeChanged[*dbmodels.Command, string]:
+		return m.reloadCommandsAfterSort(msg.State, nil)
 	case sort.Msg[*dbmodels.Command, string]:
-		// Update the sort state in the active category tab
-		m.categoryTabs.SetActiveSortState(msg.State)
-
-		// Reload the table with the new sort function
-		reload := m.loadCommandsForCurrentCategory(-1)
-
-		// If there's an info message, return it as well
-		if msg.InfoMsg != nil {
-			infoMsg := *msg.InfoMsg
-			return tea.Batch(
-				reload,
-				func() tea.Msg {
-					return infoMsg
-				},
-			)
-		}
-		return reload
-
+		return m.reloadCommandsAfterSort(msg.State, msg.InfoMsg)
 	case table.ReloadMsg[*dbmodels.Command]:
 		return m.loadCommandsForCurrentCategory(msg.RowID)
 	case tea.WindowSizeMsg:
@@ -311,6 +323,28 @@ func (m *commandsList) Update(msg tea.Msg) tea.Cmd {
 	return tea.Batch(cmds...)
 }
 
+func (m *commandsList) reloadCommandsAfterSort(
+	state *sort.State[*dbmodels.Command, string],
+	infoMsg *tui.InfoMsg,
+) tea.Cmd {
+	// Update the sort state in the active category tab
+	m.categoryTabs.SetActiveSortState(state)
+
+	// Reload the table with the new sort function
+	reload := m.loadCommandsForCurrentCategory(-1)
+
+	// If there's an info message, return it as well
+	if infoMsg != nil {
+		return tea.Batch(
+			reload,
+			func() tea.Msg {
+				return infoMsg
+			},
+		)
+	}
+	return reload
+}
+
 // loadCommandsForCurrentCategory loads commands for the current category
 func (m *commandsList) loadCommandsForCurrentCategory(selectRowID resource.ID) tea.Cmd {
 	return func() tea.Msg {
@@ -343,19 +377,8 @@ func (m *commandsList) loadCommandsForCurrentCategory(selectRowID resource.ID) t
 		// Update category counts
 		m.updateCategoryCounts()
 
-		// Get the sort state from the active category tab
-		activeSortState := m.categoryTabs.GetActiveSortState()
-
-		// We don't need to manually sort the rows here because the table component
-		// will handle sorting using the dynamic sort function provided via table.WithSortFunc
-		// during table initialization.
-
-		// Update column headers with sort indicators
-		if m.Model != nil {
-			columns := m.getColumns(m.width)
-			updatedColumns := updateColumnHeadersWithSortIndicators(columns, activeSortState)
-			m.Model.SetColumns(updatedColumns)
-		}
+		m.Model.SetColumns(m.getColumns())
+		m.computeColumnsWidth(m.width)
 
 		// Log the number of loaded commands
 		slog.Debug("Loaded commands", "count", len(rows), "statuses", statuses)
@@ -405,15 +428,13 @@ func (m *commandsList) handleWindowSize(msg tea.WindowSizeMsg) tea.Cmd {
 	m.Model.SetHeight(tableHeight)
 
 	// Update columns for new width
-	m.Model.SetColumns(m.getColumns(m.width))
+	m.Model.SetColumns(m.getColumns())
+	m.computeColumnsWidth(m.width)
 
 	return cmd
 }
 
 func (m *commandsList) handleFocus() tea.Cmd {
-	// Update columns for current width
-	m.Model.SetColumns(m.getColumns(m.width))
-
 	// When focused, load commands for the current category
 	return m.loadCommandsForCurrentCategory(-1)
 }

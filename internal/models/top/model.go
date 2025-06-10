@@ -195,9 +195,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, cmd
 	}
 
-	if cmdHandled := m.handleSortCommandMsg(msg); cmdHandled {
-		return m, nil
-	}
+	m.handleSortCommandMsg(msg)
 
 	cmd := m.dispatchMessage(msg)
 	return m, cmd
@@ -227,18 +225,15 @@ func (m *Model) handleCommandMsg(msg tea.Msg) (tea.Cmd, bool) {
 	return nil, false
 }
 
-func (m *Model) handleSortCommandMsg(msg tea.Msg) bool {
+func (m *Model) handleSortCommandMsg(msg tea.Msg) {
 	switch msg := msg.(type) {
 	case sort.Msg[*dbmodels.Command, string]:
 		m.currentSortState = msg.State
 		m.updateHelpBindings()
-		return true
 	case sort.MsgSortEditModeChanged[*dbmodels.Command, string]:
 		m.currentSortState = msg.State
 		m.updateHelpBindings()
-		return true
 	}
-	return false
 }
 
 func (m *Model) dispatchMessage(msg tea.Msg) tea.Cmd {

@@ -92,12 +92,12 @@ func (state *State[ElementType, FieldType]) handleActivateSort() tea.Cmd {
 	// Return an info message
 	return tea.Batch(
 		func() tea.Msg {
-			return tui.InfoMsg("Sort mode activated - use Tab/Shift+Tab to navigate, Enter to apply, Esc to cancel")
-		},
-		func() tea.Msg {
 			return MsgSortEditModeChanged[ElementType, FieldType]{
 				State: state,
 			}
+		},
+		func() tea.Msg {
+			return tui.InfoMsg("Sort mode activated - use ←|→ to navigate, ↓|↑ to change values, Enter to apply, Esc to cancel")
 		},
 	)
 }
