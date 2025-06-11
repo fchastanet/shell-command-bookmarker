@@ -102,14 +102,14 @@ func (mm *ListMaker) Make(_ resource.ID, width, height int) (structure.ChildMode
 		// Apply primary sort indicator
 		primaryField := table.ColumnKey(sortState.PrimarySort.Field)
 		if column.Key == primaryField {
-			cellContent += " 1" + string(sortState.PrimarySort.Direction)
+			cellContent = "1" + string(sortState.PrimarySort.Direction) + " " + cellContent
 		}
 
 		// Apply secondary sort indicator if applicable
 		if sortState.SecondarySort != nil {
 			secondaryField := table.ColumnKey(sortState.SecondarySort.Field)
 			if column.Key == secondaryField {
-				cellContent += " 2" + string(sortState.SecondarySort.Direction)
+				cellContent = " 2" + string(sortState.SecondarySort.Direction) + " " + cellContent
 			}
 		}
 
@@ -260,6 +260,7 @@ func (m *commandsList) computeColumnsWidth(width int) {
 	m.scriptColumn.Width = scriptColumnPercentWidth*w/percent + roundedAdaptation
 	m.statusColumn.Width = statusColumnPercentWidth*w/percent + roundedAdaptation
 	m.lintStatusColumn.Width = lintStatusColumnPercentWidth*w/percent + roundedAdaptation
+	m.Model.SetColumns(m.getColumns())
 }
 
 func (m *commandsList) Init() tea.Cmd {
@@ -349,7 +350,7 @@ func (m *commandsList) reloadCommandsAfterSort(
 func (m *commandsList) loadCommandsForCurrentCategory(selectRowID resource.ID) tea.Cmd {
 	return func() tea.Msg {
 		// Get status types from current category
-		statuses := m.categoryTabs.GetCommandTypes(compareBySortField)
+		statuses := m.categoryTabs.GetActiveTabCommandTypes()
 
 		// Log the current category and statuses for debugging
 		slog.Debug("Loading commands for category",
@@ -377,7 +378,6 @@ func (m *commandsList) loadCommandsForCurrentCategory(selectRowID resource.ID) t
 		// Update category counts
 		m.updateCategoryCounts()
 
-		m.Model.SetColumns(m.getColumns())
 		m.computeColumnsWidth(m.width)
 
 		// Log the number of loaded commands
@@ -428,7 +428,6 @@ func (m *commandsList) handleWindowSize(msg tea.WindowSizeMsg) tea.Cmd {
 	m.Model.SetHeight(tableHeight)
 
 	// Update columns for new width
-	m.Model.SetColumns(m.getColumns())
 	m.computeColumnsWidth(m.width)
 
 	return cmd
@@ -543,19 +542,17 @@ func (m *commandsList) handleKeyMsg(msg tea.KeyMsg) (cmd tea.Cmd, forward bool) 
 	cmds = append(cmds, cmd)
 
 	customK := m.tableCustomActionKeyMap
-	if tui.CheckKey(msg, customK.ComposeCommand) {
+	switch {
+	case tui.CheckKey(msg, customK.ComposeCommand):
 		forward = false
 		cmds = append(cmds, m.handleComposeCommand())
-	}
-	if tui.CheckKey(msg, customK.RestoreCommand) {
+	case tui.CheckKey(msg, customK.RestoreCommand):
 		forward = false
 		cmds = append(cmds, m.handleRestoreCommand())
-	}
-	if tui.CheckKey(msg, customK.CopyToClipboard) {
+	case tui.CheckKey(msg, customK.CopyToClipboard):
 		forward = false
 		cmds = append(cmds, m.handleCopyToClipboard())
-	}
-	if tui.CheckKey(msg, customK.SelectForShell) {
+	case tui.CheckKey(msg, customK.SelectForShell):
 		forward = false
 		cmds = append(cmds, m.handleSelectForShell())
 	}
@@ -608,9 +605,7 @@ func (m *commandsList) handleComposeCommand() tea.Cmd {
 	// change the category tab to "Available Commands" immediately
 	// so the user can see the new command right away
 	// The sort state will be automatically loaded from the target category tab
-	m.categoryTabs.Update(pkgTabs.ChangeCategoryTabMsg[*dbmodels.Command, dbmodels.CommandStatus, string]{
-		NewTab: m.categoryTabs.GetActiveTab(),
-	})
+	m.categoryTabs.ChangeCategoryTab(tabs.AvailableCommands)
 	return tea.Batch(
 		func() tea.Msg {
 			return table.ReloadMsg[*dbmodels.Command]{

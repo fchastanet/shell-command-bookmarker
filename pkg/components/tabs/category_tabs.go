@@ -15,9 +15,6 @@ import (
 	"github.com/fchastanet/shell-command-bookmarker/pkg/tui/table"
 )
 
-// CategoryType is an alias for category.Type
-type CategoryType = category.Type
-
 // CategoryTabStyles is an interface for styling category tabs
 type CategoryTabStyles interface {
 	GetActiveTabStyle() lipgloss.Style
@@ -31,7 +28,7 @@ type CategoryTab[ElementType resource.Identifiable, CommandStatus any, FieldType
 	Title        string
 	FilterState  *category.FilterSortState[ElementType, FieldType]
 	CommandTypes []CommandStatus
-	Type         CategoryType
+	Type         category.Type
 	Count        int
 }
 
@@ -48,11 +45,11 @@ type CategoryAdapterInterface[
 
 	// GetCategoryTabConfiguration returns the full category tab configuration
 	GetCategoryTabConfiguration(
-		category CategoryType,
+		category category.Type,
 		compareBySortFieldFunc sort.CompareBySortFieldFunc[ElementType, FieldType],
 	) CategoryTab[ElementType, CommandStatus, FieldType]
 	// GetCategoryCounts returns the counts of commands in each category
-	GetCategoryCounts() (map[CategoryType]int, error)
+	GetCategoryCounts() (map[category.Type]int, error)
 }
 
 type FilterKeyMap struct {
@@ -89,17 +86,9 @@ type CategoryTabChangedMsg[
 	NewTab *CategoryTab[ElementType, CommandStatus, FieldType]
 }
 
-type ChangeCategoryTabMsg[
-	ElementType resource.Identifiable,
-	CommandStatus any,
-	FieldType string,
-] struct {
-	NewTab *CategoryTab[ElementType, CommandStatus, FieldType]
-}
-
 // ErrCategoryTabNotFound is returned when no commands are selected for an operation
 type ErrCategoryTabNotFound struct {
-	tab CategoryType
+	tab category.Type
 }
 
 func (e *ErrCategoryTabNotFound) Error() string {
@@ -178,8 +167,6 @@ func (ct *CategoryTabs[ElementType, CommandStatus, FieldType]) Update(msg tea.Ms
 		ct.focused = false
 	case table.BulkInsertMsg[ElementType]:
 		ct.filteredCount = len(msg.Items)
-	case ChangeCategoryTabMsg[ElementType, CommandStatus, FieldType]:
-		return ct.changeCategoryTab(msg.NewTab)
 	}
 
 	// Update filter model
@@ -188,17 +175,17 @@ func (ct *CategoryTabs[ElementType, CommandStatus, FieldType]) Update(msg tea.Ms
 	return tea.Batch(cmds...)
 }
 
-func (ct *CategoryTabs[ElementType, CommandStatus, FieldType]) changeCategoryTab(
-	newTab *CategoryTab[ElementType, CommandStatus, FieldType],
+func (ct *CategoryTabs[ElementType, CommandStatus, FieldType]) ChangeCategoryTab(
+	newTabType category.Type,
 ) tea.Cmd {
 	// Find the index of the new tab
 	for i, tab := range ct.tabs {
-		if tab.Type == newTab.Type {
+		if tab.Type == newTabType {
 			ct.activeTabIdx = i
 			// Set the filter value for the new tab
-			ct.inputModel.SetFilterValue(newTab.FilterState.FilterValue)
+			ct.inputModel.SetFilterValue(tab.FilterState.FilterValue)
 			// Save the filter value in the tab's filter state
-			ct.tabs[ct.activeTabIdx].FilterState.FilterValue = newTab.FilterState.FilterValue
+			ct.tabs[ct.activeTabIdx].FilterState.FilterValue = tab.FilterState.FilterValue
 			// Return a command to notify about the tab change
 			return func() tea.Msg {
 				return CategoryTabChangedMsg[ElementType, CommandStatus, FieldType]{
@@ -209,7 +196,7 @@ func (ct *CategoryTabs[ElementType, CommandStatus, FieldType]) changeCategoryTab
 	}
 	// If the new tab is not found, return error command
 	return func() tea.Msg {
-		return tui.ErrorMsg(&ErrCategoryTabNotFound{tab: newTab.Type})
+		return tui.ErrorMsg(&ErrCategoryTabNotFound{tab: newTabType})
 	}
 }
 
@@ -316,7 +303,7 @@ func (ct *CategoryTabs[ElementType, CommandStatus, FieldType]) categoryChangedMs
 }
 
 // GetActiveCategory returns the currently active category
-func (ct *CategoryTabs[ElementType, CommandStatus, FieldType]) GetActiveCategory() CategoryType {
+func (ct *CategoryTabs[ElementType, CommandStatus, FieldType]) GetActiveCategory() category.Type {
 	return ct.tabs[ct.activeTabIdx].Type
 }
 
@@ -339,17 +326,12 @@ func (ct *CategoryTabs[ElementType, CommandStatus, FieldType]) SetActiveSortStat
 }
 
 // GetCommandTypes returns the command status types for the active category
-func (ct *CategoryTabs[ElementType, CommandStatus, FieldType]) GetCommandTypes(
-	compareBySortFieldFunc sort.CompareBySortFieldFunc[ElementType, FieldType],
-) []CommandStatus {
-	return ct.adapter.GetCategoryTabConfiguration(
-		ct.tabs[ct.activeTabIdx].Type,
-		compareBySortFieldFunc,
-	).CommandTypes
+func (ct *CategoryTabs[ElementType, CommandStatus, FieldType]) GetActiveTabCommandTypes() []CommandStatus {
+	return ct.tabs[ct.activeTabIdx].CommandTypes
 }
 
 // SetCounts updates the counts for each category
-func (ct *CategoryTabs[ElementType, CommandStatus, FieldType]) SetCounts(counts map[CategoryType]int) {
+func (ct *CategoryTabs[ElementType, CommandStatus, FieldType]) SetCounts(counts map[category.Type]int) {
 	for i := range ct.tabs {
 		if count, ok := counts[ct.tabs[i].Type]; ok {
 			ct.tabs[i].Count = count

@@ -11,7 +11,7 @@ import (
 
 const (
 	// AvailableCommands represents commands that are available for use
-	AvailableCommands pkgTabs.CategoryType = iota
+	AvailableCommands category.Type = iota
 	// SavedCommands represents commands that have been saved
 	SavedCommands
 	// NewCommands represents commands that have been imported but not yet saved
@@ -75,7 +75,7 @@ func (ca *CategoryAdapter) GetCategoryTabs(
 		dbmodels.CommandStatus,
 		string,
 	]{
-		NewCategoryTab(
+		newCategoryTab(
 			"Available",
 			createNewSortState(),
 			AvailableCommands,
@@ -84,7 +84,7 @@ func (ca *CategoryAdapter) GetCategoryTabs(
 				dbmodels.CommandStatusImported,
 			},
 		),
-		NewCategoryTab(
+		newCategoryTab(
 			"Saved",
 			createNewSortState(),
 			SavedCommands,
@@ -92,7 +92,7 @@ func (ca *CategoryAdapter) GetCategoryTabs(
 				dbmodels.CommandStatusSaved,
 			},
 		),
-		NewCategoryTab(
+		newCategoryTab(
 			"New",
 			createNewSortState(),
 			NewCommands,
@@ -100,7 +100,7 @@ func (ca *CategoryAdapter) GetCategoryTabs(
 				dbmodels.CommandStatusImported,
 			},
 		),
-		NewCategoryTab(
+		newCategoryTab(
 			"Deleted",
 			createNewSortState(),
 			DeletedCommands,
@@ -108,7 +108,7 @@ func (ca *CategoryAdapter) GetCategoryTabs(
 				dbmodels.CommandStatusDeleted,
 			},
 		),
-		NewCategoryTab(
+		newCategoryTab(
 			"All",
 			createNewSortState(),
 			AllCommands,
@@ -122,10 +122,10 @@ func (ca *CategoryAdapter) GetCategoryTabs(
 	}
 }
 
-func NewCategoryTab(
+func newCategoryTab(
 	title string,
 	sortState *sort.State[*dbmodels.Command, string],
-	categoryType pkgTabs.CategoryType,
+	categoryType category.Type,
 	commandTypes []dbmodels.CommandStatus,
 ) pkgTabs.CategoryTab[
 	*dbmodels.Command,
@@ -150,14 +150,14 @@ func NewCategoryTab(
 
 // GetCommandTypesByCategory returns command statuses for a UI category type
 func (ca *CategoryAdapter) GetCategoryTabConfiguration(
-	cat pkgTabs.CategoryType,
+	cat category.Type,
 	compareBySortFieldFunc sort.CompareBySortFieldFunc[*dbmodels.Command, string],
 ) pkgTabs.CategoryTab[*dbmodels.Command, dbmodels.CommandStatus, string] {
 	return ca.GetCategoryTabs(compareBySortFieldFunc)[cat]
 }
 
 // GetCategoryCounts maps service-level category counts to UI category types
-func (ca *CategoryAdapter) GetCategoryCounts() (map[pkgTabs.CategoryType]int, error) {
+func (ca *CategoryAdapter) GetCategoryCounts() (map[category.Type]int, error) {
 	// Get category counts from service
 	serviceCounts, err := ca.historyService.GetCommandCountsByCategory()
 	if err != nil {
@@ -165,7 +165,7 @@ func (ca *CategoryAdapter) GetCategoryCounts() (map[pkgTabs.CategoryType]int, er
 	}
 
 	// Map service categories to UI categories
-	uiCounts := make(map[pkgTabs.CategoryType]int)
+	uiCounts := make(map[category.Type]int)
 	uiCounts[AvailableCommands] = serviceCounts[services.CommandCategoryAvailable]
 	uiCounts[SavedCommands] = serviceCounts[services.CommandCategorySaved]
 	uiCounts[NewCommands] = serviceCounts[services.CommandCategoryNew]

@@ -536,7 +536,9 @@ func (m *Model) updateHelpBindings() {
 		m.helpModel.AddBindingSet("Prompt Controls", keys.GetFormBindings())
 	case normalMode:
 		// For normal mode, organize bindings into logical groups
-		sort.UpdateBindings(m.currentSortState.KeyMap, m.currentSortState)
+		if m.currentSortState != nil {
+			sort.UpdateBindings(m.currentSortState.KeyMap, m.currentSortState)
+		}
 		if m.currentSortState != nil && m.currentSortState.IsEditActive {
 			m.helpModel.AddBindingSet("Sort Controls", keys.KeyMapToSlice(*m.currentSortState.KeyMap))
 		}

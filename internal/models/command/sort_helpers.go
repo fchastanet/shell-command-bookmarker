@@ -9,12 +9,6 @@ import (
 	"github.com/fchastanet/shell-command-bookmarker/pkg/sort"
 )
 
-// IsSortModeActive returns true if the sort mode is currently active
-func (m *commandsList) IsSortModeActive() bool {
-	sortState := m.categoryTabs.GetActiveSortState()
-	return sortState != nil && sortState.IsEditActive
-}
-
 // compareBySortField compares two commands by the given field
 func compareBySortField(i, j *models.Command, field structure.Field) int {
 	switch field {

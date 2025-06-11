@@ -26,3 +26,4 @@ applyTo: '**/*.go'
 - Generate code so it could be easily mocked for testing purposes.
 - Update Markdown files with relevant information when necessary.
 - Generate unit tests for new features or changes.
+- Do not use go type aliases as they can lead to confusion and make the code harder to understand.
