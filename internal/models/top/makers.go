@@ -35,6 +35,7 @@ func NewMakerFactory(
 		NavigationKeyMap:        keyMaps.tableNavigation,
 		ActionKeyMap:            keyMaps.tableAction,
 		FilterKeyMap:            keyMaps.filter,
+		SortKeyMap:              keyMaps.sort,
 	}
 	makers[structure.SearchKind] = &command.SearchMaker{
 		App:     app.Self(),

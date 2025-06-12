@@ -24,6 +24,7 @@ import (
 	dbmodels "github.com/fchastanet/shell-command-bookmarker/internal/services/models"
 	"github.com/fchastanet/shell-command-bookmarker/internal/version"
 	"github.com/fchastanet/shell-command-bookmarker/pkg/components/tabs"
+	"github.com/fchastanet/shell-command-bookmarker/pkg/sort"
 	"github.com/fchastanet/shell-command-bookmarker/pkg/tui"
 	"github.com/fchastanet/shell-command-bookmarker/pkg/tui/table"
 )
@@ -67,6 +68,7 @@ const (
 type MessageClearTickMsg struct{}
 
 type KeyMaps struct {
+	sort              *sort.KeyMap
 	filter            *tabs.FilterKeyMap
 	global            *keys.GlobalKeyMap
 	pane              *keys.PaneNavigationKeyMap
@@ -90,7 +92,8 @@ type Model struct {
 
 	spinner *spinner.Model
 
-	selectedCommand *dbmodels.Command
+	selectedCommand  *dbmodels.Command
+	currentSortState *sort.State[*dbmodels.Command, string]
 
 	footerModel footer.Model
 	headerModel header.Model
@@ -120,6 +123,7 @@ func NewModel(
 
 	keyMaps := &KeyMaps{
 		editor:            keys.GetDefaultEditorKeyMap(),
+		sort:              sort.GetDefaultKeyMap(),
 		filter:            keys.GetFilterKeyMap(),
 		global:            keys.GetGlobalKeyMap(),
 		pane:              keys.GetPaneNavigationKeyMap(),
@@ -163,6 +167,7 @@ func NewModel(
 		perfMonitorActive: false,
 		quitting:          false,
 		selectedCommand:   nil,
+		currentSortState:  nil,
 	}
 	makers := NewMakerFactory(m.PaneManager, appService, myStyles, &spinnerObj, keyMaps)
 	m.SetMakerFactory(makers)
@@ -178,6 +183,8 @@ func (m *Model) Init() tea.Cmd {
 func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	// Use enhanced logging for better debugging
 	m.appService.LoggerService.EnhancedLogTeaMsg(msg)
+	msgType := fmt.Sprintf("%T", msg)
+	slog.Debug("Received message", "type", msgType)
 
 	// First handle performance monitoring messages
 	if cmd := m.handlePerformanceMessages(msg); cmd != nil {
@@ -187,6 +194,8 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	if cmd, cmdHandled := m.handleCommandMsg(msg); cmdHandled {
 		return m, cmd
 	}
+
+	m.handleSortCommandMsg(msg)
 
 	cmd := m.dispatchMessage(msg)
 	return m, cmd
@@ -214,6 +223,17 @@ func (m *Model) handleCommandMsg(msg tea.Msg) (tea.Cmd, bool) {
 		return m.handleCommandSelectedForShellMsg(msg), true
 	}
 	return nil, false
+}
+
+func (m *Model) handleSortCommandMsg(msg tea.Msg) {
+	switch msg := msg.(type) {
+	case sort.Msg[*dbmodels.Command, string]:
+		m.currentSortState = msg.State
+		m.updateHelpBindings()
+	case sort.MsgSortEditModeChanged[*dbmodels.Command, string]:
+		m.currentSortState = msg.State
+		m.updateHelpBindings()
+	}
 }
 
 func (m *Model) dispatchMessage(msg tea.Msg) tea.Cmd {
@@ -516,21 +536,31 @@ func (m *Model) updateHelpBindings() {
 		m.helpModel.AddBindingSet("Prompt Controls", keys.GetFormBindings())
 	case normalMode:
 		// For normal mode, organize bindings into logical groups
+		if m.currentSortState != nil {
+			sort.UpdateBindings(m.currentSortState.KeyMap, m.currentSortState)
+		}
+		if m.currentSortState != nil && m.currentSortState.IsEditActive {
+			m.helpModel.AddBindingSet("Sort Controls", keys.KeyMapToSlice(*m.currentSortState.KeyMap))
+		}
 		m.helpModel.AddBindingSet("Global", keys.KeyMapToSlice(*m.keyMaps.global))
 		m.helpModel.AddBindingSet("Pane Navigation", m.HelpBindings())
-		if m.FocusedPosition() == structure.TopPane {
+		if m.FocusedPosition() == structure.TopPane && !m.currentSortState.IsEditActive {
 			m.helpModel.AddBindingSet("Filter Controls", keys.KeyMapToSlice(*m.keyMaps.filter))
 			m.helpModel.AddBindingSet("Table Nav", keys.KeyMapToSlice(*m.keyMaps.tableNavigation))
-			tableActions := m.keyMaps.tableAction
-			tableCustomActions := m.keyMaps.tableCustomAction
 			keys.UpdateBindings(
-				tableActions,
-				tableCustomActions,
+				m.keyMaps.tableAction,
+				m.keyMaps.tableCustomAction,
 				m.appService.IsShellSelectionMode(),
 				m.selectedCommand,
 			)
-			m.helpModel.AddBindingSet("Table Actions", keys.KeyMapToSlice(*tableActions))
-			m.helpModel.AddBindingSet("Command Actions", keys.KeyMapToSlice(*tableCustomActions))
+
+			tableCustomActions := keys.KeyMapToSlice(*m.keyMaps.tableCustomAction)
+			if !m.currentSortState.IsEditActive {
+				tableCustomActions = append(tableCustomActions, m.currentSortState.KeyMap.Sort)
+			}
+
+			m.helpModel.AddBindingSet("Table Actions", keys.KeyMapToSlice(*m.keyMaps.tableAction))
+			m.helpModel.AddBindingSet("Command Actions", tableCustomActions)
 		}
 	}
 }

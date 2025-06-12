@@ -103,14 +103,3 @@ func (c *Command) GetSingleLineDescription(maxChars int) string {
 	}
 	return c.Title
 }
-
-func CommandSorter(i, j *Command) int {
-	switch {
-	case i.ID < j.ID:
-		return -1
-	case i.ID > j.ID:
-		return 1
-	default:
-		return 0
-	}
-}

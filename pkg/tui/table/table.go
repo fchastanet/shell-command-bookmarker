@@ -29,14 +29,15 @@ type EditorsCacheInterface interface {
 type Model[V resource.Identifiable] struct {
 	borderColor lipgloss.TerminalColor
 
-	previewKind      resource.Kind
-	styles           *Style
-	navigationKeyMap *Navigation
-	actionKeyMap     *Action
-	rowRenderer      RowRenderer[V]
-	cellRenderer     DynamicCellRenderer[V]
-	rendered         map[resource.ID]RenderedRow
-	editorsCache     EditorsCacheInterface
+	previewKind        resource.Kind
+	styles             *Style
+	navigationKeyMap   *Navigation
+	actionKeyMap       *Action
+	rowRenderer        RowRenderer[V]
+	cellRenderer       DynamicCellRenderer[V]
+	headerCellRenderer HeaderCellRenderer
+	rendered           map[resource.ID]RenderedRow
+	editorsCache       EditorsCacheInterface
 
 	// items are the unfiltered set of items available to the table.
 	items    map[resource.ID]V
@@ -82,6 +83,8 @@ type RowRenderer[V any] func(V) RenderedRow
 
 type DynamicCellRenderer[V any] func(row V, cellContent string, colIndex int, rowEdited bool) string
 
+type HeaderCellRenderer func(cellContent string, colIndex int) string
+
 // RenderedRow provides the rendered string for each column in a row.
 type RenderedRow map[ColumnKey]string
 
@@ -101,31 +104,33 @@ func New[V resource.Identifiable](
 	cols []Column,
 	rowRenderer RowRenderer[V],
 	cellRenderer DynamicCellRenderer[V],
+	headerCellRenderer HeaderCellRenderer,
 	width, height int, opts ...Option[V],
 ) Model[V] {
 	m := Model[V]{
-		focused:          false,
-		styles:           tableStyles,
-		editorsCache:     editorsCache,
-		navigationKeyMap: nil,
-		actionKeyMap:     nil,
-		cols:             make([]Column, len(cols)),
-		rows:             []V{},
-		rowRenderer:      rowRenderer,
-		cellRenderer:     cellRenderer,
-		items:            make(map[resource.ID]V),
-		rendered:         make(map[resource.ID]RenderedRow),
-		selected:         make(map[resource.ID]V),
-		selectable:       true,
-		border:           lipgloss.NormalBorder(),
-		borderColor:      lipgloss.NoColor{},
-		currentRowIndex:  -1,
-		currentRowID:     resource.ID(0),
-		sortFunc:         nil,
-		start:            0,
-		width:            width,
-		height:           height,
-		previewKind:      resource.DefaultKind{},
+		focused:            false,
+		styles:             tableStyles,
+		editorsCache:       editorsCache,
+		navigationKeyMap:   nil,
+		actionKeyMap:       nil,
+		cols:               make([]Column, len(cols)),
+		rows:               []V{},
+		rowRenderer:        rowRenderer,
+		cellRenderer:       cellRenderer,
+		headerCellRenderer: headerCellRenderer,
+		items:              make(map[resource.ID]V),
+		rendered:           make(map[resource.ID]RenderedRow),
+		selected:           make(map[resource.ID]V),
+		selectable:         true,
+		border:             lipgloss.NormalBorder(),
+		borderColor:        lipgloss.NoColor{},
+		currentRowIndex:    -1,
+		currentRowID:       resource.ID(0),
+		sortFunc:           nil,
+		start:              0,
+		width:              width,
+		height:             height,
+		previewKind:        resource.DefaultKind{},
 	}
 	for _, fn := range opts {
 		fn(&m)
@@ -786,9 +791,9 @@ func (m *Model[V]) GetNextRowIDRelativeToCurrentSelection() resource.ID {
 }
 
 func (m *Model[V]) headersView() string {
-	s := make([]string, 0, len(m.cols))
-	// TODO: use index and don't use append below
-	for _, col := range m.cols {
+	s := make([]string, len(m.cols))
+
+	for colIndex, col := range m.cols {
 		style := lipgloss.NewStyle().
 			Width(col.Width).
 			MaxWidth(col.Width).
@@ -798,8 +803,12 @@ func (m *Model[V]) headersView() string {
 		if col.RightAlign {
 			style = style.AlignHorizontal(lipgloss.Right)
 		}
-		renderedCell := style.Render(TruncateRight(col.Title, col.Width, "…"))
-		s = append(s, m.styles.Cell.Render(renderedCell))
+		cellContent := col.Title
+		if m.headerCellRenderer != nil {
+			cellContent = m.headerCellRenderer(cellContent, colIndex)
+		}
+		renderedCell := style.Render(TruncateRight(cellContent, col.Width, "…"))
+		s[colIndex] = m.styles.Cell.Render(renderedCell)
 	}
 	return lipgloss.NewStyle().
 		MaxWidth(m.width).

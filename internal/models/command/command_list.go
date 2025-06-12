@@ -3,9 +3,9 @@ package command
 import (
 	"fmt"
 	"log/slog"
+	"strings"
 
 	"github.com/atotto/clipboard"
-	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/bubbles/spinner"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
@@ -18,6 +18,7 @@ import (
 	dbmodels "github.com/fchastanet/shell-command-bookmarker/internal/services/models"
 	pkgTabs "github.com/fchastanet/shell-command-bookmarker/pkg/components/tabs"
 	"github.com/fchastanet/shell-command-bookmarker/pkg/resource"
+	"github.com/fchastanet/shell-command-bookmarker/pkg/sort"
 	"github.com/fchastanet/shell-command-bookmarker/pkg/tui"
 	"github.com/fchastanet/shell-command-bookmarker/pkg/tui/filters"
 	"github.com/fchastanet/shell-command-bookmarker/pkg/tui/table"
@@ -28,6 +29,7 @@ type ListMaker struct {
 	TableCustomActionKeyMap *keys.TableCustomActionKeyMap
 	FilterKeyMap            *pkgTabs.FilterKeyMap
 	NavigationKeyMap        *table.Navigation
+	SortKeyMap              *sort.KeyMap
 	ActionKeyMap            *table.Action
 	EditorsCache            table.EditorsCacheInterface
 	Styles                  *styles.Styles
@@ -48,56 +50,26 @@ const (
 )
 
 func (mm *ListMaker) Make(_ resource.ID, width, height int) (structure.ChildModel, error) {
-	idColumn := table.Column{
-		Key:            "id",
-		Title:          "Id",
-		FlexFactor:     0,
-		Width:          0,
-		TruncationFunc: table.NoTruncate,
-		RightAlign:     false,
-	}
-	titleColumn := table.Column{
-		Key:            "title",
-		Title:          "Title",
-		FlexFactor:     0,
-		Width:          0,
-		TruncationFunc: table.GetDefaultTruncationFunc(),
-		RightAlign:     false,
-	}
-	scriptColumn := table.Column{
-		Key:            "script",
-		Title:          "Script",
-		FlexFactor:     0,
-		Width:          0,
-		TruncationFunc: table.GetDefaultTruncationFunc(),
-		RightAlign:     false,
-	}
-	statusColumn := table.Column{
-		Key:            "status",
-		Title:          "Status",
-		FlexFactor:     0,
-		Width:          0,
-		TruncationFunc: table.GetDefaultTruncationFunc(),
-		RightAlign:     false,
-	}
-	lintStatusColumn := table.Column{
-		Key:            "lintStatus",
-		Title:          "Lint",
-		FlexFactor:     0,
-		Width:          0,
-		TruncationFunc: table.GetDefaultTruncationFunc(),
-		RightAlign:     false,
-	}
+	idColumn := newColumn(table.ColumnKey(structure.FieldID), "Id", table.NoTruncate)
+	titleColumn := newColumn(table.ColumnKey(structure.FieldTitle), "Title", table.GetDefaultTruncationFunc())
+	scriptColumn := newColumn(table.ColumnKey(structure.FieldScript), "Script", table.GetDefaultTruncationFunc())
+	statusColumn := newColumn(table.ColumnKey(structure.FieldStatus), "Status", table.GetDefaultTruncationFunc())
+	lintStatusColumn := newColumn(table.ColumnKey(structure.FieldLintStatus), "Lint", table.GetDefaultTruncationFunc())
 
 	// set filter
 	filter := filters.NewInput()
 	// Initialize the category tabs component
-	categoryAdapter := tabs.NewCategoryAdapter(mm.App.GetHistoryService())
-	categoryTabs := pkgTabs.NewCategoryTabs[*dbmodels.Command](
+	categoryAdapter := tabs.NewCategoryAdapter(
+		mm.App.GetHistoryService(),
+		mm.Styles.SortStyles,
+		mm.SortKeyMap,
+	)
+	categoryTabs := pkgTabs.NewCategoryTabs(
 		mm.Styles.CategoryTabStyles,
 		filter,
 		categoryAdapter,
 		mm.FilterKeyMap,
+		compareBySortField,
 	)
 
 	m := &commandsList{
@@ -120,21 +92,53 @@ func (mm *ListMaker) Make(_ resource.ID, width, height int) (structure.ChildMode
 	renderer := func(cmd *dbmodels.Command) table.RenderedRow {
 		return mm.renderRow(cmd, m)
 	}
+	headerCellRenderer := func(cellContent string, colIndex int) string {
+		// Get the sort state from the active category tab
+		sortState := m.categoryTabs.GetActiveSortState()
+
+		columns := m.getColumns()
+		column := columns[colIndex]
+
+		// Apply primary sort indicator
+		primaryField := table.ColumnKey(sortState.PrimarySort.Field)
+		if column.Key == primaryField {
+			cellContent = "1" + string(sortState.PrimarySort.Direction) + " " + cellContent
+		}
+
+		// Apply secondary sort indicator if applicable
+		if sortState.SecondarySort != nil {
+			secondaryField := table.ColumnKey(sortState.SecondarySort.Field)
+			if column.Key == secondaryField {
+				cellContent = " 2" + string(sortState.SecondarySort.Direction) + " " + cellContent
+			}
+		}
+
+		return cellContent
+	}
+
 	cellRenderer := func(_ *dbmodels.Command, cellContent string, colIndex int, rowEdited bool) string {
 		if rowEdited && colIndex == indexColumnStatus {
 			cellContent = m.styles.TableStyle.CellEdited.Render("Edited")
 		}
 		return cellContent
 	}
+	// Create a dynamic sort function that always uses the current active category tab's sort state
+	customSortFunc := sort.CommandSortFuncDynamic(
+		func() *sort.State[*dbmodels.Command, string] {
+			return categoryTabs.GetActiveSortState()
+		},
+	)
+
 	tbl := table.New(
 		mm.EditorsCache,
 		mm.Styles.TableStyle,
-		m.getColumns(0),
+		m.getColumns(),
 		renderer,
 		cellRenderer,
+		headerCellRenderer,
 		width,
 		height,
-		table.WithSortFunc(dbmodels.CommandSorter),
+		table.WithSortFunc(customSortFunc),
 		table.WithPreview[*dbmodels.Command](structure.CommandKind),
 		table.WithNavigation[*dbmodels.Command](mm.NavigationKeyMap),
 		table.WithAction[*dbmodels.Command](mm.ActionKeyMap),
@@ -143,6 +147,17 @@ func (mm *ListMaker) Make(_ resource.ID, width, height int) (structure.ChildMode
 	m.Model = &tbl
 
 	return m, nil
+}
+
+func newColumn(key table.ColumnKey, title string, truncationFunc table.TruncationFunc) table.Column {
+	return table.Column{
+		Key:            key,
+		Title:          title,
+		FlexFactor:     0,
+		Width:          0,
+		TruncationFunc: truncationFunc,
+		RightAlign:     false,
+	}
 }
 
 func (*ListMaker) renderRow(
@@ -197,13 +212,17 @@ func formatLintStatus(
 }
 
 type commandsList struct {
-	Model *table.Model[*dbmodels.Command]
+	editorsCache table.EditorsCacheInterface
+	Model        *table.Model[*dbmodels.Command]
 	*services.AppService
 	styles                  *styles.Styles
 	spinner                 *spinner.Model
-	editorsCache            table.EditorsCacheInterface
 	tableCustomActionKeyMap *keys.TableCustomActionKeyMap
-	categoryTabs            *pkgTabs.CategoryTabs[*dbmodels.Command, dbmodels.CommandStatus]
+	categoryTabs            *pkgTabs.CategoryTabs[
+		*dbmodels.Command,
+		dbmodels.CommandStatus,
+		string,
+	]
 
 	idColumn         *table.Column
 	titleColumn      *table.Column
@@ -211,26 +230,17 @@ type commandsList struct {
 	statusColumn     *table.Column
 	lintStatusColumn *table.Column
 
+	height int
+	width  int
+
 	reloading bool
-	height    int
-	width     int
 }
 
 func (*commandsList) BeforeSwitchPane() tea.Cmd {
 	return nil
 }
 
-func (m *commandsList) getColumns(width int) []table.Column {
-	slog.Debug("getColumns", "width", width)
-	const columnsCount = 5
-	const roundedAdaptation = 1
-	w := width -
-		columnsCount*m.styles.TableStyle.Cell.GetHorizontalPadding()*sidesCount
-	m.idColumn.Width = idColumnPercentWidth*w/percent + roundedAdaptation
-	m.titleColumn.Width = titleColumnPercentWidth*w/percent + roundedAdaptation
-	m.scriptColumn.Width = scriptColumnPercentWidth*w/percent + roundedAdaptation
-	m.statusColumn.Width = statusColumnPercentWidth*w/percent + roundedAdaptation
-	m.lintStatusColumn.Width = lintStatusColumnPercentWidth*w/percent + roundedAdaptation
+func (m *commandsList) getColumns() []table.Column {
 	return []table.Column{
 		*m.idColumn,
 		*m.titleColumn,
@@ -240,10 +250,28 @@ func (m *commandsList) getColumns(width int) []table.Column {
 	}
 }
 
-func (*commandsList) Init() tea.Cmd {
-	return func() tea.Msg {
-		return tea.FocusMsg{}
-	}
+func (m *commandsList) computeColumnsWidth(width int) {
+	const columnsCount = 5
+	const roundedAdaptation = 1
+	w := width -
+		columnsCount*m.styles.TableStyle.Cell.GetHorizontalPadding()*sidesCount
+	m.idColumn.Width = idColumnPercentWidth*w/percent + roundedAdaptation
+	m.titleColumn.Width = titleColumnPercentWidth*w/percent + roundedAdaptation
+	m.scriptColumn.Width = scriptColumnPercentWidth*w/percent + roundedAdaptation
+	m.statusColumn.Width = statusColumnPercentWidth*w/percent + roundedAdaptation
+	m.lintStatusColumn.Width = lintStatusColumnPercentWidth*w/percent + roundedAdaptation
+	m.Model.SetColumns(m.getColumns())
+}
+
+func (m *commandsList) Init() tea.Cmd {
+	activeSortState := m.categoryTabs.GetActiveSortState()
+
+	return tea.Batch(
+		activeSortState.Init(),
+		func() tea.Msg {
+			return tea.FocusMsg{}
+		},
+	)
 }
 
 //nolint:cyclop // not really complex
@@ -252,6 +280,10 @@ func (m *commandsList) Update(msg tea.Msg) tea.Cmd {
 	keyMsg := false
 
 	switch msg := msg.(type) {
+	case sort.MsgSortEditModeChanged[*dbmodels.Command, string]:
+		return m.reloadCommandsAfterSort(msg.State, nil)
+	case sort.Msg[*dbmodels.Command, string]:
+		return m.reloadCommandsAfterSort(msg.State, msg.InfoMsg)
 	case table.ReloadMsg[*dbmodels.Command]:
 		return m.loadCommandsForCurrentCategory(msg.RowID)
 	case tea.WindowSizeMsg:
@@ -264,16 +296,18 @@ func (m *commandsList) Update(msg tea.Msg) tea.Cmd {
 		return m.handleFocus()
 	case tea.KeyMsg:
 		keyMsg = true
-		if !m.categoryTabs.FilterActive() {
-			cmd, forward := m.handleKeyMsg(msg)
-			if !forward {
-				return cmd
-			}
-			cmds = append(cmds, cmd)
+		cmd, forward := m.handleKeyMsg(msg)
+		if !forward {
+			return cmd
 		}
+		cmds = append(cmds, cmd)
 	case table.RowDeleteActionMsg[*dbmodels.Command]:
 		return m.handleDeleteRows()
-	case pkgTabs.CategoryTabChangedMsg:
+	case pkgTabs.CategoryTabChangedMsg[
+		*dbmodels.Command,
+		dbmodels.CommandStatus,
+		string,
+	]:
 		return m.loadCommandsForCurrentCategory(-1)
 	}
 
@@ -290,11 +324,33 @@ func (m *commandsList) Update(msg tea.Msg) tea.Cmd {
 	return tea.Batch(cmds...)
 }
 
+func (m *commandsList) reloadCommandsAfterSort(
+	state *sort.State[*dbmodels.Command, string],
+	infoMsg *tui.InfoMsg,
+) tea.Cmd {
+	// Update the sort state in the active category tab
+	m.categoryTabs.SetActiveSortState(state)
+
+	// Reload the table with the new sort function
+	reload := m.loadCommandsForCurrentCategory(-1)
+
+	// If there's an info message, return it as well
+	if infoMsg != nil {
+		return tea.Batch(
+			reload,
+			func() tea.Msg {
+				return infoMsg
+			},
+		)
+	}
+	return reload
+}
+
 // loadCommandsForCurrentCategory loads commands for the current category
 func (m *commandsList) loadCommandsForCurrentCategory(selectRowID resource.ID) tea.Cmd {
 	return func() tea.Msg {
 		// Get status types from current category
-		statuses := m.categoryTabs.GetCommandTypes()
+		statuses := m.categoryTabs.GetActiveTabCommandTypes()
 
 		// Log the current category and statuses for debugging
 		slog.Debug("Loading commands for category",
@@ -321,6 +377,8 @@ func (m *commandsList) loadCommandsForCurrentCategory(selectRowID resource.ID) t
 
 		// Update category counts
 		m.updateCategoryCounts()
+
+		m.computeColumnsWidth(m.width)
 
 		// Log the number of loaded commands
 		slog.Debug("Loaded commands", "count", len(rows), "statuses", statuses)
@@ -362,22 +420,20 @@ func (m *commandsList) handleWindowSize(msg tea.WindowSizeMsg) tea.Cmd {
 
 	// Reserve space for category tabs (3 lines: tabs row, separator, filter status)
 	const categoryTabsHeight = 3
+	const filterHeight = 1
 
 	// Adjust table height to make room for category tabs
-	tableHeight := max(m.height-categoryTabsHeight, 1)
+	tableHeight := max(m.height-categoryTabsHeight-filterHeight, 1)
 
 	m.Model.SetHeight(tableHeight)
 
 	// Update columns for new width
-	m.Model.SetColumns(m.getColumns(m.width))
+	m.computeColumnsWidth(m.width)
 
 	return cmd
 }
 
 func (m *commandsList) handleFocus() tea.Cmd {
-	// Update columns for current width
-	m.Model.SetColumns(m.getColumns(m.width))
-
 	// When focused, load commands for the current category
 	return m.loadCommandsForCurrentCategory(-1)
 }
@@ -473,20 +529,34 @@ func (m *commandsList) deleteCommands(cmds []*dbmodels.Command) tea.Cmd {
 }
 
 func (m *commandsList) handleKeyMsg(msg tea.KeyMsg) (cmd tea.Cmd, forward bool) {
+	if m.categoryTabs.FilterActive() {
+		return nil, true
+	}
+	forward = true
+	activeSortState := m.categoryTabs.GetActiveSortState()
+	cmd, propagate := activeSortState.Update(msg)
+	if !propagate {
+		return cmd, false
+	}
+	var cmds []tea.Cmd
+	cmds = append(cmds, cmd)
+
 	customK := m.tableCustomActionKeyMap
-	if key.Matches(msg, *customK.ComposeCommand) && customK.ComposeCommand.Enabled() {
-		return m.handleComposeCommand(), false
+	switch {
+	case tui.CheckKey(msg, customK.ComposeCommand):
+		forward = false
+		cmds = append(cmds, m.handleComposeCommand())
+	case tui.CheckKey(msg, customK.RestoreCommand):
+		forward = false
+		cmds = append(cmds, m.handleRestoreCommand())
+	case tui.CheckKey(msg, customK.CopyToClipboard):
+		forward = false
+		cmds = append(cmds, m.handleCopyToClipboard())
+	case tui.CheckKey(msg, customK.SelectForShell):
+		forward = false
+		cmds = append(cmds, m.handleSelectForShell())
 	}
-	if key.Matches(msg, *customK.RestoreCommand) && customK.RestoreCommand.Enabled() {
-		return m.handleRestoreCommand(), false
-	}
-	if key.Matches(msg, *customK.CopyToClipboard) && customK.CopyToClipboard.Enabled() {
-		return m.handleCopyToClipboard(), false
-	}
-	if key.Matches(msg, *customK.SelectForShell) && customK.SelectForShell.Enabled() {
-		return m.handleSelectForShell(), false
-	}
-	return nil, true
+	return tea.Batch(cmds...), forward
 }
 
 func (m *commandsList) handleRestoreCommand() tea.Cmd {
@@ -534,10 +604,8 @@ func (m *commandsList) handleComposeCommand() tea.Cmd {
 	))
 	// change the category tab to "Available Commands" immediately
 	// so the user can see the new command right away
-	m.categoryTabs.Update(pkgTabs.ChangeCategoryTabMsg{
-		NewTab: tabs.AvailableCommands,
-		Filter: "",
-	})
+	// The sort state will be automatically loaded from the target category tab
+	m.categoryTabs.ChangeCategoryTab(tabs.AvailableCommands)
 	return tea.Batch(
 		func() tea.Msg {
 			return table.ReloadMsg[*dbmodels.Command]{
@@ -596,9 +664,18 @@ func (m *commandsList) View() string {
 		return "Waiting for proper window dimensions..."
 	}
 
-	// Render category tabs and table in a vertical layout
+	// Render category tabs
 	categoryTabsView := m.categoryTabs.View()
+
+	// Add a horizontal line as separator
+	separator := strings.Repeat("-", m.width)
+
+	// Display table view
 	tableView := m.Model.View()
 
-	return lipgloss.JoinVertical(lipgloss.Left, categoryTabsView, tableView)
+	return lipgloss.JoinVertical(lipgloss.Left,
+		categoryTabsView,
+		separator,
+		tableView,
+	)
 }
