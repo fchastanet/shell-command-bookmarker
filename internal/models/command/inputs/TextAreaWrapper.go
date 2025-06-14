@@ -12,10 +12,10 @@ import (
 
 // TextAreaWrapper wraps textarea.Model to implement the Input interface
 type TextAreaWrapper struct {
+	style TextAreaWrapperStyle
 	*textarea.Model
 	markdownRenderer *glamour.TermRenderer
 	readOnly         bool
-	style            TextAreaWrapperStyle
 }
 
 type TextAreaWrapperOption func(*TextAreaWrapper) error
