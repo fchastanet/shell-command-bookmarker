@@ -25,14 +25,14 @@ const (
 // CategoryAdapter helps translate between UI category types and service-level categories
 type CategoryAdapter struct {
 	historyService *services.HistoryService
-	sortStyles     sort.EditorSortStyles
+	sortStyles     sort.EditorSortStylesInterface
 	sortKeyMap     *sort.KeyMap
 }
 
 // NewCategoryAdapter creates a new adapter for category conversions
 func NewCategoryAdapter(
 	historyService *services.HistoryService,
-	sortStyles sort.EditorSortStyles,
+	sortStyles sort.EditorSortStylesInterface,
 	sortKeyMap *sort.KeyMap,
 ) *CategoryAdapter {
 	return &CategoryAdapter{

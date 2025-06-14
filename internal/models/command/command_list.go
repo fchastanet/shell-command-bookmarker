@@ -118,7 +118,7 @@ func (mm *ListMaker) Make(_ resource.ID, width, height int) (structure.ChildMode
 
 	cellRenderer := func(_ *dbmodels.Command, cellContent string, colIndex int, rowEdited bool) string {
 		if rowEdited && colIndex == indexColumnStatus {
-			cellContent = m.styles.TableStyle.CellEdited.Render("Edited")
+			cellContent = m.styles.TableStyle.GetTableCellEditedStyle().Render("Edited")
 		}
 		return cellContent
 	}
@@ -254,7 +254,7 @@ func (m *commandsList) computeColumnsWidth(width int) {
 	const columnsCount = 5
 	const roundedAdaptation = 1
 	w := width -
-		columnsCount*m.styles.TableStyle.Cell.GetHorizontalPadding()*sidesCount
+		columnsCount*m.styles.TableStyle.GetTableCellStyle().GetHorizontalPadding()*sidesCount
 	m.idColumn.Width = idColumnPercentWidth*w/percent + roundedAdaptation
 	m.titleColumn.Width = titleColumnPercentWidth*w/percent + roundedAdaptation
 	m.scriptColumn.Width = scriptColumnPercentWidth*w/percent + roundedAdaptation

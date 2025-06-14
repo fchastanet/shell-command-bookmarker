@@ -30,7 +30,7 @@ type Model[V resource.Identifiable] struct {
 	borderColor lipgloss.TerminalColor
 
 	previewKind        resource.Kind
-	styles             *Style
+	styles             StyleInterface
 	navigationKeyMap   *Navigation
 	actionKeyMap       *Action
 	rowRenderer        RowRenderer[V]
@@ -100,7 +100,7 @@ type BulkInsertMsg[T any] struct {
 // New creates a new model for the table widget.
 func New[V resource.Identifiable](
 	editorsCache EditorsCacheInterface,
-	tableStyles *Style,
+	tableStyles StyleInterface,
 	cols []Column,
 	rowRenderer RowRenderer[V],
 	cellRenderer DynamicCellRenderer[V],
@@ -236,7 +236,7 @@ func (m *Model[V]) setDimensions(width, height int) {
 
 // rowAreaHeight returns the height of the terminal allocated to rows.
 func (m *Model[V]) rowAreaHeight() int {
-	height := max(0, m.height-m.styles.HeaderHeight)
+	height := max(0, m.height-m.styles.GetTableHeaderHeight())
 
 	slog.Debug("table rowAreaHeight", "height", height)
 	return height
@@ -440,22 +440,25 @@ func (m *Model[V]) View() string {
 	//
 	// TODO: this allocation logic is wrong
 	components := make([]string, 0, 1+1+m.visibleRows())
-	style := lipgloss.NewStyle().
-		BorderStyle(lipgloss.NormalBorder()).
-		BorderForeground(lipgloss.Color("240")).
-		BorderBottom(true)
-	components = append(components, style.Render(m.headersView()))
+	components = append(
+		components,
+		m.styles.GetTableHeaderStyle().Render(m.headersView()),
+	)
 	// Generate scrollbar
 	scrollbar := tui.Scrollbar(
-		m.styles.ScrollbarStyle,
-		m.rowAreaHeight(), len(m.rows), m.visibleRows(), m.start)
+		m.styles.GetTableScrollbarStyle(),
+		m.rowAreaHeight(),
+		len(m.rows),
+		m.visibleRows(),
+		m.start,
+	)
 	// Get all the visible rows
 	rows := make([]string, 0, m.visibleRows())
 	for i := range m.visibleRows() {
 		rows = append(rows, m.renderRow(m.start+i))
 	}
 	rowArea := lipgloss.NewStyle().
-		Width(m.width - m.styles.ScrollbarStyle.Width).
+		Width(m.width - m.styles.GetTableScrollbarStyle().Width).
 		Render(strings.Join(rows, "\n"))
 	// Put rows alongside the scrollbar to the right.
 	components = append(components, lipgloss.JoinHorizontal(lipgloss.Top, rowArea, scrollbar))
@@ -794,12 +797,9 @@ func (m *Model[V]) headersView() string {
 	s := make([]string, len(m.cols))
 
 	for colIndex, col := range m.cols {
-		style := lipgloss.NewStyle().
+		style := m.styles.GetTableHeaderCellStyle().
 			Width(col.Width).
-			MaxWidth(col.Width).
-			Inline(true).
-			Bold(true).
-			Italic(true)
+			MaxWidth(col.Width)
 		if col.RightAlign {
 			style = style.AlignHorizontal(lipgloss.Right)
 		}
@@ -808,7 +808,7 @@ func (m *Model[V]) headersView() string {
 			cellContent = m.headerCellRenderer(cellContent, colIndex)
 		}
 		renderedCell := style.Render(TruncateRight(cellContent, col.Width, "…"))
-		s[colIndex] = m.styles.Cell.Render(renderedCell)
+		s[colIndex] = m.styles.GetTableCellStyle().Render(renderedCell)
 	}
 	return lipgloss.NewStyle().
 		MaxWidth(m.width).
@@ -840,7 +840,7 @@ func (m *Model[V]) renderCells(
 		inlined := style.Render(truncated)
 		// Apply block-styling to content
 		boxed := lipgloss.NewStyle().
-			PaddingRight(1 + m.styles.Cell.GetPaddingLeft()).
+			PaddingRight(1 + m.styles.GetTableCellStyle().GetPaddingLeft()).
 			Render(inlined)
 		styledCells[i] = boxed
 	}
@@ -858,15 +858,15 @@ func (m *Model[V]) renderRow(rowIdx int) string {
 		selected = true
 	}
 	current = rowIdx == m.currentRowIndex
-	rowStyle := *m.styles.Cell
+	rowStyle := *m.styles.GetTableCellStyle()
 
 	switch {
 	case current && selected:
-		rowStyle = *m.styles.CurrentAndSelectedRow
+		rowStyle = *m.styles.GetTableCurrentAndSelectedRowStyle()
 	case current:
-		rowStyle = *m.styles.CurrentRow
+		rowStyle = *m.styles.GetTableCurrentRowStyle()
 	case selected:
-		rowStyle = *m.styles.SelectedRow
+		rowStyle = *m.styles.GetTableSelectedRowStyle()
 	}
 
 	rowEdited := false
