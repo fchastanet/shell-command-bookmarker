@@ -126,12 +126,12 @@ type EditorStyle struct {
 	ContentPadding int
 }
 
-func (s *EditorStyle) GetInputWrapperWarningStyle() *lipgloss.Style {
+func (*EditorStyle) GetInputWrapperWarningStyle() *lipgloss.Style {
 	warningStyle := lipgloss.NewStyle().Foreground(colors.Yellow).Bold(true)
 	return &warningStyle
 }
 
-func (s *EditorStyle) GetTextAreaWrapperWarningStyle() *lipgloss.Style {
+func (*EditorStyle) GetTextAreaWrapperWarningStyle() *lipgloss.Style {
 	warningStyle := lipgloss.NewStyle().Foreground(colors.Yellow).Bold(true)
 	return &warningStyle
 }
@@ -180,7 +180,7 @@ type CategoryTabStyles struct {
 	tabCountStyle        *lipgloss.Style
 }
 
-func (s *Styles) getCategoryTabsStyles(primaryColor lipgloss.TerminalColor) tabs.CategoryTabStylesInterface {
+func (*Styles) getCategoryTabsStyles(primaryColor lipgloss.TerminalColor) tabs.CategoryTabStylesInterface {
 	activeTabStyle := lipgloss.NewStyle().
 		Foreground(lipgloss.Color("white")).
 		Background(primaryColor).

@@ -361,10 +361,7 @@ func (m *Model) handleKeyMsg(msg tea.KeyMsg) []tea.Cmd {
 		if cmd != nil {
 			return []tea.Cmd{cmd}
 		}
-		// If still normal mode, we let manageKey handle the key message.
-		if m.mode == structure.NormalMode {
-			return m.manageKey(msg)
-		}
+		return m.manageKey(msg)
 	}
 
 	return nil

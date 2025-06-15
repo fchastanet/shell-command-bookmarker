@@ -67,7 +67,7 @@ func New(
 	}
 }
 
-func (m *Model) Init() tea.Cmd {
+func (*Model) Init() tea.Cmd {
 	// No initialization needed for help component
 	return nil
 }

@@ -38,55 +38,55 @@ func (*Cache) Get(resource.ID) EditorInterface {
 
 type tableStyle struct{}
 
-func (t *tableStyle) GetTableBorderStyle() *lipgloss.Style {
+func (*tableStyle) GetTableBorderStyle() *lipgloss.Style {
 	return &lipgloss.Style{}
 }
 
-func (t *tableStyle) GetTableFiltersBlockStyle() *lipgloss.Style {
+func (*tableStyle) GetTableFiltersBlockStyle() *lipgloss.Style {
 	return &lipgloss.Style{}
 }
 
-func (t *tableStyle) GetTableCellStyle() *lipgloss.Style {
+func (*tableStyle) GetTableCellStyle() *lipgloss.Style {
 	return &lipgloss.Style{}
 }
 
-func (t *tableStyle) GetTableRowStyle() *lipgloss.Style {
+func (*tableStyle) GetTableRowStyle() *lipgloss.Style {
 	return &lipgloss.Style{}
 }
 
-func (t *tableStyle) GetTableCurrentRowStyle() *lipgloss.Style {
+func (*tableStyle) GetTableCurrentRowStyle() *lipgloss.Style {
 	return &lipgloss.Style{}
 }
 
-func (t *tableStyle) GetTableSelectedRowStyle() *lipgloss.Style {
+func (*tableStyle) GetTableSelectedRowStyle() *lipgloss.Style {
 	return &lipgloss.Style{}
 }
 
-func (t *tableStyle) GetTableCurrentAndSelectedRowStyle() *lipgloss.Style {
+func (*tableStyle) GetTableCurrentAndSelectedRowStyle() *lipgloss.Style {
 	return &lipgloss.Style{}
 }
 
-func (t *tableStyle) GetTableCellEditedStyle() *lipgloss.Style {
+func (*tableStyle) GetTableCellEditedStyle() *lipgloss.Style {
 	return &lipgloss.Style{}
 }
 
-func (t *tableStyle) GetTableScrollbarStyle() *tui.ScrollbarStyle {
+func (*tableStyle) GetTableScrollbarStyle() *tui.ScrollbarStyle {
 	return &tui.ScrollbarStyle{} //nolint:exhaustruct //test
 }
 
-func (t *tableStyle) GetTableHeaderHeight() int {
+func (*tableStyle) GetTableHeaderHeight() int {
 	return 0
 }
 
-func (t *tableStyle) GetTableFilterHeight() int {
+func (*tableStyle) GetTableFilterHeight() int {
 	return 0
 }
 
-func (t *tableStyle) GetTableHeaderStyle() *lipgloss.Style {
+func (*tableStyle) GetTableHeaderStyle() *lipgloss.Style {
 	return &lipgloss.Style{}
 }
 
-func (t *tableStyle) GetTableHeaderCellStyle() *lipgloss.Style {
+func (*tableStyle) GetTableHeaderCellStyle() *lipgloss.Style {
 	return &lipgloss.Style{}
 }
 

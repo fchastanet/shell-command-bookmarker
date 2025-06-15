@@ -56,7 +56,7 @@ func (mm *ListMaker) Make(_ resource.ID, width, height int) (structure.ChildMode
 	scriptColumn := newColumn(table.ColumnKey(structure.FieldScript), "Script", table.GetDefaultTruncationFunc())
 	statusColumn := newColumn(table.ColumnKey(structure.FieldStatus), "Status", table.GetDefaultTruncationFunc())
 	lintStatusColumn := newColumn(table.ColumnKey(structure.FieldLintStatus), "Lint", table.GetDefaultTruncationFunc())
-	filterScoreColumn := newColumn(table.ColumnKey(structure.FieldFilterScore), "Filter Score", table.NoTruncate)
+	filterScoreColumn := newColumn(table.ColumnKey(structure.FieldFilterScore), "Score", table.NoTruncate)
 
 	// set filter
 	filter := filters.NewInput()

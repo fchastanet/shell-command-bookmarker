@@ -111,6 +111,10 @@ func (s *LoggerService) safeDump(v any) {
 		return
 	}
 
+	if s.dumpFileHandler == nil {
+		slog.Warn("Dump file handler is not initialized, skipping dump")
+		return
+	}
 	// Now safely use spew.Dump
 	spew.Fdump(s.dumpFileHandler, v)
 }

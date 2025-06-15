@@ -62,13 +62,19 @@ func (ca *CategoryAdapter) GetCategoryTabs(
 
 	// Create a function that returns a new sort state for each tab
 	createNewSortState := func() *sort.State[*dbmodels.Command, string] {
-		return sort.NewDefaultState(
+		sortState := sort.NewDefaultState(
 			ca.sortStyles,
-			structure.FieldID,
+			structure.FieldFilterScore,
 			sortFields,
 			ca.sortKeyMap,
 			compareBySortFieldFunc,
 		)
+		sortState.PrimarySort.Direction = sort.DirectionDesc
+		sortState.SecondarySort = &sort.Option[structure.Field]{
+			Field:     structure.FieldID,
+			Direction: sort.DirectionAsc,
+		}
+		return sortState
 	}
 
 	return []pkgTabs.CategoryTab[

@@ -11,5 +11,5 @@ const (
 	FieldLintStatus       Field = "Lint Status"
 	FieldCreationDate     Field = "Creation Date"
 	FieldModificationDate Field = "Modification Date"
-	FieldFilterScore      Field = "Filter Score"
+	FieldFilterScore      Field = "Score"
 )

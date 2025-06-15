@@ -731,12 +731,16 @@ func (m *Model[V]) GotoID(id resource.ID) tea.Cmd {
 		}
 	}
 	m.setStart()
-	item := m.items[m.currentRowID]
-
-	return tui.CmdHandler(RowSelectedActionMsg[V]{
-		Row:   item,
-		RowID: item.GetID(),
-	})
+	// If items is a map with IDs as keys
+	if item, exists := m.items[m.currentRowID]; exists {
+		return tui.CmdHandler(RowSelectedActionMsg[V]{
+			Row:   item,
+			RowID: item.GetID(),
+		})
+	}
+	// The item doesn't exist in the map
+	slog.Warn("Attempted to access non-existent item", "itemId", m.currentRowID)
+	return nil
 }
 
 // GotoTop makes the top row the current row.
