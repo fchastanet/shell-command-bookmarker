@@ -37,6 +37,7 @@ type Model struct {
 	currentSortState        *sort.State[*dbmodels.Command, string]
 	bindingSets             []BindingSet
 	width                   int
+	height                  int
 	mode                    structure.Mode
 	focusedPane             structure.Position
 	showHelp                bool
@@ -51,6 +52,7 @@ func New(
 ) Model {
 	return Model{
 		width:                   0,
+		height:                  0,
 		styles:                  myStyles,
 		showHelp:                false,
 		bindingSets:             []BindingSet{},
@@ -75,27 +77,26 @@ func (m *Model) Update(msg tea.Msg) tea.Cmd {
 	switch msg := msg.(type) {
 	case structure.ChangeModeMsg:
 		m.mode = msg.NewMode
-		m.updateHelpBindings()
+		return m.updateHelpBindings()
 	case tea.WindowSizeMsg:
-		m.updateHelpBindings()
 		return m.handleWindowSize(msg)
 	case structure.FocusedPaneChangedMsg:
 		m.focusedPane = msg.To
-		m.updateHelpBindings()
+		return m.updateHelpBindings()
 	case tui.YesNoPromptMsg:
-		m.updateHelpBindings()
+		return m.updateHelpBindings()
 	case table.RowSelectedActionMsg[*dbmodels.Command]:
-		m.handleSelectedCommand(msg)
+		return m.handleSelectedCommand(msg)
 	case sort.Msg[*dbmodels.Command, string]:
 		m.currentSortState = msg.State
-		m.updateHelpBindings()
+		return m.updateHelpBindings()
 	case sort.MsgSortEditModeChanged[*dbmodels.Command, string]:
 		m.currentSortState = msg.State
-		m.updateHelpBindings()
+		return m.updateHelpBindings()
 	case tea.KeyMsg:
 		if tui.CheckKey(msg, m.keyMaps.Global.Help) {
 			m.showHelp = !m.showHelp
-			return nil
+			return m.updateHelpBindings()
 		}
 	}
 
@@ -109,49 +110,70 @@ func (m *Model) handleWindowSize(msg tea.WindowSizeMsg) tea.Cmd {
 	return nil
 }
 
-func (m *Model) handleSelectedCommand(msg table.RowSelectedActionMsg[*dbmodels.Command]) {
+func (m *Model) handleSelectedCommand(
+	msg table.RowSelectedActionMsg[*dbmodels.Command],
+) tea.Cmd {
 	m.selectedCommand = msg.Row
-	m.updateHelpBindings()
+	return m.updateHelpBindings()
 }
 
-// updateHelpBindings updates the key bindings displayed in help based on current mode
-func (m *Model) updateHelpBindings() {
+// updateHelpBindings updates the key bindings displayed in help
+// based on current mode
+func (m *Model) updateHelpBindings() tea.Cmd {
 	// Clear previous binding sets
 	m.clearBindingSets()
-	switch m.mode {
-	case structure.PromptMode:
-		// For prompt mode, just use a single set
-		m.AddBindingSet("Prompt Controls", keys.GetFormBindings())
-	case structure.NormalMode:
-		// For normal mode, organize bindings into logical groups
-		if m.currentSortState != nil {
-			sort.UpdateBindings(m.currentSortState.KeyMap, m.currentSortState)
-		}
-		if m.currentSortState != nil && m.currentSortState.IsEditActive {
+	m.updateHelpBindingsPromptMode()
+	m.updateHelpBindingsNormalMode()
+	return m.updateHelpHeight()
+}
+
+func (m *Model) updateHelpHeight() tea.Cmd {
+	oldHeight := m.height
+	m.height = m.maxBindingHeight()
+	if oldHeight != m.height {
+		return tui.GetResizeCmd(m, m.width, m.height)
+	}
+	return nil
+}
+
+func (m *Model) updateHelpBindingsPromptMode() {
+	if m.mode != structure.PromptMode {
+		return
+	}
+	// For prompt mode, just use a single set
+	m.AddBindingSet("Prompt Controls", keys.GetFormBindings())
+}
+
+func (m *Model) updateHelpBindingsNormalMode() {
+	if m.mode != structure.NormalMode {
+		return
+	}
+	// For normal mode, organize bindings into logical groups
+	if m.currentSortState != nil {
+		sort.UpdateBindings(m.currentSortState.KeyMap, m.currentSortState)
+		if m.currentSortState.IsEditActive {
 			m.AddBindingSet("Sort Controls", keys.KeyMapToSlice(*m.currentSortState.KeyMap))
 		}
-		m.AddBindingSet("Global", keys.KeyMapToSlice(*m.keyMaps.Global))
-		m.AddBindingSet("Pane Navigation", m.paneManagerHelpBindings.HelpBindings())
-		if m.focusedPane == structure.TopPane &&
-			m.currentSortState != nil &&
-			!m.currentSortState.IsEditActive {
-			m.AddBindingSet("Filter Controls", keys.KeyMapToSlice(*m.keyMaps.Filter))
-			m.AddBindingSet("Table Nav", keys.KeyMapToSlice(*m.keyMaps.TableNavigation))
-			keys.UpdateBindings(
-				m.keyMaps.TableAction,
-				m.keyMaps.TableCustomAction,
-				m.appService.IsShellSelectionMode(),
-				m.selectedCommand,
-			)
+	}
+	m.AddBindingSet("Global", keys.KeyMapToSlice(*m.keyMaps.Global))
+	m.AddBindingSet("Pane Navigation", m.paneManagerHelpBindings.HelpBindings())
+	if m.focusedPane == structure.TopPane &&
+		m.currentSortState != nil &&
+		!m.currentSortState.IsEditActive {
+		m.AddBindingSet("Filter Controls", keys.KeyMapToSlice(*m.keyMaps.Filter))
+		m.AddBindingSet("Table Nav", keys.KeyMapToSlice(*m.keyMaps.TableNavigation))
+		keys.UpdateBindings(
+			m.keyMaps.TableAction,
+			m.keyMaps.TableCustomAction,
+			m.appService.IsShellSelectionMode(),
+			m.selectedCommand,
+		)
 
-			tableCustomActions := keys.KeyMapToSlice(*m.keyMaps.TableCustomAction)
-			if !m.currentSortState.IsEditActive {
-				tableCustomActions = append(tableCustomActions, m.currentSortState.KeyMap.Sort)
-			}
+		tableCustomActions := keys.KeyMapToSlice(*m.keyMaps.TableCustomAction)
+		tableCustomActions = append(tableCustomActions, m.currentSortState.KeyMap.Sort)
 
-			m.AddBindingSet("Table Actions", keys.KeyMapToSlice(*m.keyMaps.TableAction))
-			m.AddBindingSet("Command Actions", tableCustomActions)
-		}
+		m.AddBindingSet("Table Actions", keys.KeyMapToSlice(*m.keyMaps.TableAction))
+		m.AddBindingSet("Command Actions", tableCustomActions)
 	}
 }
 

@@ -166,18 +166,22 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	if cmd, cmdHandled := m.handleCommandMsg(msg); cmdHandled {
 		return m, cmd
 	}
+	var cmds []tea.Cmd
 
-	m.helpModel.Update(msg)
+	cmds = append(cmds, m.helpModel.Update(msg))
+	cmds = append(cmds, m.dispatchMessage(msg)...)
 
-	cmd := m.dispatchMessage(msg)
-	return m, cmd
+	return m, tea.Batch(cmds...)
 }
 
 //nolint:cyclop // not really complex
 func (m *Model) handleCommandMsg(msg tea.Msg) (tea.Cmd, bool) {
+	var cmds []tea.Cmd
 	switch msg := msg.(type) {
 	case structure.ChangeModeMsg:
-		m.sendWindowSizeMsg()
+		cmds = append(cmds, m.sendWindowSizeMsg()...)
+	case tui.ResizeMsg[*help.Model]:
+		cmds = append(cmds, m.sendWindowSizeMsg()...)
 	case QuitClearScreenMsg:
 		return m.handleQuitClearScreenMsg(), true
 	case spinner.TickMsg:
@@ -197,10 +201,10 @@ func (m *Model) handleCommandMsg(msg tea.Msg) (tea.Cmd, bool) {
 	case structure.CommandSelectedForShellMsg:
 		return m.handleCommandSelectedForShellMsg(msg), true
 	}
-	return nil, false
+	return tea.Batch(cmds...), false
 }
 
-func (m *Model) dispatchMessage(msg tea.Msg) tea.Cmd {
+func (m *Model) dispatchMessage(msg tea.Msg) []tea.Cmd {
 	if m.prompt != nil && m.mode == structure.PromptMode {
 		return m.handlePromptMode(msg)
 	}
@@ -209,7 +213,7 @@ func (m *Model) dispatchMessage(msg tea.Msg) tea.Cmd {
 		return m.handleKeyMsg(keyMsg)
 	}
 
-	return m.PaneManager.Update(msg)
+	return []tea.Cmd{m.PaneManager.Update(msg)}
 }
 
 func (m *Model) handleQuitClearScreenMsg() tea.Cmd {
@@ -217,7 +221,7 @@ func (m *Model) handleQuitClearScreenMsg() tea.Cmd {
 	return tea.Quit
 }
 
-func (m *Model) handlePromptMode(msg tea.Msg) tea.Cmd {
+func (m *Model) handlePromptMode(msg tea.Msg) []tea.Cmd {
 	gKeys := m.keyMaps.Global
 	if keyMsg, ok := msg.(tea.KeyMsg); ok {
 		if tui.CheckKey(keyMsg, gKeys.Help) {
@@ -240,7 +244,7 @@ func (m *Model) handlePromptMode(msg tea.Msg) tea.Cmd {
 		)
 	}
 
-	return tea.Batch(cmds...)
+	return cmds
 }
 
 func (m *Model) handleCommandSelectedForShellMsg(msg structure.CommandSelectedForShellMsg) tea.Cmd {
@@ -255,10 +259,9 @@ func (m *Model) handleCommandSelectedForShellMsg(msg structure.CommandSelectedFo
 
 // handleFocusPaneChangedMsg handles the pane focus change message
 func (m *Model) handleFocusPaneChangedMsg(msg tea.Msg) tea.Cmd {
-	return tea.Batch(
-		m.sendWindowSizeMsg(),
-		m.PaneManager.Update(msg),
-	)
+	cmds := m.sendWindowSizeMsg()
+	cmds = append(cmds, m.PaneManager.Update(msg))
+	return tea.Batch(cmds...)
 }
 
 // handlePerformanceMessages handles performance monitoring related messages
@@ -330,7 +333,8 @@ func scheduleClearMessage(d time.Duration) tea.Cmd {
 func (m *Model) handleWindowSize(msg tea.WindowSizeMsg) tea.Cmd {
 	m.width = msg.Width
 	m.height = msg.Height
-	return m.sendWindowSizeMsg()
+	cmds := m.sendWindowSizeMsg()
+	return tea.Batch(cmds...)
 }
 
 // handleBlink processes cursor blink messages
@@ -348,14 +352,14 @@ func (m *Model) handleMemoryStats(msg tui.MemoryStatsMsg) tea.Cmd {
 }
 
 // handleKeyMsg processes key messages
-func (m *Model) handleKeyMsg(msg tea.KeyMsg) tea.Cmd {
+func (m *Model) handleKeyMsg(msg tea.KeyMsg) []tea.Cmd {
 	switch m.mode {
 	case structure.PromptMode:
 		// already handled in Update method above
 	case structure.NormalMode:
 		cmd := m.PaneManager.Update(msg)
 		if cmd != nil {
-			return cmd
+			return []tea.Cmd{cmd}
 		}
 		// If still normal mode, we let manageKey handle the key message.
 		if m.mode == structure.NormalMode {
@@ -378,13 +382,13 @@ func (m *Model) handleYesNoPrompt(promptMsg tui.YesNoPromptMsg) tea.Cmd {
 				NewMode: m.mode,
 			}
 		},
-		m.sendWindowSizeMsg(),
 	)
+	cmds = append(cmds, m.sendWindowSizeMsg()...)
 
 	return tea.Batch(cmds...)
 }
 
-func (m *Model) sendWindowSizeMsg() tea.Cmd {
+func (m *Model) sendWindowSizeMsg() []tea.Cmd {
 	// Send out message to panes to resize themselves to make room for the prompt above it.
 	windowSizeMsg := tea.WindowSizeMsg{
 		Height: m.viewHeight(),
@@ -398,24 +402,24 @@ func (m *Model) sendWindowSizeMsg() tea.Cmd {
 		cmds = append(cmds, m.prompt.Update(windowSizeMsg))
 	}
 	cmds = append(cmds, m.PaneManager.Update(windowSizeMsg))
-	return tea.Batch(cmds...)
+	return cmds
 }
 
-func (m *Model) manageKey(msg tea.KeyMsg) tea.Cmd {
+func (m *Model) manageKey(msg tea.KeyMsg) []tea.Cmd {
 	globalKeys := m.keyMaps.Global
 	switch {
 	case tui.CheckKey(msg, globalKeys.Quit):
-		return m.handleQuit()
+		return []tea.Cmd{m.handleQuit()}
 	case tui.CheckKey(msg, globalKeys.Help):
 		return m.displayHelp()
 	case tui.CheckKey(msg, globalKeys.Debug):
 		// ctrl+d shows memory stats for debugging performance
 		if m.perfMonitorActive {
-			return tui.StopPerformanceMonitor()
+			return []tea.Cmd{tui.StopPerformanceMonitor()}
 		}
-		return tui.StartPerformanceMonitor(performanceMonitorInterval)
+		return []tea.Cmd{tui.StartPerformanceMonitor(performanceMonitorInterval)}
 	case tui.CheckKey(msg, globalKeys.Search):
-		return models.NavigateTo(structure.SearchKind, structure.WithPosition(structure.LeftPane))
+		return []tea.Cmd{models.NavigateTo(structure.SearchKind, structure.WithPosition(structure.LeftPane))}
 	default:
 	}
 	return nil
@@ -442,7 +446,7 @@ func (m *Model) handleQuit() tea.Cmd {
 	)
 }
 
-func (m *Model) displayHelp() tea.Cmd {
+func (m *Model) displayHelp() []tea.Cmd {
 	// Help widget takes up space so update panes' dimensions
 	slog.Debug("handleHelpToggle", "viewHeight", m.viewHeight())
 	return m.sendWindowSizeMsg()
