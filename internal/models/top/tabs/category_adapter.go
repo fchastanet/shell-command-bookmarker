@@ -57,6 +57,7 @@ func (ca *CategoryAdapter) GetCategoryTabs(
 		structure.FieldLintStatus,
 		structure.FieldCreationDate,
 		structure.FieldModificationDate,
+		structure.FieldFilterScore,
 	}
 
 	// Create a function that returns a new sort state for each tab
