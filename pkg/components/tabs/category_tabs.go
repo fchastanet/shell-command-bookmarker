@@ -86,6 +86,16 @@ type CategoryTabChangedMsg[
 	NewTab *CategoryTab[ElementType, CommandStatus, FieldType]
 }
 
+type FilterModeMsg struct {
+	Active bool // Indicates if the filter mode is active
+}
+
+func getFilterModeCmd(active bool) tea.Cmd {
+	return func() tea.Msg {
+		return FilterModeMsg{Active: active}
+	}
+}
+
 // ErrCategoryTabNotFound is returned when no commands are selected for an operation
 type ErrCategoryTabNotFound struct {
 	tab category.Type
@@ -149,7 +159,7 @@ func (ct *CategoryTabs[ElementType, CommandStatus, FieldType]) Init() tea.Cmd {
 }
 
 // Update handles messages and events
-func (ct *CategoryTabs[ElementType, CommandStatus, FieldType]) Update(msg tea.Msg) tea.Cmd {
+func (ct *CategoryTabs[ElementType, CommandStatus, FieldType]) Update(msg tea.Msg) (cmd tea.Cmd, forward bool) {
 	var cmds []tea.Cmd
 
 	switch msg := msg.(type) {
@@ -158,13 +168,16 @@ func (ct *CategoryTabs[ElementType, CommandStatus, FieldType]) Update(msg tea.Ms
 		ct.inputModel.SetWidth(msg.Width / halfWidth) // Half the width for the filter
 	case tea.KeyMsg:
 		if !ct.focused {
-			break
+			return nil, false // Ignore key messages if not focused
 		}
-		return ct.handleKeyMsg(msg)
+		cmd := ct.handleKeyMsg(msg)
+		return cmd, cmd == nil
 	case tea.FocusMsg:
 		ct.focused = true
+		cmds = append(cmds, getFilterModeCmd(true))
 	case tea.BlurMsg:
 		ct.focused = false
+		cmds = append(cmds, getFilterModeCmd(false))
 	case table.BulkInsertMsg[ElementType]:
 		ct.filteredCount = len(msg.Items)
 	}
@@ -172,7 +185,7 @@ func (ct *CategoryTabs[ElementType, CommandStatus, FieldType]) Update(msg tea.Ms
 	// Update filter model
 	cmds = append(cmds, ct.inputModel.Update(msg))
 
-	return tea.Batch(cmds...)
+	return tea.Batch(cmds...), true
 }
 
 func (ct *CategoryTabs[ElementType, CommandStatus, FieldType]) ChangeCategoryTab(
@@ -204,9 +217,11 @@ func (ct *CategoryTabs[ElementType, CommandStatus, FieldType]) handleKeyMsg(keyM
 	keys := ct.filterKeyMap
 	switch {
 	case tui.CheckKey(keyMsg, keys.Filter):
+		var cmd tea.Cmd
 		if !ct.inputModel.Focused() {
-			return ct.inputModel.Focus()
+			cmd = ct.inputModel.Focus()
 		}
+		return tea.Batch(cmd, getFilterModeCmd(true))
 	case tui.CheckKey(keyMsg, keys.PreviousTab):
 		// Switch to the previous category tab
 		return ct.prevCategory()
@@ -216,12 +231,19 @@ func (ct *CategoryTabs[ElementType, CommandStatus, FieldType]) handleKeyMsg(keyM
 	case tui.CheckKey(keyMsg, keys.Validate):
 		if ct.inputModel.Focused() {
 			ct.inputModel.Blur()
-			return ct.handleValidate()
+			return tea.Batch(
+				getFilterModeCmd(false),
+				ct.handleValidate(),
+			)
 		}
 	case tui.CheckKey(keyMsg, keys.Close):
 		if ct.inputModel.Focused() {
 			ct.inputModel.Blur()
-			return tui.GetDummyCmd()
+			ct.inputModel.SetFilterValue("") // Clear the filter value
+			return tea.Batch(
+				getFilterModeCmd(false),
+				ct.handleValidate(),
+			)
 		}
 	}
 
@@ -361,9 +383,10 @@ func (ct *CategoryTabs[ElementType, CommandStatus, FieldType]) Focus() tea.Cmd {
 }
 
 // Blur removes focus from the component
-func (ct *CategoryTabs[ElementType, CommandStatus, FieldType]) Blur() {
+func (ct *CategoryTabs[ElementType, CommandStatus, FieldType]) Blur() tea.Cmd {
 	ct.focused = false
 	ct.inputModel.Blur()
+	return getFilterModeCmd(false)
 }
 
 // View renders the component

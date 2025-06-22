@@ -302,7 +302,6 @@ func (m *commandsList) Init() tea.Cmd {
 //nolint:cyclop // not really complex
 func (m *commandsList) Update(msg tea.Msg) tea.Cmd {
 	var cmds []tea.Cmd
-	keyMsg := false
 
 	switch msg := msg.(type) {
 	case sort.MsgSortEditModeChanged[*dbmodels.Command, string]:
@@ -315,12 +314,11 @@ func (m *commandsList) Update(msg tea.Msg) tea.Cmd {
 		return m.handleWindowSize(msg)
 	case tea.BlurMsg:
 		m.Model.Blur()
-		m.categoryTabs.Blur()
+		cmds = append(cmds, m.categoryTabs.Blur())
 	case tea.FocusMsg:
 		m.categoryTabs.Focus()
 		return m.handleFocus()
 	case tea.KeyMsg:
-		keyMsg = true
 		cmd, forward := m.handleKeyMsg(msg)
 		if !forward {
 			return cmd
@@ -337,9 +335,9 @@ func (m *commandsList) Update(msg tea.Msg) tea.Cmd {
 	}
 
 	// First update category tabs
-	catCmd := m.categoryTabs.Update(msg)
+	catCmd, forward := m.categoryTabs.Update(msg)
 	cmds = append(cmds, catCmd)
-	if keyMsg && catCmd != nil {
+	if !forward {
 		return tea.Batch(cmds...)
 	}
 	// Then update table model
@@ -442,7 +440,10 @@ func (m *commandsList) handleWindowSize(msg tea.WindowSizeMsg) tea.Cmd {
 	slog.Debug("handleWindowSize command_list", "height", m.height)
 
 	// Update category tabs with new size
-	cmd := m.categoryTabs.Update(msg)
+	cmd, forward := m.categoryTabs.Update(msg)
+	if !forward {
+		return cmd
+	}
 
 	// Reserve space for category tabs (3 lines: tabs row, separator, filter status)
 	const categoryTabsHeight = 3
