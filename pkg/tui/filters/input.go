@@ -58,6 +58,7 @@ func (f *Input) GetFilterValue() string {
 // SetFilterValue sets the filter value
 func (f *Input) SetFilterValue(value string) {
 	f.textinput.SetValue(value)
+	f.textinput.CursorEnd()
 	f.active = value != ""
 }
 
