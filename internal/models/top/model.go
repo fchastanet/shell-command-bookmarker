@@ -166,9 +166,14 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	if cmd, cmdHandled := m.handleCommandMsg(msg); cmdHandled {
 		return m, cmd
 	}
-	var cmds []tea.Cmd
 
-	cmds = append(cmds, m.helpModel.Update(msg))
+	cmd, forward := m.helpModel.Update(msg)
+	if !forward {
+		// If the help model handled the message, we don't need to dispatch it further
+		return m, cmd
+	}
+	var cmds []tea.Cmd
+	cmds = append(cmds, cmd)
 	cmds = append(cmds, m.dispatchMessage(msg)...)
 
 	return m, tea.Batch(cmds...)
@@ -394,7 +399,8 @@ func (m *Model) sendWindowSizeMsg() []tea.Cmd {
 	m.footerModel.SetWidth(m.width)
 	m.headerModel.SetWidth(m.width) // Set the header width
 	var cmds []tea.Cmd
-	cmds = append(cmds, m.helpModel.Update(windowSizeMsg))
+	helpCmd, _ := m.helpModel.Update(windowSizeMsg)
+	cmds = append(cmds, helpCmd)
 	if m.prompt != nil {
 		cmds = append(cmds, m.prompt.Update(windowSizeMsg))
 	}
@@ -407,8 +413,6 @@ func (m *Model) manageKey(msg tea.KeyMsg) []tea.Cmd {
 	switch {
 	case tui.CheckKey(msg, globalKeys.Quit):
 		return []tea.Cmd{m.handleQuit()}
-	case tui.CheckKey(msg, globalKeys.Help):
-		return m.displayHelp()
 	case tui.CheckKey(msg, globalKeys.Debug):
 		// ctrl+d shows memory stats for debugging performance
 		if m.perfMonitorActive {

@@ -11,6 +11,7 @@ import (
 	"github.com/fchastanet/shell-command-bookmarker/internal/models/styles"
 	"github.com/fchastanet/shell-command-bookmarker/internal/services"
 	dbmodels "github.com/fchastanet/shell-command-bookmarker/internal/services/models"
+	"github.com/fchastanet/shell-command-bookmarker/pkg/components/tabs"
 	"github.com/fchastanet/shell-command-bookmarker/pkg/sort"
 	"github.com/fchastanet/shell-command-bookmarker/pkg/tui"
 	"github.com/fchastanet/shell-command-bookmarker/pkg/tui/table"
@@ -41,6 +42,7 @@ type Model struct {
 	mode                    structure.Mode
 	focusedPane             structure.Position
 	showHelp                bool
+	filterEditActive        bool
 }
 
 // New creates a new help component
@@ -64,6 +66,7 @@ func New(
 		appService:              appService,
 		focusedPane:             structure.TopPane,
 		mode:                    structure.NormalMode,
+		filterEditActive:        false,
 	}
 }
 
@@ -73,41 +76,64 @@ func (*Model) Init() tea.Cmd {
 }
 
 // Update processes messages for the help component
-func (m *Model) Update(msg tea.Msg) tea.Cmd {
+func (m *Model) Update(msg tea.Msg) (cmd tea.Cmd, forward bool) {
 	switch msg := msg.(type) {
+	case tabs.FilterModeMsg:
+		return m.handleFilterMode(msg), true
 	case structure.ChangeModeMsg:
-		m.mode = msg.NewMode
-		return m.updateHelpBindings()
+		return m.handleChangeMode(msg), true
 	case tea.WindowSizeMsg:
-		return m.handleWindowSize(msg)
+		m.width = msg.Width
+		return nil, true
 	case structure.FocusedPaneChangedMsg:
-		m.focusedPane = msg.To
-		return m.updateHelpBindings()
+		return m.handleFocusedPaneChanged(msg), true
 	case tui.YesNoPromptMsg:
-		return m.updateHelpBindings()
+		return m.updateHelpBindings(), true
 	case table.RowSelectedActionMsg[*dbmodels.Command]:
-		return m.handleSelectedCommand(msg)
+		return m.handleSelectedCommand(msg), true
 	case sort.Msg[*dbmodels.Command, string]:
-		m.currentSortState = msg.State
-		return m.updateHelpBindings()
+		return m.handleSortState(msg), true
 	case sort.MsgSortEditModeChanged[*dbmodels.Command, string]:
-		m.currentSortState = msg.State
-		return m.updateHelpBindings()
+		return m.handleSortEditChange(msg), true
 	case tea.KeyMsg:
-		if tui.CheckKey(msg, m.keyMaps.Global.Help) {
-			m.showHelp = !m.showHelp
-			return m.updateHelpBindings()
-		}
+		return m.handleKey(msg)
 	}
 
 	// No updates needed for help component
-	return nil
+	return nil, true
 }
 
-// handleWindowSize processes window size messages
-func (m *Model) handleWindowSize(msg tea.WindowSizeMsg) tea.Cmd {
-	m.width = msg.Width
-	return nil
+func (m *Model) handleKey(msg tea.KeyMsg) (tea.Cmd, bool) {
+	if !m.filterEditActive && tui.CheckKey(msg, m.keyMaps.Global.Help) {
+		m.showHelp = !m.showHelp
+		return m.updateHelpBindings(), false
+	}
+	return nil, true
+}
+
+func (m *Model) handleSortEditChange(msg sort.MsgSortEditModeChanged[*dbmodels.Command, string]) tea.Cmd {
+	m.currentSortState = msg.State
+	return m.updateHelpBindings()
+}
+
+func (m *Model) handleSortState(msg sort.Msg[*dbmodels.Command, string]) tea.Cmd {
+	m.currentSortState = msg.State
+	return m.updateHelpBindings()
+}
+
+func (m *Model) handleFocusedPaneChanged(msg structure.FocusedPaneChangedMsg) tea.Cmd {
+	m.focusedPane = msg.To
+	return m.updateHelpBindings()
+}
+
+func (m *Model) handleChangeMode(msg structure.ChangeModeMsg) tea.Cmd {
+	m.mode = msg.NewMode
+	return m.updateHelpBindings()
+}
+
+func (m *Model) handleFilterMode(msg tabs.FilterModeMsg) tea.Cmd {
+	m.filterEditActive = msg.Active
+	return m.updateHelpBindings()
 }
 
 func (m *Model) handleSelectedCommand(
@@ -128,12 +154,8 @@ func (m *Model) updateHelpBindings() tea.Cmd {
 }
 
 func (m *Model) updateHelpHeight() tea.Cmd {
-	oldHeight := m.height
 	m.height = m.maxBindingHeight()
-	if oldHeight != m.height {
-		return tui.GetResizeCmd(m, m.width, m.height)
-	}
-	return nil
+	return tui.GetResizeCmd(m, m.width, m.height)
 }
 
 func (m *Model) updateHelpBindingsPromptMode() {
@@ -160,7 +182,17 @@ func (m *Model) updateHelpBindingsNormalMode() {
 	if m.focusedPane == structure.TopPane &&
 		m.currentSortState != nil &&
 		!m.currentSortState.IsEditActive {
+		tableCustomActions := keys.KeyMapToSlice(*m.keyMaps.TableCustomAction)
+
+		m.keyMaps.Filter.Filter.SetEnabled(!m.filterEditActive)
+		m.keyMaps.Filter.Validate.SetEnabled(m.filterEditActive)
+		m.keyMaps.Filter.Close.SetEnabled(m.filterEditActive)
 		m.AddBindingSet("Filter Controls", keys.KeyMapToSlice(*m.keyMaps.Filter))
+		if m.filterEditActive {
+			return
+		}
+		tableCustomActions = append(tableCustomActions, m.keyMaps.Filter.Filter)
+
 		m.AddBindingSet("Table Nav", keys.KeyMapToSlice(*m.keyMaps.TableNavigation))
 		keys.UpdateBindings(
 			m.keyMaps.TableAction,
@@ -169,7 +201,6 @@ func (m *Model) updateHelpBindingsNormalMode() {
 			m.selectedCommand,
 		)
 
-		tableCustomActions := keys.KeyMapToSlice(*m.keyMaps.TableCustomAction)
 		tableCustomActions = append(tableCustomActions, m.currentSortState.KeyMap.Sort)
 
 		m.AddBindingSet("Table Actions", keys.KeyMapToSlice(*m.keyMaps.TableAction))
