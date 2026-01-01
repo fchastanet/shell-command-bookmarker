@@ -20,7 +20,7 @@ repos:
 
   - repo: https://github.com/executablebooks/mdformat
     # Do this before other tools "fixing" the line endings
-    rev: 0.7.22
+    rev: 1.0.0
     hooks:
       - id: mdformat
         name: Format Markdown
@@ -41,7 +41,7 @@ repos:
           )
 
   - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v5.0.0
+    rev: v6.0.0
     hooks:
       - id: mixed-line-ending
       - id: end-of-file-fixer
@@ -78,7 +78,7 @@ repos:
           )
 
   - repo: https://github.com/rhysd/actionlint
-    rev: v1.7.7
+    rev: v1.7.10
     hooks:
       - id: actionlint
         stages: [pre-commit, pre-push, manual]
@@ -141,19 +141,19 @@ repos:
           )
 
   - repo: https://github.com/streetsidesoftware/cspell-cli
-    rev: v9.0.1
+    rev: v9.4.0
     hooks:
       - id: cspell
         stages: [pre-push, manual]
 
   - repo: https://github.com/golangci/golangci-lint
-    rev: v2.2.1
+    rev: v2.7.2
     hooks:
       - id: golangci-lint-config-verify
       - id: golangci-lint-full
 
   - repo: https://github.com/tekwizely/pre-commit-golang
-    rev: v1.0.0-rc.1
+    rev: v1.0.0-rc.4
     hooks:
       - id: go-build-repo-mod
       - id: go-mod-tidy-repo
@@ -198,7 +198,7 @@ repos:
         always_run: true
 
   - repo: https://github.com/fchastanet/bash-tools-framework
-    rev: 6.2.2
+    rev: 6.2.4
     hooks:
       - id: awkLint
       - id: shellcheckLint
